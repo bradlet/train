@@ -18,9 +18,9 @@ struct CoachChatView: View {
     @Environment(\.coachChat) private var store
     @Environment(\.coachSpeech) private var speech
 
-    /// Whether the chat begins dictating as soon as it appears. Set by the
-    /// Home tab's mic button — the voice-first entry point.
-    let startsWithVoice: Bool
+    /// How the conversation was entered: the Home card, the Home mic button
+    /// (dictation armed), or the widget / Siri (hands-free, auto-sending).
+    let entry: CoachChatEntry
     /// Builds the training snapshot. Called at most once per conversation.
     let buildContext: () -> CoachingRequest
     /// Called when the athlete accepts a workout proposal.
@@ -33,14 +33,14 @@ struct CoachChatView: View {
     let onAcceptStrengthExerciseUpdate: (StrengthExerciseUpdateProposal, UUID) -> Void
 
     init(
-        startsWithVoice: Bool = false,
+        entry: CoachChatEntry = .standard,
         buildContext: @escaping () -> CoachingRequest,
         onAcceptWorkout: @escaping (WorkoutProposal, UUID) -> Void,
         onAcceptScheduleChange: @escaping (ScheduleChangeProposal, UUID) -> Void,
         onAcceptStrengthDay: @escaping (StrengthDayProposal, UUID) -> Void,
         onAcceptStrengthExerciseUpdate: @escaping (StrengthExerciseUpdateProposal, UUID) -> Void
     ) {
-        self.startsWithVoice = startsWithVoice
+        self.entry = entry
         self.buildContext = buildContext
         self.onAcceptWorkout = onAcceptWorkout
         self.onAcceptScheduleChange = onAcceptScheduleChange
@@ -52,6 +52,10 @@ struct CoachChatView: View {
     /// The draft as it stood when the current dictation session began, so the
     /// transcript appends to typed text rather than replacing it.
     @State private var draftPrefix = ""
+    /// Whether the draft sends itself once dictation ends and the coach is
+    /// ready. Set by the hands-free entries (widget, Siri); cleared when the
+    /// draft sends or the capture gives up.
+    @State private var isAutoSendArmed = false
 
     /// Prompts offered on an empty transcript. The first is the question the
     /// retired one-shot sheet asked, verbatim.
@@ -142,17 +146,24 @@ struct CoachChatView: View {
             }
         }
         .task { await store.prepareModel(coach: coach) }
-        // The Home mic button lands here mid-gesture: start listening
-        // immediately rather than making the athlete tap a second mic.
-        .task {
-            guard startsWithVoice else { return }
-            await startVoiceSession()
+        // The Home mic button and the widget land here mid-gesture: start
+        // listening immediately rather than making the athlete tap a second
+        // mic. Siri has already transcribed, so its message just queues.
+        .task { await beginEntry() }
+        // Hands-free capture ends itself after a pause. Re-keyed on every
+        // transcript and recording change, so each one restarts the clock.
+        .task(id: AutoSendClock(transcript: speech.transcript, isRecording: speech.isRecording)) {
+            await watchForPause()
         }
         // Dictation streams into the composer, appended to anything already
         // typed. While recording, the mic session owns the draft.
         .onChange(of: speech.transcript) { _, transcript in
             draft = VoiceDraft.compose(prefix: draftPrefix, transcript: transcript)
         }
+        // An armed draft sends when capture ends (pause, stop tap, or iOS's
+        // own cutoff) — or, on a cold launch, once the model finishes loading.
+        .onChange(of: speech.isRecording) { _, _ in sendIfArmed() }
+        .onChange(of: store.canSend) { _, _ in sendIfArmed() }
         // Leaving the conversation ends the capture; the draft stays for review.
         .onDisappear { speech.stop() }
     }
@@ -370,6 +381,22 @@ struct CoachChatView: View {
     }
 
     private var composer: some View {
+        VStack(spacing: 4) {
+            if isWaitingForCoach {
+                Label("Sends when your coach is ready", systemImage: "clock")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.top, 6)
+                    .accessibilityIdentifier("coach.chat.pendingAutoSend")
+            }
+            composerRow
+        }
+        .background(.bar)
+    }
+
+    private var composerRow: some View {
         HStack(spacing: 10) {
             TextField(composerPrompt, text: $draft, axis: .vertical)
                 .lineLimit(1...5)
@@ -408,8 +435,17 @@ struct CoachChatView: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(.bar)
         .opacity(store.canSend ? 1 : 0.5)
+    }
+
+    /// Whether a hands-free draft is finished and only waiting on the model.
+    private var isWaitingForCoach: Bool {
+        VoiceAutoSend.isWaitingForCoach(
+            draft: draft,
+            isArmed: isAutoSendArmed,
+            isRecording: speech.isRecording,
+            canSend: store.canSend
+        )
     }
 
     /// Placeholder text that explains why the composer is inert.
@@ -440,6 +476,52 @@ struct CoachChatView: View {
         Task {
             await store.send(trimmed, coach: coach, context: buildContext())
         }
+    }
+
+    /// Acts on how the conversation was entered.
+    private func beginEntry() async {
+        isAutoSendArmed = entry.sendsAutomatically
+        switch entry {
+        case .standard:
+            break
+        case .voice:
+            await startVoiceSession()
+        case .message(let text):
+            draft = text
+            sendIfArmed()
+        }
+    }
+
+    /// Ends a hands-free capture once the athlete pauses, or gives up when
+    /// nothing is heard. Cancelled and restarted by every transcript change.
+    private func watchForPause() async {
+        guard isAutoSendArmed, speech.isRecording else { return }
+        let transcript = speech.transcript
+        let window = VoiceAutoSend.quietWindow(for: transcript)
+        do { try await Task.sleep(for: window) } catch { return }
+        switch VoiceAutoSend.captureAction(transcript: transcript, quietFor: window) {
+        case .keepListening:
+            break
+        case .finish:
+            // Ending capture flips `isRecording`, which sends via onChange.
+            speech.stop()
+        case .giveUp:
+            isAutoSendArmed = false
+            speech.stop()
+        }
+    }
+
+    /// Sends the draft if this is a hands-free entry whose capture has ended
+    /// and the coach is ready. The draft never sends twice.
+    private func sendIfArmed() {
+        guard VoiceAutoSend.shouldSend(
+            draft: draft,
+            isArmed: isAutoSendArmed,
+            isRecording: speech.isRecording,
+            canSend: store.canSend
+        ) else { return }
+        isAutoSendArmed = false
+        send(draft)
     }
 
     /// Starts or stops dictation into the composer.
@@ -690,4 +772,11 @@ struct ProposalCard: View {
         f.dateFormat = "EEE, MMM d"
         return f
     }()
+}
+
+/// What restarts the hands-free pause timer: any transcript change, and the
+/// capture starting or stopping.
+private struct AutoSendClock: Hashable {
+    let transcript: String
+    let isRecording: Bool
 }

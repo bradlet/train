@@ -46,3 +46,69 @@ enum VoiceDraft {
         return typed + " " + spoken
     }
 }
+
+/// Pure decisions behind hands-free dictation — the widget and Siri entries,
+/// where the athlete speaks and never taps Send.
+///
+/// The chat view owns the timers; this owns what they decide, so the rules
+/// are unit-testable without a microphone or a clock.
+enum VoiceAutoSend {
+    /// How long the transcript must sit unchanged after speech before the
+    /// capture ends and the draft sends.
+    static let silenceWindow: Duration = .milliseconds(1500)
+    /// How long to listen without hearing anything before giving up — so a
+    /// pocketed tap doesn't hold the microphone open.
+    static let noSpeechTimeout: Duration = .seconds(8)
+
+    /// What a quiet spell during capture means.
+    enum CaptureAction: Equatable {
+        /// Not quiet long enough yet.
+        case keepListening
+        /// The athlete spoke and then paused: end capture, then send.
+        case finish
+        /// Nothing was heard: end capture and send nothing.
+        case giveUp
+    }
+
+    /// How long the capture should wait, from the latest transcript change,
+    /// before re-deciding with `captureAction`.
+    /// - Parameter transcript: The live transcript.
+    static func quietWindow(for transcript: String) -> Duration {
+        isBlank(transcript) ? noSpeechTimeout : silenceWindow
+    }
+
+    /// Decides what a quiet spell means for an in-progress capture.
+    /// - Parameters:
+    ///   - transcript: The live transcript.
+    ///   - quietFor: How long the transcript has gone unchanged.
+    static func captureAction(transcript: String, quietFor: Duration) -> CaptureAction {
+        if isBlank(transcript) {
+            return quietFor >= noSpeechTimeout ? .giveUp : .keepListening
+        }
+        return quietFor >= silenceWindow ? .finish : .keepListening
+    }
+
+    /// Whether an armed draft should send now. Waits for capture to end and
+    /// for the coach to be ready — a cold launch from the widget is still
+    /// loading the model while the athlete talks.
+    /// - Parameters:
+    ///   - draft: The composer text.
+    ///   - isArmed: Whether this conversation was entered hands-free and the
+    ///     draft hasn't been sent or abandoned yet.
+    ///   - isRecording: Whether dictation is still capturing.
+    ///   - canSend: Whether the coach can take a message right now.
+    static func shouldSend(draft: String, isArmed: Bool, isRecording: Bool, canSend: Bool) -> Bool {
+        isArmed && !isRecording && canSend && !isBlank(draft)
+    }
+
+    /// Whether an armed draft is finished and only waiting on the coach,
+    /// which the composer surfaces as "Sends when your coach is ready".
+    /// - Parameters: See `shouldSend`.
+    static func isWaitingForCoach(draft: String, isArmed: Bool, isRecording: Bool, canSend: Bool) -> Bool {
+        isArmed && !isRecording && !canSend && !isBlank(draft)
+    }
+
+    private static func isBlank(_ text: String) -> Bool {
+        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}

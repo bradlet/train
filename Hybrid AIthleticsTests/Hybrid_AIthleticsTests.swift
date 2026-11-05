@@ -7300,3 +7300,175 @@ struct FavoriteWorkoutEditorTests {
         FavoriteWorkoutEditor.move([], fromOffsets: IndexSet(), toOffset: 0)
     }
 }
+
+// MARK: - Coach launch route
+
+struct CoachLaunchRouteTests {
+
+    @Test func voiceURLOpensHandsFreeDictation() {
+        // The widget extension spells this literal out; keep it in step.
+        let url = URL(string: "hybridaithletics://coach/voice")!
+        #expect(CoachLaunchRoute.entry(from: url) == .voice(autoSend: true))
+    }
+
+    @Test func schemeAndHostMatchCaseInsensitively() {
+        let url = URL(string: "HybridAIthletics://Coach/Voice")!
+        #expect(CoachLaunchRoute.entry(from: url) == .voice(autoSend: true))
+    }
+
+    @Test func messageURLDecodesPercentEncoding() {
+        let url = URL(string: "hybridaithletics://coach?message=I%20ran%205%20miles%20%26%20felt%20great")!
+        #expect(CoachLaunchRoute.entry(from: url) == .message("I ran 5 miles & felt great"))
+    }
+
+    @Test func messageIsTrimmed() {
+        let url = URL(string: "hybridaithletics://coach/?message=%20%20hi%20coach%20")!
+        #expect(CoachLaunchRoute.entry(from: url) == .message("hi coach"))
+    }
+
+    @Test func blankOrMissingMessageIsRejected() {
+        #expect(CoachLaunchRoute.entry(from: URL(string: "hybridaithletics://coach?message=%20%20")!) == nil)
+        #expect(CoachLaunchRoute.entry(from: URL(string: "hybridaithletics://coach")!) == nil)
+    }
+
+    @Test func unknownPathIsRejected() {
+        #expect(CoachLaunchRoute.entry(from: URL(string: "hybridaithletics://coach/history")!) == nil)
+    }
+
+    @Test func foreignSchemesAndHostsAreRejected() {
+        // The Google sign-in redirect shares onOpenURL and must fall through.
+        let oauth = URL(string: "com.googleusercontent.apps.123:/oauth2redirect?code=abc")!
+        #expect(CoachLaunchRoute.entry(from: oauth) == nil)
+        #expect(CoachLaunchRoute.entry(from: URL(string: "hybridaithletics://history/voice")!) == nil)
+        #expect(CoachLaunchRoute.entry(from: URL(string: "https://coach/voice")!) == nil)
+    }
+
+    @Test func urlRoundTripsExternalEntries() throws {
+        let entries: [CoachChatEntry] = [.voice(autoSend: true), .message("Tempo run felt hard, 6/10?")]
+        for entry in entries {
+            let url = try #require(CoachLaunchRoute.url(for: entry))
+            #expect(CoachLaunchRoute.entry(from: url) == entry)
+        }
+    }
+
+    @Test func urlIsNilForInAppOnlyEntries() {
+        #expect(CoachLaunchRoute.url(for: .standard) == nil)
+        #expect(CoachLaunchRoute.url(for: .voice(autoSend: false)) == nil)
+        #expect(CoachLaunchRoute.url(for: .message("   ")) == nil)
+    }
+
+    @Test func entryFlags() {
+        #expect(!CoachChatEntry.standard.startsWithVoice)
+        #expect(!CoachChatEntry.standard.sendsAutomatically)
+        #expect(CoachChatEntry.voice(autoSend: false).startsWithVoice)
+        #expect(!CoachChatEntry.voice(autoSend: false).sendsAutomatically)
+        #expect(CoachChatEntry.voice(autoSend: true).sendsAutomatically)
+        #expect(!CoachChatEntry.message("hi").startsWithVoice)
+        #expect(CoachChatEntry.message("hi").sendsAutomatically)
+    }
+}
+
+// MARK: - Coach launch router
+
+@MainActor
+struct CoachLaunchRouterTests {
+
+    @Test func startsEmpty() {
+        #expect(CoachLaunchRouter().pending == nil)
+    }
+
+    @Test func routeSetsPending() {
+        let router = CoachLaunchRouter()
+        router.route(.voice(autoSend: true))
+        #expect(router.pending == .voice(autoSend: true))
+    }
+
+    @Test func consumeReturnsAndClears() {
+        let router = CoachLaunchRouter()
+        router.route(.message("hello"))
+        #expect(router.consume() == .message("hello"))
+        #expect(router.pending == nil)
+        #expect(router.consume() == nil)
+    }
+
+    @Test func laterRouteReplacesUnconsumedOne() {
+        let router = CoachLaunchRouter()
+        router.route(.voice(autoSend: true))
+        router.route(.message("newer"))
+        #expect(router.consume() == .message("newer"))
+    }
+}
+
+// MARK: - Hands-free voice auto-send
+
+struct VoiceAutoSendTests {
+
+    @Test func quietWindowIsShortOnceSpeechArrives() {
+        #expect(VoiceAutoSend.quietWindow(for: "ran 5 miles") == VoiceAutoSend.silenceWindow)
+        #expect(VoiceAutoSend.quietWindow(for: "  ") == VoiceAutoSend.noSpeechTimeout)
+        #expect(VoiceAutoSend.silenceWindow < VoiceAutoSend.noSpeechTimeout)
+    }
+
+    @Test func speechThenPauseFinishes() {
+        #expect(VoiceAutoSend.captureAction(transcript: "ran 5 miles", quietFor: .milliseconds(1500)) == .finish)
+        #expect(VoiceAutoSend.captureAction(transcript: "ran 5 miles", quietFor: .seconds(3)) == .finish)
+    }
+
+    @Test func speechWithShortPauseKeepsListening() {
+        #expect(VoiceAutoSend.captureAction(transcript: "ran 5", quietFor: .milliseconds(1499)) == .keepListening)
+    }
+
+    @Test func silenceGivesUpOnlyAfterTimeout() {
+        #expect(VoiceAutoSend.captureAction(transcript: "", quietFor: .seconds(2)) == .keepListening)
+        #expect(VoiceAutoSend.captureAction(transcript: " \n", quietFor: .seconds(7)) == .keepListening)
+        #expect(VoiceAutoSend.captureAction(transcript: "", quietFor: .seconds(8)) == .giveUp)
+    }
+
+    @Test func sendsOnlyWhenArmedStoppedReadyAndNonBlank() {
+        #expect(VoiceAutoSend.shouldSend(draft: "hi", isArmed: true, isRecording: false, canSend: true))
+        #expect(!VoiceAutoSend.shouldSend(draft: "hi", isArmed: false, isRecording: false, canSend: true))
+        #expect(!VoiceAutoSend.shouldSend(draft: "hi", isArmed: true, isRecording: true, canSend: true))
+        #expect(!VoiceAutoSend.shouldSend(draft: "hi", isArmed: true, isRecording: false, canSend: false))
+        #expect(!VoiceAutoSend.shouldSend(draft: "  ", isArmed: true, isRecording: false, canSend: true))
+    }
+
+    @Test func waitingForCoachOnlyWhenFinishedButModelNotReady() {
+        #expect(VoiceAutoSend.isWaitingForCoach(draft: "hi", isArmed: true, isRecording: false, canSend: false))
+        #expect(!VoiceAutoSend.isWaitingForCoach(draft: "hi", isArmed: true, isRecording: false, canSend: true))
+        #expect(!VoiceAutoSend.isWaitingForCoach(draft: "hi", isArmed: true, isRecording: true, canSend: false))
+        #expect(!VoiceAutoSend.isWaitingForCoach(draft: "hi", isArmed: false, isRecording: false, canSend: false))
+        #expect(!VoiceAutoSend.isWaitingForCoach(draft: "", isArmed: true, isRecording: false, canSend: false))
+    }
+}
+
+// MARK: - Coach App Intents
+
+/// Serialized: both intents route through the process-wide
+/// `CoachLaunchRouter.shared`.
+@MainActor
+@Suite(.serialized)
+struct CoachIntentTests {
+
+    @Test func askCoachRoutesTrimmedMessage() async throws {
+        CoachLaunchRouter.shared.consume()
+        _ = try await AskCoachIntent(message: "  I ran 5 miles this morning  ").perform()
+        #expect(CoachLaunchRouter.shared.consume() == .message("I ran 5 miles this morning"))
+    }
+
+    @Test func askCoachWithBlankMessageJustOpensChat() async throws {
+        CoachLaunchRouter.shared.consume()
+        _ = try await AskCoachIntent(message: "   ").perform()
+        #expect(CoachLaunchRouter.shared.consume() == .standard)
+    }
+
+    @Test func talkToCoachRoutesHandsFreeVoice() async throws {
+        CoachLaunchRouter.shared.consume()
+        _ = try await TalkToCoachIntent().perform()
+        #expect(CoachLaunchRouter.shared.consume() == .voice(autoSend: true))
+    }
+
+    @Test func bothIntentsOpenTheApp() {
+        #expect(AskCoachIntent.openAppWhenRun)
+        #expect(TalkToCoachIntent.openAppWhenRun)
+    }
+}

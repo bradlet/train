@@ -41,6 +41,11 @@ struct Hybrid_AIthleticsApp: App {
     /// so it starts fresh on every launch.
     @State private var coachChat = CoachChatStore()
 
+    /// Carries external launches — the widget's deep link and the Siri
+    /// shortcuts — to the Home tab, which opens the coach chat. The shared
+    /// instance because App Intents route through it from outside SwiftUI.
+    @State private var coachLauncher = CoachLaunchRouter.shared
+
     /// Shared speech-to-text for the coach composer. The live service wraps
     /// SFSpeechRecognizer; under `-uiTestSeed` the stub keeps dictation
     /// deterministic and never presents a permission prompt.
@@ -64,20 +69,27 @@ struct Hybrid_AIthleticsApp: App {
                 .environment(\.googleSheetsSync, sheetsSync)
                 .environment(\.coachChat, coachChat)
                 .environment(\.coachSpeech, coachSpeech)
+                .environment(\.coachLauncher, coachLauncher)
                 .task {
                     // Restore Google Sheets sync state from AppConfiguration
                     // and silently re-authorize the OAuth session if a
                     // previous sign-in is cached on this device.
                     await sheetsSync.attach(modelContainer: sharedModelContainer)
                 }
-                #if canImport(GoogleSignIn)
                 .onOpenURL { url in
+                    // The widget's `hybridaithletics://coach…` links open
+                    // the coach chat.
+                    if let entry = CoachLaunchRoute.entry(from: url) {
+                        coachLauncher.route(entry)
+                        return
+                    }
+                    #if canImport(GoogleSignIn)
                     // OAuth redirect callback. The reversed-client-ID URL
                     // scheme registered in Info.plist routes here after
                     // the user completes Google sign-in.
                     GIDSignIn.sharedInstance.handle(url)
+                    #endif
                 }
-                #endif
         }
         .modelContainer(sharedModelContainer)
     }

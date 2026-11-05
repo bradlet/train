@@ -19,6 +19,7 @@ struct HomeView: View {
     @Environment(\.useMetricUnits) private var useMetricUnits
     @Environment(\.coachChat) private var coachChat
     @Environment(\.aiCoach) private var coach
+    @Environment(\.coachLauncher) private var coachLauncher
 
     @Query private var allExercises: [Exercise]
     @Query private var allStrengthExercises: [StrengthExercise]
@@ -44,8 +45,9 @@ struct HomeView: View {
     @State private var proposedWorkout: ProposedWorkoutRequest?
     /// Error surfaced when an accepted schedule change could not be applied.
     @State private var applyErrorMessage: String?
-    /// Whether the voice-first coach entry is pushed.
-    @State private var isVoiceEntryPresented = false
+    /// The navigation stack. Value-based so an external launch (widget,
+    /// Siri) can replace whatever is pushed with a fresh coach chat.
+    @State private var path: [HomeDestination] = []
     /// Whether the favorites manager is showing.
     @State private var isManagingFavorites = false
     /// Whether the new-favorite form is showing (from the card's empty state).
@@ -62,14 +64,12 @@ struct HomeView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(spacing: 20) {
                     VStack(spacing: 8) {
                         HStack(spacing: 12) {
-                            NavigationLink {
-                                coachChatView()
-                            } label: {
+                            NavigationLink(value: HomeDestination.chat(.standard)) {
                                 CoachEntryCard(
                                     lastReply: coachChat.lastCoachReply,
                                     isGenerating: coachChat.isGenerating,
@@ -85,9 +85,7 @@ struct HomeView: View {
                         // While the weights are missing the mic sits greyed
                         // out; this slim CTA is its obvious next step.
                         if coachChat.modelPhase.needsDownload {
-                            NavigationLink {
-                                coachChatView()
-                            } label: {
+                            NavigationLink(value: HomeDestination.chat(.standard)) {
                                 voiceDownloadCTA
                             }
                             .buttonStyle(.plain)
@@ -144,9 +142,17 @@ struct HomeView: View {
             // filesystem check only: it neither downloads nor loads, so the
             // landing tab never pulls gigabytes of weights into memory.
             .task { coachChat.checkAvailability(coach: coach) }
-            // Voice entry pushes the same destination with dictation armed.
-            .navigationDestination(isPresented: $isVoiceEntryPresented) {
-                coachChatView(startsWithVoice: true)
+            .navigationDestination(for: HomeDestination.self) { destination in
+                switch destination {
+                case .chat(let entry, _):
+                    coachChatView(entry: entry)
+                }
+            }
+            // An external launch replaces the stack with a new chat — even one
+            // already open — so a widget tap always starts a fresh dictation.
+            .onChange(of: coachLauncher.pending, initial: true) { _, pending in
+                guard pending != nil, let entry = coachLauncher.consume() else { return }
+                Task { await openExternalEntry(entry) }
             }
             .sheet(item: $quickAddRequest) { request in
                 RecordWorkoutSheet(
@@ -217,9 +223,9 @@ struct HomeView: View {
 
     /// The coach conversation destination. Built in one place so the entry
     /// card, the voice button, and the download CTA can't drift apart.
-    private func coachChatView(startsWithVoice: Bool = false) -> some View {
+    private func coachChatView(entry: CoachChatEntry) -> some View {
         CoachChatView(
-            startsWithVoice: startsWithVoice,
+            entry: entry,
             buildContext: buildCoachRequest,
             onAcceptWorkout: { proposal, messageID in
                 proposedWorkout = ProposedWorkoutRequest(
@@ -235,13 +241,27 @@ struct HomeView: View {
         )
     }
 
+    /// Opens a chat for an entry routed from outside the app.
+    ///
+    /// Anything already pushed is popped first and the new chat pushed after
+    /// the pop settles: swapping the stack in one step can run the old chat's
+    /// `onDisappear` — which stops dictation — after the new one has started
+    /// listening.
+    private func openExternalEntry(_ entry: CoachChatEntry) async {
+        if !path.isEmpty {
+            path = []
+            try? await Task.sleep(for: .milliseconds(450))
+        }
+        path = [.chat(entry)]
+    }
+
     /// The voice-first entry point: tap and talk to the coach.
     ///
     /// Gated on the same availability as the card — until the weights exist
     /// the button sits greyed out, with the slim CTA below as the way forward.
     private var voiceEntryButton: some View {
         Button {
-            isVoiceEntryPresented = true
+            path.append(.chat(.voice(autoSend: false)))
         } label: {
             Image(systemName: "mic.fill")
                 .font(.title2)
@@ -440,4 +460,11 @@ private struct ProposedWorkoutRequest: Identifiable {
 #Preview {
     HomeView()
         .modelContainer(ModelContainerFactory.makePreviewContainer())
+}
+
+/// Where the Home tab's navigation stack can go.
+enum HomeDestination: Hashable {
+    /// The coach conversation. `id` makes every push a new destination, so
+    /// routing the same entry twice still re-runs the chat's entry behavior.
+    case chat(CoachChatEntry, id: UUID = UUID())
 }
