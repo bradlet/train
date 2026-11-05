@@ -13,6 +13,7 @@
 		1CCF39D82F88A594009D4D21 /* AICoachCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0001032FA6B00000000001 /* AICoachCore */; };
 		CC0003012FC0D00000000001 /* AICoachRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = CC0003022FC0D00000000001 /* AICoachRuntime */; };
 		AA0001012FA6B00000000001 /* AICoachCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0001022FA6B00000000001 /* AICoachCore */; };
+		DD0004022FD0E00000000001 /* CoachVoiceWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DD0004012FD0E00000000001 /* CoachVoiceWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -30,7 +31,28 @@
 			remoteGlobalIDString = 1C1476D02F817B6800DCF85D;
 			remoteInfo = "Hybrid AIthletics";
 		};
+		DD00040A2FD0E00000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1C1476C92F817B6800DCF85D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DD0004052FD0E00000000001;
+			remoteInfo = CoachVoiceWidget;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		DD0004092FD0E00000000001 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				DD0004022FD0E00000000001 /* CoachVoiceWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		1C1476D12F817B6800DCF85D /* Hybrid AIthletics.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Hybrid AIthletics.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -38,6 +60,7 @@
 		1C1476EC2F817B6900DCF85D /* Hybrid AIthleticsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Hybrid AIthleticsUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1C8168F82F83FE0700E33EF9 /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
 		1C8168FE2F83FE0700E33EF9 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		DD0004012FD0E00000000001 /* CoachVoiceWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CoachVoiceWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -47,6 +70,13 @@
 				Info.plist,
 			);
 			target = 1C1476D02F817B6800DCF85D /* Hybrid AIthletics */;
+		};
+		DD0004042FD0E00000000001 /* Exceptions for "CoachVoiceWidget" folder in "CoachVoiceWidget" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = DD0004052FD0E00000000001 /* CoachVoiceWidget */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -67,6 +97,14 @@
 		1C1476EF2F817B6900DCF85D /* Hybrid AIthleticsUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "Hybrid AIthleticsUITests";
+			sourceTree = "<group>";
+		};
+		DD0004032FD0E00000000001 /* CoachVoiceWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				DD0004042FD0E00000000001 /* Exceptions for "CoachVoiceWidget" folder in "CoachVoiceWidget" target */,
+			);
+			path = CoachVoiceWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -98,6 +136,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DD0004072FD0E00000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -109,6 +154,7 @@
 				1C1476D32F817B6800DCF85D /* Hybrid AIthletics */,
 				1C1476E52F817B6900DCF85D /* Hybrid AIthleticsTests */,
 				1C1476EF2F817B6900DCF85D /* Hybrid AIthleticsUITests */,
+				DD0004032FD0E00000000001 /* CoachVoiceWidget */,
 				1C9E36B72FA2550C0022393D /* Frameworks */,
 				1C1476D22F817B6800DCF85D /* Products */,
 			);
@@ -120,6 +166,7 @@
 				1C1476D12F817B6800DCF85D /* Hybrid AIthletics.app */,
 				1C1476E22F817B6900DCF85D /* Hybrid AIthleticsTests.xctest */,
 				1C1476EC2F817B6900DCF85D /* Hybrid AIthleticsUITests.xctest */,
+				DD0004012FD0E00000000001 /* CoachVoiceWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -141,10 +188,12 @@
 				1C1476CD2F817B6800DCF85D /* Sources */,
 				1C1476CE2F817B6800DCF85D /* Frameworks */,
 				1C1476CF2F817B6800DCF85D /* Resources */,
+				DD0004092FD0E00000000001 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				DD00040B2FD0E00000000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				1C1476D32F817B6800DCF85D /* Hybrid AIthletics */,
@@ -207,6 +256,28 @@
 			productReference = 1C1476EC2F817B6900DCF85D /* Hybrid AIthleticsUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		DD0004052FD0E00000000001 /* CoachVoiceWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DD00040E2FD0E00000000001 /* Build configuration list for PBXNativeTarget "CoachVoiceWidget" */;
+			buildPhases = (
+				DD0004062FD0E00000000001 /* Sources */,
+				DD0004072FD0E00000000001 /* Frameworks */,
+				DD0004082FD0E00000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DD0004032FD0E00000000001 /* CoachVoiceWidget */,
+			);
+			name = CoachVoiceWidget;
+			packageProductDependencies = (
+			);
+			productName = CoachVoiceWidget;
+			productReference = DD0004012FD0E00000000001 /* CoachVoiceWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -227,6 +298,9 @@
 					1C1476EB2F817B6900DCF85D = {
 						CreatedOnToolsVersion = 26.4;
 						TestTargetID = 1C1476D02F817B6800DCF85D;
+					};
+					DD0004052FD0E00000000001 = {
+						CreatedOnToolsVersion = 26.4;
 					};
 				};
 			};
@@ -252,6 +326,7 @@
 				1C1476D02F817B6800DCF85D /* Hybrid AIthletics */,
 				1C1476E12F817B6900DCF85D /* Hybrid AIthleticsTests */,
 				1C1476EB2F817B6900DCF85D /* Hybrid AIthleticsUITests */,
+				DD0004052FD0E00000000001 /* CoachVoiceWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -273,6 +348,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		1C1476EA2F817B6900DCF85D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DD0004082FD0E00000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -303,6 +385,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DD0004062FD0E00000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -315,6 +404,11 @@
 			isa = PBXTargetDependency;
 			target = 1C1476D02F817B6800DCF85D /* Hybrid AIthletics */;
 			targetProxy = 1C1476ED2F817B6900DCF85D /* PBXContainerItemProxy */;
+		};
+		DD00040B2FD0E00000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DD0004052FD0E00000000001 /* CoachVoiceWidget */;
+			targetProxy = DD00040A2FD0E00000000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -600,6 +694,62 @@
 			};
 			name = Release;
 		};
+		DD00040C2FD0E00000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 20;
+				DEVELOPMENT_TEAM = CB9HS9S84R;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CoachVoiceWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Coach Voice";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "bradlet.Hybrid-AIthletics.CoachVoiceWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		DD00040D2FD0E00000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 20;
+				DEVELOPMENT_TEAM = CB9HS9S84R;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CoachVoiceWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Coach Voice";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "bradlet.Hybrid-AIthletics.CoachVoiceWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -635,6 +785,15 @@
 			buildConfigurations = (
 				1C1476FE2F817B6900DCF85D /* Debug */,
 				1C1476FF2F817B6900DCF85D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DD00040E2FD0E00000000001 /* Build configuration list for PBXNativeTarget "CoachVoiceWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DD00040C2FD0E00000000001 /* Debug */,
+				DD00040D2FD0E00000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
