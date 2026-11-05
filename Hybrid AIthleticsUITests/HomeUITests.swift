@@ -504,3 +504,78 @@ extension HomeUITests {
         )
     }
 }
+
+// MARK: - External entry (widget deep link)
+
+extension HomeUITests {
+
+    /// The widget's deep link — duplicated as a literal, like the widget does.
+    private static let voiceLink = URL(string: "hybridaithletics://coach/voice")!
+
+    @MainActor
+    func testWidgetLinkDictatesAndSendsWithoutATap() throws {
+        let app = launchApp()
+        // Start somewhere other than Home: the link must bring Home forward.
+        app.tabBars.buttons["History"].tap()
+        app.open(Self.voiceLink)
+
+        // The stub hears its canned phrase and then goes quiet, so the pause
+        // ends capture and the draft sends itself — no Send tap.
+        let userBubble = app.otherElements["coach.chat.bubble.user"]
+        XCTAssertTrue(
+            userBubble.waitForExistence(timeout: 10),
+            "the dictated message should send itself after the pause"
+        )
+        XCTAssertTrue(
+            app.otherElements["coach.chat.bubble.coach"].waitForExistence(timeout: 10),
+            "the coach should start replying"
+        )
+    }
+
+    @MainActor
+    func testMessageLinkSendsTheMessage() throws {
+        let app = launchApp()
+        app.open(URL(string: "hybridaithletics://coach?message=How%20did%20last%20week%20go%3F")!)
+        let userBubble = app.otherElements["coach.chat.bubble.user"]
+        XCTAssertTrue(userBubble.waitForExistence(timeout: 10), "the message should send")
+        XCTAssertTrue(
+            app.staticTexts["How did last week go?"].exists,
+            "the bubble should carry the linked text"
+        )
+    }
+
+    @MainActor
+    func testWidgetLinkReplacesAnOpenChat() throws {
+        let app = launchApp()
+        openChat(in: app)
+        app.open(Self.voiceLink)
+        XCTAssertTrue(
+            app.otherElements["coach.chat.bubble.user"].waitForExistence(timeout: 12),
+            "a fresh hands-free chat should open and send, even over an open one"
+        )
+    }
+
+    @MainActor
+    func testWidgetLinkWithoutModelKeepsDraftAndNeverDownloads() throws {
+        let app = launchWithoutModel()
+        app.open(Self.voiceLink)
+
+        XCTAssertTrue(
+            app.otherElements["coach.chat.downloadPrompt"].waitForExistence(timeout: 5),
+            "the download call to action should be offered, not started"
+        )
+        XCTAssertTrue(
+            app.staticTexts["coach.chat.pendingAutoSend"].waitForExistence(timeout: 8)
+                || app.otherElements["coach.chat.pendingAutoSend"].exists,
+            "the finished draft should wait for the coach"
+        )
+        XCTAssertFalse(
+            app.otherElements["coach.chat.bubble.user"].exists,
+            "nothing may send before the model exists"
+        )
+        XCTAssertFalse(
+            app.otherElements["coach.chat.downloadProgress"].exists,
+            "a deep link must never start the download"
+        )
+    }
+}
