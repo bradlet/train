@@ -26,7 +26,7 @@ the way it is, and how to change it safely.
 11. [Proposals: accept, apply, confirm](#11-proposals-accept-apply-confirm)
 12. [CoachChatStore](#12-coachchatstore)
 13. [UI surfaces](#13-ui-surfaces)
-14. [Voice entry](#14-voice-entry)
+14. [Voice entry](#14-voice-entry) (incl. widget and Siri)
 15. [Testing](#15-testing)
 16. [Evals](#16-evals)
 17. [Design invariants (do not regress)](#17-design-invariants-do-not-regress)
@@ -648,8 +648,9 @@ Behavioural rules:
 | Proposal card | `ProposalCard` in `CoachChatView.swift` | Per-tool icon, title, and summary lines so the athlete can check what the coach heard |
 | Pre-filled record sheet | `Views/AerobicTraining/RecordWorkoutSheet.swift` (`prefill:`) | Shared with normal recording |
 
-There is a single `coachChatView(startsWithVoice:)` builder in `HomeView` behind every entry point
-(card, mic, CTA), so they can't drift apart.
+There is a single `coachChatView(entry:)` builder in `HomeView` behind every entry point (card,
+mic, CTA, widget, Siri), so they can't drift apart. Home navigates by value
+(`HomeDestination.chat(CoachChatEntry)`), which lets an external launch replace whatever is pushed.
 
 Accessibility identifiers used by UI tests:
 
@@ -658,7 +659,7 @@ home.coachCard  home.coachVoiceButton  home.coachVoiceDownloadCTA
 coach.chat.input  coach.chat.send  coach.chat.mic  coach.chat.stop  coach.chat.clear
 coach.chat.download  coach.chat.downloadPrompt  coach.chat.downloadProgress  coach.chat.loading
 coach.chat.proposal  coach.chat.accept  coach.chat.dismiss
-coach.chat.bubble.user  coach.chat.bubble.coach
+coach.chat.bubble.user  coach.chat.bubble.coach  coach.chat.pendingAutoSend
 ```
 
 ---
@@ -667,7 +668,7 @@ coach.chat.bubble.user  coach.chat.bubble.coach
 
 ```mermaid
 flowchart LR
-    Mic["Home mic<br/>home.coachVoiceButton"] -->|"push CoachChatView(startsWithVoice: true)"| Chat
+    Mic["Home mic<br/>home.coachVoiceButton"] -->|"push CoachChatView(entry: .voice(autoSend: false))"| Chat
     Chat -->|".task: startVoiceSession()"| SS["CoachSpeechService.start()"]
     SS -->|"partial results → transcript"| Chat
     Chat -->|"VoiceDraft.compose(prefix, transcript)"| Draft["composer draft"]
@@ -677,12 +678,61 @@ flowchart LR
 - `CoachSpeechService` (`@MainActor` protocol) has two implementations. `LiveCoachSpeechService` uses
   `SFSpeechRecognizer` + `AVAudioEngine` and requires on-device recognition where the device supports
   it. `StubCoachSpeechService` is used for previews and tests.
-- Dictation **never auto-sends**. The transcript fills the composer for the athlete to review.
+- Dictation from the **in-app mic never auto-sends**. The transcript fills the composer for the
+  athlete to review. Only the hands-free external entries (§14a) send by themselves.
 - `VoiceDraft.compose` appends dictation to whatever was typed before recording started, joined by
   exactly one space. A blank transcript leaves typed text alone.
 - Permission refusals go to `errorMessage` with a pointer to Settings, and typing still works.
   `Info.plist` holds `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription`.
 - Leaving the chat stops capture. Sending stops and resets it.
+
+### 14a. Widget and Siri entry
+
+A widget **cannot record audio**. Widget extensions never get microphone access, interactive
+widgets included. So the `CoachVoiceWidget` extension (Home Screen `systemSmall`, plus Lock Screen
+`accessoryCircular` / `accessoryRectangular`) is only a `widgetURL`, and the app does the listening.
+Siri is the one path where the athlete speaks *before* the app opens, because Siri transcribes.
+
+```mermaid
+flowchart LR
+    W["CoachVoiceWidget tap"] -->|"widgetURL hybridaithletics://coach/voice"| U["onOpenURL →<br/>CoachLaunchRoute.entry(from:)"]
+    S["Siri: AskCoachIntent(message)"] -->|"openAppWhenRun"| R
+    T["Siri: TalkToCoachIntent"] -->|"openAppWhenRun"| R
+    U --> R["CoachLaunchRouter.shared.pending"]
+    R --> C["ContentView: select Home tab"]
+    R --> H["HomeView: consume() → path = [.chat(entry)]"]
+    H --> E{"CoachChatEntry"}
+    E -->|".voice(autoSend: true)"| D["dictate → 1.5 s pause → stop"]
+    E -->|".message(text)"| M["draft = text"]
+    D --> Q["VoiceAutoSend.shouldSend:<br/>armed, not recording, canSend"]
+    M --> Q
+    Q -->|"model still loading"| Wait["'Sends when your coach is ready'"]
+    Wait -->|"onChange(canSend)"| Send["store.send"]
+    Q --> Send
+```
+
+- **Deep links** (`CoachLaunchRoute`): `hybridaithletics://coach/voice` gives `.voice(autoSend: true)`
+  and `hybridaithletics://coach?message=…` gives `.message`. The scheme is registered in `Info.plist`.
+  Every other URL returns `nil` and falls through to the Google sign-in handler. The widget spells
+  the voice URL out (an extension can't link app code), and `CoachLaunchRouteTests` pins the literal.
+- **`CoachLaunchRouter`** is app-scope and holds one pending entry. It is `shared` because an App
+  Intent's `perform()` has no environment, and it is injected as `@Environment(\.coachLauncher)`.
+  When a chat is already open, `HomeView` pops it and then pushes the new one. Swapping the stack in
+  one step can run the old chat's `onDisappear` (which stops dictation) after the new chat starts
+  listening.
+- **Auto-send** (`VoiceAutoSend`, pure and unit-tested): after speech, the transcript must sit
+  unchanged for `silenceWindow` (1.5 s) before capture ends. If nothing is heard for
+  `noSpeechTimeout` (8 s), it gives up and sends nothing. An armed draft sends once capture has
+  stopped (pause, stop tap, or iOS's own ~1 min cutoff) **and** the model is `.ready`. A cold launch
+  is still loading the weights while the athlete talks.
+- **Never auto-downloads.** If the weights are missing, the draft stays in the composer beside the
+  download prompt. The explicit opt-in rule (§6) holds for external entries too.
+- **Siri phrases.** Every App Shortcut phrase must contain `\(.applicationName)`, and "Hybrid
+  AIthletics" is hard to say. `INAlternativeAppNames` in `Info.plist` registers "AI Coach" and
+  "Coach" as synonyms for that slot, so `"Tell my \(.applicationName)"` is spoken as **"Tell my AI
+  coach"**. `AskCoachIntent` asks a follow-up question for the message, because a phrase can't
+  carry free-form text. If a device doesn't pick up the synonym, the athlete can rename the
+  shortcut in the Shortcuts app.
 
 ---
 
@@ -904,6 +954,8 @@ Write a new `AICoachService` conformance that yields `CoachEvent`s, decodes thro
 | `Hybrid AIthletics/Config/AICoachEnvironment.swift`, `CoachChatEnvironment.swift`, `CoachSpeechEnvironment.swift` | Environment keys (stub defaults) |
 | `Hybrid AIthletics/Hybrid_AIthleticsApp.swift` | Root injection, `-uiTestSeed` / `-uiTestCoachNotDownloaded` |
 | `Hybrid AIthletics/Views/Home/HomeView.swift` | Snapshot builder, proposal application, entry points |
+| `…/CoachLaunchRoute.swift`, `CoachIntents.swift`, `Config/CoachLaunchEnvironment.swift` | Widget deep links, Siri intents, launch router |
+| `CoachVoiceWidget/CoachVoiceWidget.swift` | Home / Lock Screen widget (a deep link only, no mic) |
 | `Hybrid AIthletics/Views/Home/CoachChatView.swift` | Chat UI, `CoachMessageBubble`, `ProposalCard` |
 | `Hybrid AIthletics/Views/Home/CoachEntryCard.swift` | Home card |
 | `Evals/` | `coach-eval` CLI and `CoachEvalKit` (see `docs/EVALS_GUIDE.md`) |
