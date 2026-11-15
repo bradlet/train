@@ -25,7 +25,7 @@ struct ContentView: View {
     /// Reactively reads the week-start preference, clamped to a valid
     /// Calendar weekday (1=Sunday ... 7=Saturday) in case a bad value
     /// arrives via CloudKit sync.
-    private var weekStartDay: Int { min(max(configurations.first?.weekStartDay ?? 1, 1), 7) }
+    private var weekStartDay: Int { min(max(configurations.first?.weekStartDay ?? AppConfiguration.defaultWeekStartDay, 1), 7) }
 
     var body: some View {
         TabView(selection: $selectedTab) {

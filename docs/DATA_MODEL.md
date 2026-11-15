@@ -172,7 +172,7 @@ A **singleton** preferences record. The app creates exactly one instance on firs
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `useMetricUnits` | `Bool` | `false` | When `true`, distances display in kilometers. When `false`, miles. |
-| `weekStartDay` | `Int` | `1` | First day of the week for weekly aggregation and the Aerobic Training weekly calendar: 1 = Sunday … 7 = Saturday. Monthly calendar grids stay Sunday-first. Injected as `@Environment(\.weekStartDay)`. |
+| `weekStartDay` | `Int` | `2` (Monday) | First day of the week for weekly aggregation and the Aerobic Training weekly calendar: 1 = Sunday … 7 = Saturday. Monthly calendar grids stay Sunday-first. Injected as `@Environment(\.weekStartDay)`. |
 | `googleSheetsSyncEnabled` | `Bool` | `false` | Whether one-way Google Sheets export sync is enabled. |
 | `googleSheetsSpreadsheetID` | `String` | `""` | The spreadsheet written to; empty until first enable. |
 

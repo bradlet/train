@@ -30,15 +30,22 @@ final class AppConfiguration {
     /// First day of the user's workout week, using the Calendar weekday
     /// convention (1=Sunday ... 7=Saturday). Affects weekly aggregation math
     /// only (weekly mileage buckets, "This Week" stats); calendar grids stay
-    /// visually Sunday-first regardless. Default is 1 (Sunday).
-    var weekStartDay: Int = 1
+    /// visually Sunday-first regardless. Default is 2 (Monday) — see
+    /// `defaultWeekStartDay`.
+    var weekStartDay: Int = AppConfiguration.defaultWeekStartDay
+
+    /// The week start a fresh install gets: Monday (Calendar weekday 2),
+    /// which matches how most athletes think of a training week. Shared by
+    /// the model default, the environment fallback, and `ContentView`'s
+    /// clamp so they can't drift apart.
+    static let defaultWeekStartDay = 2
 
     /// Creates a new configuration with default values.
     init(
         useMetricUnits: Bool = false,
         googleSheetsSyncEnabled: Bool = false,
         googleSheetsSpreadsheetID: String = "",
-        weekStartDay: Int = 1
+        weekStartDay: Int = AppConfiguration.defaultWeekStartDay
     ) {
         self.useMetricUnits = useMetricUnits
         self.googleSheetsSyncEnabled = googleSheetsSyncEnabled

@@ -648,14 +648,23 @@ struct AppConfigurationTests {
         #expect(config2.useMetricUnits == true)
     }
 
-    @Test func weekStartDayDefaultsToSunday() throws {
+    @Test func weekStartDayDefaultsToMonday() throws {
         let config = AppConfiguration()
-        #expect(config.weekStartDay == 1)
+        #expect(config.weekStartDay == 2)
+        #expect(AppConfiguration.defaultWeekStartDay == 2)
     }
 
     @Test func weekStartDayAcceptsExplicitValue() throws {
-        let config = AppConfiguration(weekStartDay: 2)
-        #expect(config.weekStartDay == 2)
+        let config = AppConfiguration(weekStartDay: 1)
+        #expect(config.weekStartDay == 1)
+    }
+
+    @Test func weekStartDayPersistsDefaultForNewConfiguration() throws {
+        let context = try makeContext()
+        _ = AppConfiguration.current(in: context)
+        try context.save()
+        let fetched = AppConfiguration.current(in: context)
+        #expect(fetched.weekStartDay == 2)
     }
 
     @Test func weekStartDayPersists() throws {

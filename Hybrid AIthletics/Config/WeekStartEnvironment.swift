@@ -11,7 +11,7 @@ import SwiftUI
 
 /// Environment key for the workout week start preference.
 private struct WeekStartDayKey: EnvironmentKey {
-    static let defaultValue = 1
+    static let defaultValue = AppConfiguration.defaultWeekStartDay
 }
 
 extension EnvironmentValues {

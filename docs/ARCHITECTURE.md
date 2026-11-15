@@ -43,7 +43,7 @@ The recorded-instance data for an `Exercise`. **Not** a `@Model` — a plain `Co
 Singleton preferences stored in SwiftData for CloudKit sync.
 
 - `useMetricUnits: Bool` — controls distance display across the app (`@Environment(\.useMetricUnits)`)
-- `weekStartDay: Int` — 1 = Sunday … 7 = Saturday; governs weekly aggregation and the Aerobic Training weekly calendar (`@Environment(\.weekStartDay)`)
+- `weekStartDay: Int` — 1 = Sunday … 7 = Saturday, default 2 (Monday); governs weekly aggregation and the Aerobic Training weekly calendar (`@Environment(\.weekStartDay)`)
 - `googleSheetsSyncEnabled` / `googleSheetsSpreadsheetID` — Google Sheets export state
 - Accessed via `@Query` in `ContentView` (and `SettingsView` for editing), propagated as SwiftUI `EnvironmentKey`s
 
