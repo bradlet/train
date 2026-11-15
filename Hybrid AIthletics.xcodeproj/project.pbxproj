@@ -11,8 +11,8 @@
 		1C9E36B92FA2550C0022393D /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 1C9E36B82FA2550C0022393D /* GoogleSignIn */; };
 		1C9E36BB2FA2550C0022393D /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 1C9E36BA2FA2550C0022393D /* GoogleSignInSwift */; };
 		1CCF39D82F88A594009D4D21 /* AICoachCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0001032FA6B00000000001 /* AICoachCore */; };
-		CC0003012FC0D00000000001 /* AICoachRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = CC0003022FC0D00000000001 /* AICoachRuntime */; };
 		AA0001012FA6B00000000001 /* AICoachCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0001022FA6B00000000001 /* AICoachCore */; };
+		CC0003012FC0D00000000001 /* AICoachRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = CC0003022FC0D00000000001 /* AICoachRuntime */; };
 		DD0004022FD0E00000000001 /* CoachVoiceWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DD0004012FD0E00000000001 /* CoachVoiceWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -286,7 +286,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2640;
-				LastUpgradeCheck = 2640;
+				LastUpgradeCheck = 2720;
 				TargetAttributes = {
 					1C1476D02F817B6800DCF85D = {
 						CreatedOnToolsVersion = 26.4;
@@ -420,8 +420,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Hybrid AIthletics/Hybrid_AIthletics.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20;
-				DEVELOPMENT_TEAM = CB9HS9S84R;
+				CURRENT_PROJECT_VERSION = 21;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Hybrid AIthletics/Info.plist";
@@ -439,7 +438,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "bradlet.Hybrid-AIthletics";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -459,8 +458,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Hybrid AIthletics/Hybrid_AIthletics.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20;
-				DEVELOPMENT_TEAM = CB9HS9S84R;
+				CURRENT_PROJECT_VERSION = 21;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Hybrid AIthletics/Info.plist";
@@ -478,7 +476,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "bradlet.Hybrid-AIthletics";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -526,6 +524,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = CB9HS9S84R;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -549,6 +548,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -589,6 +589,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = CB9HS9S84R;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -605,6 +606,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -616,7 +618,6 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = CB9HS9S84R;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
@@ -638,7 +639,6 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = CB9HS9S84R;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
@@ -659,7 +659,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = CB9HS9S84R;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "bradlet.Hybrid-AIthleticsUITests";
@@ -679,7 +678,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = CB9HS9S84R;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "bradlet.Hybrid-AIthleticsUITests";
@@ -699,7 +697,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 20;
-				DEVELOPMENT_TEAM = CB9HS9S84R;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CoachVoiceWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Coach Voice";
@@ -727,7 +724,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 20;
-				DEVELOPMENT_TEAM = CB9HS9S84R;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CoachVoiceWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Coach Voice";
