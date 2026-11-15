@@ -24,7 +24,20 @@ cd Evals && ./coach-eval run --save --note "…"      # save to Evals/results/, 
 cd Evals && ./coach-eval inspect --scenario record-yesterday   # exact prompt + tool schemas, no model
 cd Evals && ./coach-eval chat                       # interactive REPL against the real model
 cd Evals && swift test                              # CoachEvalKit unit tests, no model
+
+# App icon — regenerate after editing the script (needs only uv; Pillow comes via inline metadata)
+uv run scripts/generate_app_icon.py                          # overwrites the AppIcon asset
+uv run scripts/generate_app_icon.py --output /tmp/icon.png   # preview without touching the asset
 ```
+
+## App Icon
+The app icon is **generated, never hand-edited**: `scripts/generate_app_icon.py` draws it and writes `Hybrid AIthletics/Assets.xcassets/AppIcon.appiconset/hai-icon.png` (1024×1024, opaque — iOS rejects alpha; `Contents.json` stays untouched). To change the icon/logo, edit the script and re-run it, then commit the script and the PNG together. Every design knob is a named constant at the top of the script:
+- **Shape**: `START`/`OUTLINE` (the shoe's side profile as cubic Béziers, toe right, y down), `MIDSOLE_CUT` and `SPEED_SLASHES` (tapered white negative-space cuts).
+- **Placement**: `SHOE_WIDTH` (fraction of the canvas) and `CENTER` — the shoe sits small in the top-right corner like the heart in Apple's Health icon; keep it clear of iOS's rounded-corner mask.
+- **Colour**: `NAVY_TOP`→`NAVY` (upper's subtle gradient), `NEON_STOPS` (glossy midsole gradient), `HIGHLIGHT*` (specular streak on the midsole), `SPLIT_CURVE`/`NEON_SIDE` (where navy meets neon — today the midsole line).
+- **Shadow**: `SHADOW_*` (soft drop shadow, cast from the solid outline so the white cuts stay white).
+
+Check a change by previewing with `--output` at full size *and* downscaled to ~60 px (home-screen size) before overwriting the asset.
 
 ## Architecture
 The AI coach has a full contributor guide in `docs/AI_COACH.md`, and its evals have `docs/EVALS_GUIDE.md` — keep both in step with the coach notes below.
