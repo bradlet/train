@@ -4,7 +4,7 @@
 # dependencies = ["pillow>=10"]
 # ///
 """
-generate_app_icon.py — draw the Hybrid AIthletics app icon.
+generate_app_icon.py — draw the Train app icon.
 
 A small, sleek racing-shoe silhouette tucked into the top-right corner of a
 plain white background (placed like the heart in Apple's Health icon): low upper, flared
@@ -113,7 +113,7 @@ WEIGHT_HIGHLIGHT: tuple[float, float] = (0.010, 0.009)
 
 DEFAULT_OUTPUT = (
     Path(__file__).resolve().parent.parent
-    / "Hybrid AIthletics/Assets.xcassets/AppIcon.appiconset/app-icon.png"
+    / "Train/Assets.xcassets/AppIcon.appiconset/app-icon.png"
 )
 
 Point = tuple[float, float]
