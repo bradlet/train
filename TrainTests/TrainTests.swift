@@ -1,5 +1,5 @@
 //
-//  Hybrid_AIthleticsTests.swift
+//  TrainTests.swift
 //  Hybrid AIthleticsTests
 //
 //  Unit tests for models, extensions, and business logic.
@@ -10,7 +10,7 @@ import Foundation
 import SwiftData
 import SwiftUI
 import AICoachCore
-@testable import Hybrid_AIthletics
+@testable import Train
 
 // MARK: - ExerciseType Tests
 

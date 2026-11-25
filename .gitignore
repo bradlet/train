@@ -1,12 +1,13 @@
 # Don't track heavy resources in VCS -- download before bundling
 # (small checked-in resources like the exercise library JSON are negated below)
-Hybrid AIthletics/Resources/*
-!Hybrid AIthletics/Resources/StrengthExerciseLibrary.json
+Train/Resources/*
+!Train/Resources/StrengthExerciseLibrary.json
 
 # Swift Package Manager build artifacts
 .build/
 
 # IDEs
 .vscode/
-Hybrid AIthletics.xcodeproj/project.xcworkspace/xcuserdata/bradley.xcuserdatad/UserInterfaceState.xcuserstate
+# Per-user Xcode state (schemes, breakpoints, UI state)
+xcuserdata/
 

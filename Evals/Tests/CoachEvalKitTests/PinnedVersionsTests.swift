@@ -42,7 +42,7 @@ struct PinnedVersionsTests {
     @Test(arguments: ["Evals/Package.resolved", "Packages/AICoachRuntime/Package.resolved"])
     func modelStackMatchesTheApp(_ resolvedFile: String) throws {
         let app = try Self.revisions(
-            "Hybrid AIthletics.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+            "Train.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
         )
         let other = try Self.revisions(resolvedFile)
         for package in Self.modelStack {

@@ -1,5 +1,5 @@
 //
-//  Hybrid_AIthleticsApp.swift
+//  TrainApp.swift
 //  Hybrid AIthletics
 //
 //  App entry point. Configures the SwiftData model container
@@ -13,7 +13,7 @@ import GoogleSignIn
 #endif
 
 @main
-struct Hybrid_AIthleticsApp: App {
+struct TrainApp: App {
     var sharedModelContainer: ModelContainer = Self.makeContainerForLaunch()
 
     /// Shared on-device coach instance. Uses MLX-Swift to run Gemma 4 E2B

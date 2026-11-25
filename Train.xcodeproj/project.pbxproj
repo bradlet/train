@@ -22,14 +22,14 @@
 			containerPortal = 1C1476C92F817B6800DCF85D /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 1C1476D02F817B6800DCF85D;
-			remoteInfo = "Hybrid AIthletics";
+			remoteInfo = "Train";
 		};
 		1C1476ED2F817B6900DCF85D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 1C1476C92F817B6800DCF85D /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 1C1476D02F817B6800DCF85D;
-			remoteInfo = "Hybrid AIthletics";
+			remoteInfo = "Train";
 		};
 		DD00040A2FD0E00000000001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -55,21 +55,21 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		1C1476D12F817B6800DCF85D /* Hybrid AIthletics.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Hybrid AIthletics.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		1C1476E22F817B6900DCF85D /* Hybrid AIthleticsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Hybrid AIthleticsTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		1C1476EC2F817B6900DCF85D /* Hybrid AIthleticsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Hybrid AIthleticsUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1C1476D12F817B6800DCF85D /* Train.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Train.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1C1476E22F817B6900DCF85D /* TrainTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TrainTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1C1476EC2F817B6900DCF85D /* TrainUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TrainUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1C8168F82F83FE0700E33EF9 /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
 		1C8168FE2F83FE0700E33EF9 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		DD0004012FD0E00000000001 /* CoachVoiceWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CoachVoiceWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		1C1476F42F817B6900DCF85D /* Exceptions for "Hybrid AIthletics" folder in "Hybrid AIthletics" target */ = {
+		1C1476F42F817B6900DCF85D /* Exceptions for "Train" folder in "Train" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = 1C1476D02F817B6800DCF85D /* Hybrid AIthletics */;
+			target = 1C1476D02F817B6800DCF85D /* Train */;
 		};
 		DD0004042FD0E00000000001 /* Exceptions for "CoachVoiceWidget" folder in "CoachVoiceWidget" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -81,22 +81,22 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		1C1476D32F817B6800DCF85D /* Hybrid AIthletics */ = {
+		1C1476D32F817B6800DCF85D /* Train */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				1C1476F42F817B6900DCF85D /* Exceptions for "Hybrid AIthletics" folder in "Hybrid AIthletics" target */,
+				1C1476F42F817B6900DCF85D /* Exceptions for "Train" folder in "Train" target */,
 			);
-			path = "Hybrid AIthletics";
+			path = "Train";
 			sourceTree = "<group>";
 		};
-		1C1476E52F817B6900DCF85D /* Hybrid AIthleticsTests */ = {
+		1C1476E52F817B6900DCF85D /* TrainTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Hybrid AIthleticsTests";
+			path = "TrainTests";
 			sourceTree = "<group>";
 		};
-		1C1476EF2F817B6900DCF85D /* Hybrid AIthleticsUITests */ = {
+		1C1476EF2F817B6900DCF85D /* TrainUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Hybrid AIthleticsUITests";
+			path = "TrainUITests";
 			sourceTree = "<group>";
 		};
 		DD0004032FD0E00000000001 /* CoachVoiceWidget */ = {
@@ -151,9 +151,9 @@
 			children = (
 				1C8168F82F83FE0700E33EF9 /* CLAUDE.md */,
 				1C8168FE2F83FE0700E33EF9 /* README.md */,
-				1C1476D32F817B6800DCF85D /* Hybrid AIthletics */,
-				1C1476E52F817B6900DCF85D /* Hybrid AIthleticsTests */,
-				1C1476EF2F817B6900DCF85D /* Hybrid AIthleticsUITests */,
+				1C1476D32F817B6800DCF85D /* Train */,
+				1C1476E52F817B6900DCF85D /* TrainTests */,
+				1C1476EF2F817B6900DCF85D /* TrainUITests */,
 				DD0004032FD0E00000000001 /* CoachVoiceWidget */,
 				1C9E36B72FA2550C0022393D /* Frameworks */,
 				1C1476D22F817B6800DCF85D /* Products */,
@@ -163,9 +163,9 @@
 		1C1476D22F817B6800DCF85D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				1C1476D12F817B6800DCF85D /* Hybrid AIthletics.app */,
-				1C1476E22F817B6900DCF85D /* Hybrid AIthleticsTests.xctest */,
-				1C1476EC2F817B6900DCF85D /* Hybrid AIthleticsUITests.xctest */,
+				1C1476D12F817B6800DCF85D /* Train.app */,
+				1C1476E22F817B6900DCF85D /* TrainTests.xctest */,
+				1C1476EC2F817B6900DCF85D /* TrainUITests.xctest */,
 				DD0004012FD0E00000000001 /* CoachVoiceWidget.appex */,
 			);
 			name = Products;
@@ -181,9 +181,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		1C1476D02F817B6800DCF85D /* Hybrid AIthletics */ = {
+		1C1476D02F817B6800DCF85D /* Train */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 1C1476F52F817B6900DCF85D /* Build configuration list for PBXNativeTarget "Hybrid AIthletics" */;
+			buildConfigurationList = 1C1476F52F817B6900DCF85D /* Build configuration list for PBXNativeTarget "Train" */;
 			buildPhases = (
 				1C1476CD2F817B6800DCF85D /* Sources */,
 				1C1476CE2F817B6800DCF85D /* Frameworks */,
@@ -196,22 +196,22 @@
 				DD00040B2FD0E00000000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				1C1476D32F817B6800DCF85D /* Hybrid AIthletics */,
+				1C1476D32F817B6800DCF85D /* Train */,
 			);
-			name = "Hybrid AIthletics";
+			name = "Train";
 			packageProductDependencies = (
 				AA0001022FA6B00000000001 /* AICoachCore */,
 				CC0003022FC0D00000000001 /* AICoachRuntime */,
 				1C9E36B82FA2550C0022393D /* GoogleSignIn */,
 				1C9E36BA2FA2550C0022393D /* GoogleSignInSwift */,
 			);
-			productName = "Hybrid AIthletics";
-			productReference = 1C1476D12F817B6800DCF85D /* Hybrid AIthletics.app */;
+			productName = "Train";
+			productReference = 1C1476D12F817B6800DCF85D /* Train.app */;
 			productType = "com.apple.product-type.application";
 		};
-		1C1476E12F817B6900DCF85D /* Hybrid AIthleticsTests */ = {
+		1C1476E12F817B6900DCF85D /* TrainTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 1C1476FA2F817B6900DCF85D /* Build configuration list for PBXNativeTarget "Hybrid AIthleticsTests" */;
+			buildConfigurationList = 1C1476FA2F817B6900DCF85D /* Build configuration list for PBXNativeTarget "TrainTests" */;
 			buildPhases = (
 				1C1476DE2F817B6900DCF85D /* Sources */,
 				1C1476DF2F817B6900DCF85D /* Frameworks */,
@@ -223,19 +223,19 @@
 				1C1476E42F817B6900DCF85D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				1C1476E52F817B6900DCF85D /* Hybrid AIthleticsTests */,
+				1C1476E52F817B6900DCF85D /* TrainTests */,
 			);
-			name = "Hybrid AIthleticsTests";
+			name = "TrainTests";
 			packageProductDependencies = (
 				AA0001032FA6B00000000001 /* AICoachCore */,
 			);
-			productName = "Hybrid AIthleticsTests";
-			productReference = 1C1476E22F817B6900DCF85D /* Hybrid AIthleticsTests.xctest */;
+			productName = "TrainTests";
+			productReference = 1C1476E22F817B6900DCF85D /* TrainTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		1C1476EB2F817B6900DCF85D /* Hybrid AIthleticsUITests */ = {
+		1C1476EB2F817B6900DCF85D /* TrainUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 1C1476FD2F817B6900DCF85D /* Build configuration list for PBXNativeTarget "Hybrid AIthleticsUITests" */;
+			buildConfigurationList = 1C1476FD2F817B6900DCF85D /* Build configuration list for PBXNativeTarget "TrainUITests" */;
 			buildPhases = (
 				1C1476E82F817B6900DCF85D /* Sources */,
 				1C1476E92F817B6900DCF85D /* Frameworks */,
@@ -247,13 +247,13 @@
 				1C1476EE2F817B6900DCF85D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				1C1476EF2F817B6900DCF85D /* Hybrid AIthleticsUITests */,
+				1C1476EF2F817B6900DCF85D /* TrainUITests */,
 			);
-			name = "Hybrid AIthleticsUITests";
+			name = "TrainUITests";
 			packageProductDependencies = (
 			);
-			productName = "Hybrid AIthleticsUITests";
-			productReference = 1C1476EC2F817B6900DCF85D /* Hybrid AIthleticsUITests.xctest */;
+			productName = "TrainUITests";
+			productReference = 1C1476EC2F817B6900DCF85D /* TrainUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 		DD0004052FD0E00000000001 /* CoachVoiceWidget */ = {
@@ -304,7 +304,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 1C1476CC2F817B6800DCF85D /* Build configuration list for PBXProject "Hybrid AIthletics" */;
+			buildConfigurationList = 1C1476CC2F817B6800DCF85D /* Build configuration list for PBXProject "Train" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -323,9 +323,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				1C1476D02F817B6800DCF85D /* Hybrid AIthletics */,
-				1C1476E12F817B6900DCF85D /* Hybrid AIthleticsTests */,
-				1C1476EB2F817B6900DCF85D /* Hybrid AIthleticsUITests */,
+				1C1476D02F817B6800DCF85D /* Train */,
+				1C1476E12F817B6900DCF85D /* TrainTests */,
+				1C1476EB2F817B6900DCF85D /* TrainUITests */,
 				DD0004052FD0E00000000001 /* CoachVoiceWidget */,
 			);
 		};
@@ -397,12 +397,12 @@
 /* Begin PBXTargetDependency section */
 		1C1476E42F817B6900DCF85D /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 1C1476D02F817B6800DCF85D /* Hybrid AIthletics */;
+			target = 1C1476D02F817B6800DCF85D /* Train */;
 			targetProxy = 1C1476E32F817B6900DCF85D /* PBXContainerItemProxy */;
 		};
 		1C1476EE2F817B6900DCF85D /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 1C1476D02F817B6800DCF85D /* Hybrid AIthletics */;
+			target = 1C1476D02F817B6800DCF85D /* Train */;
 			targetProxy = 1C1476ED2F817B6900DCF85D /* PBXContainerItemProxy */;
 		};
 		DD00040B2FD0E00000000001 /* PBXTargetDependency */ = {
@@ -418,12 +418,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "Hybrid AIthletics/Hybrid_AIthletics.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "Train/Train.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 22;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Hybrid AIthletics/Info.plist";
+				INFOPLIST_FILE = "Train/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Hybrid AIthletics";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
@@ -456,12 +456,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "Hybrid AIthletics/Hybrid_AIthletics.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "Train/Train.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 22;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Hybrid AIthletics/Info.plist";
+				INFOPLIST_FILE = "Train/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Hybrid AIthletics";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
@@ -629,7 +629,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Hybrid AIthletics.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Hybrid AIthletics";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Train.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Train";
 			};
 			name = Debug;
 		};
@@ -650,7 +650,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Hybrid AIthletics.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Hybrid AIthletics";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Train.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Train";
 			};
 			name = Release;
 		};
@@ -669,7 +669,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = "Hybrid AIthletics";
+				TEST_TARGET_NAME = "Train";
 			};
 			name = Debug;
 		};
@@ -688,7 +688,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = "Hybrid AIthletics";
+				TEST_TARGET_NAME = "Train";
 			};
 			name = Release;
 		};
@@ -749,7 +749,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		1C1476CC2F817B6800DCF85D /* Build configuration list for PBXProject "Hybrid AIthletics" */ = {
+		1C1476CC2F817B6800DCF85D /* Build configuration list for PBXProject "Train" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1C1476F82F817B6900DCF85D /* Debug */,
@@ -758,7 +758,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		1C1476F52F817B6900DCF85D /* Build configuration list for PBXNativeTarget "Hybrid AIthletics" */ = {
+		1C1476F52F817B6900DCF85D /* Build configuration list for PBXNativeTarget "Train" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1C1476F62F817B6900DCF85D /* Debug */,
@@ -767,7 +767,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		1C1476FA2F817B6900DCF85D /* Build configuration list for PBXNativeTarget "Hybrid AIthleticsTests" */ = {
+		1C1476FA2F817B6900DCF85D /* Build configuration list for PBXNativeTarget "TrainTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1C1476FB2F817B6900DCF85D /* Debug */,
@@ -776,7 +776,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		1C1476FD2F817B6900DCF85D /* Build configuration list for PBXNativeTarget "Hybrid AIthleticsUITests" */ = {
+		1C1476FD2F817B6900DCF85D /* Build configuration list for PBXNativeTarget "TrainUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1C1476FE2F817B6900DCF85D /* Debug */,

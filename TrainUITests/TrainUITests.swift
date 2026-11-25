@@ -1,5 +1,5 @@
 //
-//  Hybrid_AIthleticsUITests.swift
+//  TrainUITests.swift
 //  Hybrid AIthleticsUITests
 //
 //  Created by Bradley on 4/4/26.
@@ -7,7 +7,7 @@
 
 import XCTest
 
-final class Hybrid_AIthleticsUITests: XCTestCase {
+final class TrainUITests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
