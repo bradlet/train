@@ -61,8 +61,8 @@ struct TalkToCoachIntent: AppIntent {
 /// The Siri phrases.
 ///
 /// Every App Shortcut phrase must contain `\(.applicationName)`, and nobody
-/// wants to say "Hybrid AIthletics" to Siri. `INAlternativeAppNames` in
-/// `Info.plist` registers "AI Coach" and "Coach" as synonyms Siri accepts in
+/// wants to say "Tell my Train" to Siri. `INAlternativeAppNames` in
+/// `Info.plist` registers "AI Coach", "Coach" and "Train Coach" as synonyms Siri accepts in
 /// that slot — so "Tell my \(.applicationName)" is said "Tell my AI coach".
 /// The athlete can also rename a shortcut in the Shortcuts app to any phrase.
 struct CoachShortcuts: AppShortcutsProvider {

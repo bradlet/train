@@ -77,7 +77,7 @@ struct TrainApp: App {
                     await sheetsSync.attach(modelContainer: sharedModelContainer)
                 }
                 .onOpenURL { url in
-                    // The widget's `hybridaithletics://coach…` links open
+                    // The widget's `com.bradlet.train://coach…` links open
                     // the coach chat.
                     if let entry = CoachLaunchRoute.entry(from: url) {
                         coachLauncher.route(entry)

@@ -12,10 +12,10 @@
 		</dict>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>bradlet.Hybrid-AIthletics.coach</string>
+			<string>com.bradlet.train.coach</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>hybridaithletics</string>
+				<string>com.bradlet.train</string>
 			</array>
 		</dict>
 	</array>
@@ -29,13 +29,17 @@
 			<key>INAlternativeAppName</key>
 			<string>Coach</string>
 		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Train Coach</string>
+		</dict>
 	</array>
 	<key>GIDClientID</key>
 	<string>194504085959-f1bhbq2bic5qnajo4rcn91p1oe06cjro.apps.googleusercontent.com</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Hybrid AIthletics uses your microphone so you can dictate messages to your AI coach.</string>
+	<string>Train uses your microphone so you can dictate messages to your AI coach.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Hybrid AIthletics uses speech recognition to transcribe what you dictate to your AI coach.</string>
+	<string>Train uses speech recognition to transcribe what you dictate to your AI coach.</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
@@ -46,7 +50,7 @@
 			<key>UTTypeDescription</key>
 			<string>Exercise Drag Item</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.hybridaithletics.exercise</string>
+			<string>com.bradlet.train.exercise</string>
 		</dict>
 		<dict>
 			<key>UTTypeConformsTo</key>
@@ -56,7 +60,7 @@
 			<key>UTTypeDescription</key>
 			<string>Strength Exercise Drag Item</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.hybridaithletics.strengthexercise</string>
+			<string>com.bradlet.train.strengthexercise</string>
 		</dict>
 	</array>
 </dict>

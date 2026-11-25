@@ -510,7 +510,7 @@ extension HomeUITests {
 extension HomeUITests {
 
     /// The widget's deep link — duplicated as a literal, like the widget does.
-    private static let voiceLink = URL(string: "hybridaithletics://coach/voice")!
+    private static let voiceLink = URL(string: "com.bradlet.train://coach/voice")!
 
     @MainActor
     func testWidgetLinkDictatesAndSendsWithoutATap() throws {
@@ -535,7 +535,7 @@ extension HomeUITests {
     @MainActor
     func testMessageLinkSendsTheMessage() throws {
         let app = launchApp()
-        app.open(URL(string: "hybridaithletics://coach?message=How%20did%20last%20week%20go%3F")!)
+        app.open(URL(string: "com.bradlet.train://coach?message=How%20did%20last%20week%20go%3F")!)
         let userBubble = app.otherElements["coach.chat.bubble.user"]
         XCTAssertTrue(userBubble.waitForExistence(timeout: 10), "the message should send")
         XCTAssertTrue(

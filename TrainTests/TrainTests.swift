@@ -7316,39 +7316,39 @@ struct CoachLaunchRouteTests {
 
     @Test func voiceURLOpensHandsFreeDictation() {
         // The widget extension spells this literal out; keep it in step.
-        let url = URL(string: "hybridaithletics://coach/voice")!
+        let url = URL(string: "com.bradlet.train://coach/voice")!
         #expect(CoachLaunchRoute.entry(from: url) == .voice(autoSend: true))
     }
 
     @Test func schemeAndHostMatchCaseInsensitively() {
-        let url = URL(string: "HybridAIthletics://Coach/Voice")!
+        let url = URL(string: "Com.Bradlet.Train://Coach/Voice")!
         #expect(CoachLaunchRoute.entry(from: url) == .voice(autoSend: true))
     }
 
     @Test func messageURLDecodesPercentEncoding() {
-        let url = URL(string: "hybridaithletics://coach?message=I%20ran%205%20miles%20%26%20felt%20great")!
+        let url = URL(string: "com.bradlet.train://coach?message=I%20ran%205%20miles%20%26%20felt%20great")!
         #expect(CoachLaunchRoute.entry(from: url) == .message("I ran 5 miles & felt great"))
     }
 
     @Test func messageIsTrimmed() {
-        let url = URL(string: "hybridaithletics://coach/?message=%20%20hi%20coach%20")!
+        let url = URL(string: "com.bradlet.train://coach/?message=%20%20hi%20coach%20")!
         #expect(CoachLaunchRoute.entry(from: url) == .message("hi coach"))
     }
 
     @Test func blankOrMissingMessageIsRejected() {
-        #expect(CoachLaunchRoute.entry(from: URL(string: "hybridaithletics://coach?message=%20%20")!) == nil)
-        #expect(CoachLaunchRoute.entry(from: URL(string: "hybridaithletics://coach")!) == nil)
+        #expect(CoachLaunchRoute.entry(from: URL(string: "com.bradlet.train://coach?message=%20%20")!) == nil)
+        #expect(CoachLaunchRoute.entry(from: URL(string: "com.bradlet.train://coach")!) == nil)
     }
 
     @Test func unknownPathIsRejected() {
-        #expect(CoachLaunchRoute.entry(from: URL(string: "hybridaithletics://coach/history")!) == nil)
+        #expect(CoachLaunchRoute.entry(from: URL(string: "com.bradlet.train://coach/history")!) == nil)
     }
 
     @Test func foreignSchemesAndHostsAreRejected() {
         // The Google sign-in redirect shares onOpenURL and must fall through.
         let oauth = URL(string: "com.googleusercontent.apps.123:/oauth2redirect?code=abc")!
         #expect(CoachLaunchRoute.entry(from: oauth) == nil)
-        #expect(CoachLaunchRoute.entry(from: URL(string: "hybridaithletics://history/voice")!) == nil)
+        #expect(CoachLaunchRoute.entry(from: URL(string: "com.bradlet.train://history/voice")!) == nil)
         #expect(CoachLaunchRoute.entry(from: URL(string: "https://coach/voice")!) == nil)
     }
 

@@ -18,13 +18,13 @@
 #   scripts/inspect-store.sh -q "SELECT ..." # run one query and exit
 #
 # Env:
-#   BUNDLE_ID   app bundle id (default: bradlet.Hybrid-AIthletics)
+#   BUNDLE_ID   app bundle id (default: com.bradlet.train)
 #
 # See docs/INSPECTING_DATA.md for the full walkthrough.
 
 set -euo pipefail
 
-BUNDLE_ID="${BUNDLE_ID:-bradlet.Hybrid-AIthletics}"
+BUNDLE_ID="${BUNDLE_ID:-com.bradlet.train}"
 QUERY=""
 SOURCE=""
 

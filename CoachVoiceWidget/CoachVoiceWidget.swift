@@ -19,7 +19,7 @@ import WidgetKit
 /// `CoachLaunchRouteTests.voiceURLOpensHandsFreeDictation` pins the same
 /// literal on the app side.
 enum CoachVoiceLink {
-    static let url = URL(string: "hybridaithletics://coach/voice")!
+    static let url = URL(string: "com.bradlet.train://coach/voice")!
 }
 
 /// The widget has no data: one static entry, never refreshed.

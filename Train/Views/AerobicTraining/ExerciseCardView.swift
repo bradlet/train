@@ -15,7 +15,7 @@ import UniformTypeIdentifiers
 
 /// Custom UTType for exercise drag-and-drop within the app.
 extension UTType {
-    static let exerciseDragItem = UTType(exportedAs: "com.hybridaithletics.exercise")
+    static let exerciseDragItem = UTType(exportedAs: "com.bradlet.train.exercise")
 }
 
 /// Lightweight transferable payload carrying only the exercise's UUID.

@@ -76,7 +76,7 @@ struct ImportHealthKitSheet: View {
             ContentUnavailableView(
                 "No recent workouts",
                 systemImage: "heart.slash",
-                description: Text("No workouts found in the last \(Int(importLookbackDays)) days. If this is unexpected, check Settings → Health → Data Access & Devices to confirm Hybrid AIthletics has read access.")
+                description: Text("No workouts found in the last \(Int(importLookbackDays)) days. If this is unexpected, check Settings → Health → Data Access & Devices to confirm Train has read access.")
             )
         case .error(let message):
             VStack(spacing: 16) {

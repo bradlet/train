@@ -40,16 +40,16 @@ enum CoachChatEntry: Hashable {
     }
 }
 
-/// Parses and builds the app's `hybridaithletics://coach…` deep links.
+/// Parses and builds the app's `com.bradlet.train://coach…` deep links.
 ///
-/// - `hybridaithletics://coach/voice` → `.voice(autoSend: true)` (the widget)
-/// - `hybridaithletics://coach?message=…` → `.message(…)`
+/// - `com.bradlet.train://coach/voice` → `.voice(autoSend: true)` (the widget)
+/// - `com.bradlet.train://coach?message=…` → `.message(…)`
 ///
 /// The widget extension spells the voice URL out literally (it cannot link
 /// app code); `CoachLaunchRouteTests` pins that literal.
 enum CoachLaunchRoute {
     /// The URL scheme registered in `Info.plist`.
-    static let scheme = "hybridaithletics"
+    static let scheme = "com.bradlet.train"
     /// The host every coach link uses.
     static let host = "coach"
 

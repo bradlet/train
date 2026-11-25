@@ -60,7 +60,7 @@ final class GoogleSheetsSyncCoordinator {
     private var debounceTask: Task<Void, Never>?
 
     /// Title used when creating a new spreadsheet on first enable.
-    private static let spreadsheetTitle = "Hybrid AIthletics"
+    private static let spreadsheetTitle = "Train"
 
     /// Debounce window for mutation-triggered syncs. Mutation hooks call
     /// `requestSync()`; the actual upload fires this many seconds after the
