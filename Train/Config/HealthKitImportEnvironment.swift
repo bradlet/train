@@ -1,6 +1,6 @@
 //
 //  HealthKitImportEnvironment.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Custom SwiftUI environment key that injects a `HealthKitImportService`
 //  into the view hierarchy. Default value is `StubHealthKitImportService`

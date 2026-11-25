@@ -1,6 +1,6 @@
 //
 //  Exercise.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  A single training activity — planned, recorded, or both. The planning
 //  fields (type, target duration/distance, notes, date) always apply. Once

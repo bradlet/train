@@ -1,6 +1,6 @@
 //
 //  AICoachEnvironment.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Custom SwiftUI environment key that injects an AICoachService into the
 //  view hierarchy. Default value is StubAICoachService so previews and

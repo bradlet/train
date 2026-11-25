@@ -1,6 +1,6 @@
 //
 //  StrengthLibraryUITests.swift
-//  Hybrid AIthleticsUITests
+//  TrainUITests
 //
 //  Functional UI tests for the strength library flows: creating a custom
 //  exercise through the library sheet's '+' form and removing it again with

@@ -1,6 +1,6 @@
 //
 //  StrengthBoardPlanner.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Owns the mutation logic for the strength kanban board: which lane an
 //  exercise lives in (day + active/offloaded section) and its order within

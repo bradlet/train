@@ -1,6 +1,6 @@
 //
 //  HealthKitImportService.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Protocol abstraction over the HealthKit workout fetch flow. Views
 //  depend on this protocol (via `@Environment(\.healthKitImport)`) so

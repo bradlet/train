@@ -1,6 +1,6 @@
 //
 //  PlanPerformance.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Classifies a recorded workout's distance against its planned distance
 //  so exercise cards can tint their completed half by performance.

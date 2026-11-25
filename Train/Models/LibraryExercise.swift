@@ -1,6 +1,6 @@
 //
 //  LibraryExercise.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  A strength exercise definition in the exercise library. Plain Codable
 //  value type decoded from the bundled JSON catalog (and, in the future,

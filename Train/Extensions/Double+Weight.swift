@@ -1,6 +1,6 @@
 //
 //  Double+Weight.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Weight formatting helpers. Weights are stored in pounds internally
 //  (mirroring the miles-internally convention for distance) and converted

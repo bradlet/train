@@ -1,6 +1,6 @@
 //
 //  HealthKitWorkout.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Source-agnostic snapshot of an `HKWorkout`. This DTO is what crosses
 //  the boundary between `HealthKitImportService` and SwiftUI views, so

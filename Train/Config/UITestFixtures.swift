@@ -1,6 +1,6 @@
 //
 //  UITestFixtures.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Deterministic exercise fixtures used by UI test targets.
 //  Activated only when the app is launched with `-uiTestSeed`.

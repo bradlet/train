@@ -1,6 +1,6 @@
 //
 //  TodayTraining.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Pure selection of what the Home tab shows for a given day. Kept out of the
 //  view so the day-matching and ordering rules are unit-testable, the same

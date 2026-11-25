@@ -1,6 +1,6 @@
 //
 //  StrengthTrainingView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Top-level view for the Strength tab: a kanban-style weekly board. One
 //  column per day (Sunday-Saturday), swipeable left/right like a project

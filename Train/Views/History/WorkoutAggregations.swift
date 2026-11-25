@@ -1,6 +1,6 @@
 //
 //  WorkoutAggregations.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Pure, stateless aggregation helpers used by the History tab's
 //  Performance Hub. Groups recorded exercises into weekly buckets

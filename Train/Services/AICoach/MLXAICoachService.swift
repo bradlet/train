@@ -1,6 +1,6 @@
 //
 //  MLXAICoachService.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Production AI coach backed by Gemma 4 E2B running on-device via MLX-Swift.
 //

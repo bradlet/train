@@ -1,6 +1,6 @@
 //
 //  CoachSpeechEnvironment.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  SwiftUI environment key that injects the shared speech-to-text service.
 //

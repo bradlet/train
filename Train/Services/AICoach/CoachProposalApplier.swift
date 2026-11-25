@@ -1,6 +1,6 @@
 //
 //  CoachProposalApplier.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Turns an accepted coach proposal into a SwiftData mutation.
 //

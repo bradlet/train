@@ -1,6 +1,6 @@
 //
 //  FavoritesUITests.swift
-//  Hybrid AIthleticsUITests
+//  TrainUITests
 //
 //  Functional UI tests for favorite workouts: quick-recording from a Home
 //  chip, managing favorites from the card's Edit button, and starting a quick

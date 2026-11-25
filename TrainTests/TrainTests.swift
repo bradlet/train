@@ -1,6 +1,6 @@
 //
 //  TrainTests.swift
-//  Hybrid AIthleticsTests
+//  TrainTests
 //
 //  Unit tests for models, extensions, and business logic.
 //

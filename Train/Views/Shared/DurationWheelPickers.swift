@@ -1,6 +1,6 @@
 //
 //  DurationWheelPickers.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Shared hours/minutes/seconds wheel-picker row used by every duration
 //  editor (workout forms, exercise scheduling, planned targets).

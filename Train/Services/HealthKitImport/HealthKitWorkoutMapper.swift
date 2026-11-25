@@ -1,6 +1,6 @@
 //
 //  HealthKitWorkoutMapper.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Stateless mapping from HealthKit types to the app's domain types.
 //  Pure functions only — no `HKHealthStore`, no SwiftData, no async.

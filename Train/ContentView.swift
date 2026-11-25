@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Root view containing the four-tab navigation structure.
 //  Reads the unit configuration and injects it into the environment.

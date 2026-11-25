@@ -1,6 +1,6 @@
 //
 //  StrengthExercise.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  A strength exercise on the weekly kanban board. Unlike aerobic `Exercise`,
 //  a strength exercise has NO date — it lives permanently in a day-of-week

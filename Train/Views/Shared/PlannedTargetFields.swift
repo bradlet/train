@@ -1,6 +1,6 @@
 //
 //  PlannedTargetFields.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  "Planned Target" form section shown alongside the completed fields in
 //  the unified workout editor, so a recorded exercise's plan and actuals

@@ -1,6 +1,6 @@
 //
 //  FavoriteMenuSection.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  The "Start from Favorite" form section shared by the record (quick add)
 //  and schedule sheets. Picking a favorite hands it back to the sheet, which

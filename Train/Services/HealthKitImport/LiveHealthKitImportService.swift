@@ -1,6 +1,6 @@
 //
 //  LiveHealthKitImportService.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Production `HealthKitImportService` backed by a real `HKHealthStore`.
 //  Requests read-only access for `HKObjectType.workoutType()` and runs an

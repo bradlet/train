@@ -1,6 +1,6 @@
 //
 //  GoogleSheetsSyncCoordinator.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Orchestrates the Google Sheets sync feature: owns the user-facing
 //  enable/disable state, debounces mutation-triggered syncs, and bridges

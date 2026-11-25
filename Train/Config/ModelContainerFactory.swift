@@ -1,6 +1,6 @@
 //
 //  ModelContainerFactory.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Centralizes ModelContainer creation for the app, previews, and tests.
 //  Configures SwiftData with CloudKit sync.

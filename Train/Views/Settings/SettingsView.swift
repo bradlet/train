@@ -1,6 +1,6 @@
 //
 //  SettingsView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  App-wide preferences sheet, opened from the History tab's toolbar.
 //  Edits the singleton `AppConfiguration` (SwiftData, CloudKit-synced).

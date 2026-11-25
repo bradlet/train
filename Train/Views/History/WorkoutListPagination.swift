@@ -1,6 +1,6 @@
 //
 //  WorkoutListPagination.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Pure-Swift pagination math used by `WorkoutListView`. Extracted so the
 //  index/page calculations can be unit-tested without spinning up SwiftUI.

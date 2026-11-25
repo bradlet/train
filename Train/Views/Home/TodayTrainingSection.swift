@@ -1,6 +1,6 @@
 //
 //  TodayTrainingSection.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  The "today" block on the Home tab: the day's aerobic sessions and the day's
 //  active strength lane. Selection and ordering live in `TodayTraining`; this

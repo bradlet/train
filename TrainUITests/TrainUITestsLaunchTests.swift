@@ -1,6 +1,6 @@
 //
 //  TrainUITestsLaunchTests.swift
-//  Hybrid AIthleticsUITests
+//  TrainUITests
 //
 //  Created by Bradley on 4/4/26.
 //

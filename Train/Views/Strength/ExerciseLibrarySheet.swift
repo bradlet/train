@@ -1,6 +1,6 @@
 //
 //  ExerciseLibrarySheet.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Browsable strength exercise library. Entries load asynchronously through
 //  the `ExerciseLibraryProvider` abstraction (bundled JSON today, mergeable

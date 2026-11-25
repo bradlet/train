@@ -1,6 +1,6 @@
 //
 //  WeeklyChartSegments.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Splits a run of weekly metric points into contiguous stretches that
 //  actually have data, so `WeeklyChartView` can draw a line that *breaks*

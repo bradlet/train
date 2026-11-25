@@ -1,6 +1,6 @@
 //
 //  RatingPickerUITests.swift
-//  Hybrid AIthleticsUITests
+//  TrainUITests
 //
 //  Functional UI tests for the two radial rating dials in the workout form:
 //  feeling (1–5) and perceived exertion (1–10).

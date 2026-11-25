@@ -1,6 +1,6 @@
 //
 //  MonthlyCalendarView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  A month-grid calendar that shows colored dots on days with activity.
 //  Accepts any `CalendarDisplayable` items (workouts, exercises, or dots).

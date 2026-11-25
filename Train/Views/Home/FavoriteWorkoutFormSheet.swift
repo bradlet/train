@@ -1,6 +1,6 @@
 //
 //  FavoriteWorkoutFormSheet.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Create/edit form for a favorite workout. Holds only the preset's identity
 //  and targets — no date, notes or ratings, which belong to a workout, not a

@@ -1,6 +1,6 @@
 //
 //  AerobicTrainingUITests.swift
-//  Hybrid AIthleticsUITests
+//  TrainUITests
 //
 //  Functional UI tests for the Aerobic Training tab: monthly calendar
 //  navigation, quick-add workflow, and schedule exercise workflow.

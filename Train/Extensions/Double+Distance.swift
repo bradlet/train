@@ -1,6 +1,6 @@
 //
 //  Double+Distance.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Distance formatting and conversion utilities.
 //  All distances are stored internally in miles.

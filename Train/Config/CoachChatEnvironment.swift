@@ -1,6 +1,6 @@
 //
 //  CoachChatEnvironment.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  SwiftUI environment key that injects the shared `CoachChatStore`.
 //  The default value is a fresh, empty store so previews and tests each get

@@ -1,6 +1,6 @@
 //
 //  WorkoutFormFields.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Reusable Form sections describing a workout (name/type, duration, distance,
 //  date, notes, feeling, perceived exertion). Shared by `RecordWorkoutSheet`

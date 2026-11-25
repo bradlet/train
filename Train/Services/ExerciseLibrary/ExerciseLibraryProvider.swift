@@ -1,6 +1,6 @@
 //
 //  ExerciseLibraryProvider.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Extensible loading layer for the strength exercise library. Today the
 //  library ships as a bundled JSON catalog; the provider abstraction lets us

@@ -1,6 +1,6 @@
 //
 //  ExercisePlanner.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Stateless bulk-CRUD surface for exercise series. All methods take a
 //  ModelContext so callers (UI today, an AI-coach tool layer later) can

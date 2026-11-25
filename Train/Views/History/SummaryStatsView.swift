@@ -1,6 +1,6 @@
 //
 //  SummaryStatsView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Page 1 of the History tab's Performance Hub. Displays mileage stat
 //  cards (all-time, this year, this month, this week) plus the current

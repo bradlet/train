@@ -1,6 +1,6 @@
 //
 //  Workout.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Recorded-instance data for an `Exercise`. This is a plain Codable value
 //  type (NOT a SwiftData @Model) stored inline on `Exercise.workout`, so an

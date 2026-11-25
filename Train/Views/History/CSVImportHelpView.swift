@@ -1,6 +1,6 @@
 //
 //  CSVImportHelpView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Help page explaining the expected CSV format for workout imports.
 //  Exercise type values are generated dynamically from ExerciseType.allCases

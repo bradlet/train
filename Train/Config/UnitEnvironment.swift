@@ -1,6 +1,6 @@
 //
 //  UnitEnvironment.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Custom SwiftUI environment key for metric unit preference.
 //  Allows any view in the hierarchy to read the unit setting

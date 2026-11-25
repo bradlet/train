@@ -1,6 +1,6 @@
 //
 //  FavoriteWorkout.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  A saved aerobic workout preset ("favorite"). Picking one pre-fills the
 //  record and schedule sheets with its identity and targets, so a session the

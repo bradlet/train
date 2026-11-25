@@ -1,6 +1,6 @@
 //
 //  CalendarDisplayable.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Protocol for items that can appear as dots on a monthly calendar grid.
 //  Exercise conforms (via its single `date`), enabling the shared

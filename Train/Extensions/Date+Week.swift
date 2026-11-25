@@ -1,6 +1,6 @@
 //
 //  Date+Week.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Calendar arithmetic helpers for week and month boundaries.
 //  Uses the standard Sunday-start week via `Calendar.current`.

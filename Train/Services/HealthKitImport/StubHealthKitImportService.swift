@@ -1,6 +1,6 @@
 //
 //  StubHealthKitImportService.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  In-memory `HealthKitImportService` used by SwiftUI previews and unit
 //  tests. Returns a canned set of `HealthKitWorkout` fixtures so the UI

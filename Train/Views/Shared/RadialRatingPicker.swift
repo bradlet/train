@@ -1,6 +1,6 @@
 //
 //  RadialRatingPicker.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  A Garmin-style radial dial for the two subjective workout ratings. Only
 //  the top arc of a large circle is visible; the athlete swipes horizontally

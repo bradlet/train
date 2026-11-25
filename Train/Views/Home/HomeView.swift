@@ -1,6 +1,6 @@
 //
 //  HomeView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  The app's landing tab: today's training, a quick way to record it, and the
 //  entry point into the coach conversation.

@@ -1,6 +1,6 @@
 //
 //  UserLibraryExercise.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  A user-created exercise library entry. Unlike the bundled catalog (plain
 //  `LibraryExercise` values decoded from JSON), user entries are SwiftData

@@ -1,6 +1,6 @@
 //
 //  TrainApp.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  App entry point. Configures the SwiftData model container
 //  and injects it into the view hierarchy.

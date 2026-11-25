@@ -1,6 +1,6 @@
 //
 //  CoachEntryCard.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  The Home tab's entry point into the coach conversation. Replaces the
 //  "Ask Coach" toolbar button that used to open a one-shot sheet.

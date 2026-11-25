@@ -1,6 +1,6 @@
 //
 //  ImportHealthKitSheet.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Sheet presented from the History tab menu to import workouts from
 //  Apple Health. Requests read authorization on appear, loads the most

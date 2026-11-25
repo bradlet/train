@@ -1,6 +1,6 @@
 //
 //  CoachChatView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  The coach conversation. A pushed destination rather than a sheet so the
 //  keyboard and the pinned composer behave.

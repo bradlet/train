@@ -1,6 +1,6 @@
 //
 //  CoachIntents.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Siri / Shortcuts entry to the coach: "Tell my AI coach…" and "Talk to my
 //  AI coach". Both open the app and route through `CoachLaunchRouter`, the

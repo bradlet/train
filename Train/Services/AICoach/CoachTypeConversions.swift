@@ -1,6 +1,6 @@
 //
 //  CoachTypeConversions.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Extensions to convert the app's SwiftData `Exercise` model (and its nested
 //  `Workout` value) into AICoachCore's plain types for prompt building.

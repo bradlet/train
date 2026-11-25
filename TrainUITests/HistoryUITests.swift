@@ -1,6 +1,6 @@
 //
 //  HistoryUITests.swift
-//  Hybrid AIthleticsUITests
+//  TrainUITests
 //
 //  Functional UI tests for the History tab: pagination controls, calendar
 //  navigation, and workout detail sheet open/edit/delete flows.

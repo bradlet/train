@@ -1,6 +1,6 @@
 //
 //  DiagonalSplitShapes.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Shapes backing the completed/planned diagonal split on exercise cards.
 //

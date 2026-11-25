@@ -1,6 +1,6 @@
 //
 //  ExerciseSeriesSpec.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Pure value types describing a planned exercise series: how often it
 //  recurs, when it ends, and how it progresses over time. These are Codable

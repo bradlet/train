@@ -1,6 +1,6 @@
 //
 //  CoachSpeechService.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Speech-to-text for the coach composer, plus the pure merge of dictated
 //  text into whatever the athlete already typed.

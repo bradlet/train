@@ -1,6 +1,6 @@
 //
 //  HistoryView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Container view for the History tab. Shows summary stats,
 //  a monthly calendar, and a paginated list of all recorded workouts.

@@ -1,6 +1,6 @@
 //
 //  AICoachService.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Protocol abstraction over the on-device coaching model so that the
 //  rest of the app never directly depends on MLX (or any specific runtime).

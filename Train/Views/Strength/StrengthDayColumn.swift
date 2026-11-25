@@ -1,6 +1,6 @@
 //
 //  StrengthDayColumn.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  One day's kanban column: the active exercise plan on top and the
 //  "offloaded" holding section below. Both sections accept card drops —

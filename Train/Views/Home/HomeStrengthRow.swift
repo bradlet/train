@@ -1,6 +1,6 @@
 //
 //  HomeStrengthRow.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Compact row for one of today's strength exercises on the Home tab.
 //

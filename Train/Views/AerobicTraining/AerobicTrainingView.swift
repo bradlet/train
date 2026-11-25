@@ -1,6 +1,6 @@
 //
 //  AerobicTrainingView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Top-level view for the Aerobic Training tab.
 //  Shows a monthly calendar with exercise dots, a weekly calendar with

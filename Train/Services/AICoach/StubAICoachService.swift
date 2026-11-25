@@ -1,6 +1,6 @@
 //
 //  StubAICoachService.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Deterministic AI coach implementation used by SwiftUI previews and unit
 //  tests. Returns a canned response without loading any real model, so it

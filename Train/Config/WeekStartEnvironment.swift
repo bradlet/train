@@ -1,6 +1,6 @@
 //
 //  WeekStartEnvironment.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Custom SwiftUI environment key for the workout week start preference.
 //  Allows any view in the hierarchy to read the configured first weekday

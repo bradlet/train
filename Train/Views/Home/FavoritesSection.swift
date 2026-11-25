@@ -1,6 +1,6 @@
 //
 //  FavoritesSection.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  The Home card for favorite workouts: one chip per favorite that
 //  quick-records it for today, plus the Edit entry point into managing them.

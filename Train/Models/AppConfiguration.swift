@@ -1,6 +1,6 @@
 //
 //  AppConfiguration.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Singleton app-wide preferences stored in SwiftData.
 //  Syncs via CloudKit alongside other model data.

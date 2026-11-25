@@ -1,6 +1,6 @@
 //
 //  WeeklyCalendarView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Renders 7 day swimlanes for the selected week, ordered by the caller
 //  (top day = the user's configured week start).

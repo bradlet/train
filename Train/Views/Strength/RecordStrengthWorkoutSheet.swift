@@ -1,6 +1,6 @@
 //
 //  RecordStrengthWorkoutSheet.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Form for recording a weight entry against a strength exercise: the date,
 //  the weight lifted, and what kind of measurement the weight represents

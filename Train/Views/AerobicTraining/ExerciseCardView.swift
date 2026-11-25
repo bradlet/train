@@ -1,6 +1,6 @@
 //
 //  ExerciseCardView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Displays a single planned exercise as a compact card.
 //  Supports drag-and-drop between day swimlanes, swipe-to-delete, and

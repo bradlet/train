@@ -1,6 +1,6 @@
 //
 //  MuscleGroup.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Muscle groups targeted by strength exercises. Decoding falls back to
 //  `.other` for unknown raw values so exercise data loaded from a future

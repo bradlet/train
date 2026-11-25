@@ -1,6 +1,6 @@
 //
 //  WorkoutDetailSheet.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Edit/delete sheet for a recorded exercise (one whose `workout` is set).
 //  Opens directly in editable mode, shows every user-facing field

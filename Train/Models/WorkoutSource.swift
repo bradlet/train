@@ -1,6 +1,6 @@
 //
 //  WorkoutSource.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Provenance categories for a `Workout`. Stored on `Workout.source` as the
 //  raw string value so CloudKit sees a primitive and adding future cases

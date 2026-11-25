@@ -1,6 +1,6 @@
 //
 //  WorkoutCSVDocument.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  FileDocument wrapper that carries a pre-encoded CSV string to
 //  SwiftUI's `.fileExporter`. Import uses `.fileImporter` (URL-based)

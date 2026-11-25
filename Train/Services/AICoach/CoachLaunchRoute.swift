@@ -1,6 +1,6 @@
 //
 //  CoachLaunchRoute.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  How the coach chat is entered, and the deep links that open it from
 //  outside the app — the home-screen widget and the Siri shortcuts.

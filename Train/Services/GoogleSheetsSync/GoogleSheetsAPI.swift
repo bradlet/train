@@ -1,6 +1,6 @@
 //
 //  GoogleSheetsAPI.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Thin abstraction over Google's OAuth + Sheets REST surface used by
 //  `GoogleSheetsSyncCoordinator`. Two implementations:

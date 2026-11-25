@@ -1,6 +1,6 @@
 //
 //  WorkoutCSV.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Pure CSV encoding and parsing for recorded exercises (Exercise + nested
 //  Workout). Deliberately has no SwiftData or SwiftUI dependencies so it is

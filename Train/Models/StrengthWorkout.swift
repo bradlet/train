@@ -1,6 +1,6 @@
 //
 //  StrengthWorkout.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  A single recorded strength session for a `StrengthExercise`. Plain Codable
 //  value type (NOT a SwiftData @Model) stored as a JSON-encoded array inline

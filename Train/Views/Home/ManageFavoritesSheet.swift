@@ -1,6 +1,6 @@
 //
 //  ManageFavoritesSheet.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  The favorites list behind the Home card's Edit button: add, edit,
 //  swipe-delete and drag-reorder favorite workouts. Receives the favorites as

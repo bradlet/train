@@ -1,6 +1,6 @@
 //
 //  LiveCoachSpeechService.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Production speech-to-text for the coach composer, built on
 //  SFSpeechRecognizer + AVAudioEngine.

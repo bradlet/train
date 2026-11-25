@@ -1,6 +1,6 @@
 //
 //  StrengthExerciseCard.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  A kanban card for one strength exercise: name, muscle group, and the most
 //  recent recorded weight. Draggable between lanes/days; tap to record a

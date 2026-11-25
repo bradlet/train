@@ -1,6 +1,6 @@
 //
 //  WorkoutListView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  A paginated, reverse-chronological list of all recorded workouts with
 //  discrete prev/next page controls. Rows are tappable and present a

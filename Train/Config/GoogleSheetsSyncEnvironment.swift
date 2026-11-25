@@ -1,6 +1,6 @@
 //
 //  GoogleSheetsSyncEnvironment.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  SwiftUI environment key that injects the shared
 //  `GoogleSheetsSyncCoordinator`. Default value is a coordinator backed by

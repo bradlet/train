@@ -1,6 +1,6 @@
 //
 //  StubCoachSpeechService.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Deterministic speech-to-text implementation used by SwiftUI previews,
 //  unit tests, and UI tests. Emits a canned transcript on `start()` so the

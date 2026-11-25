@@ -1,6 +1,6 @@
 //
 //  QuickRecordSection.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  The quick-record entry point on the Home tab: log a workout or a lift
 //  without first navigating to a calendar.

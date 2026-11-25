@@ -1,6 +1,6 @@
 //
 //  WeekMileage.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Pure aggregation helpers for the weekly training header's mileage stats.
 //  Kept free of SwiftUI/ModelContext so the math is unit-testable.

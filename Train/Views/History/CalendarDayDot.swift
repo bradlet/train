@@ -1,6 +1,6 @@
 //
 //  CalendarDayDot.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Decides how a monthly-calendar day cell draws its activity dot. Extracted
 //  from `MonthlyCalendarView` so the "did anything that day count as

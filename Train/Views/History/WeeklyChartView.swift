@@ -1,6 +1,6 @@
 //
 //  WeeklyChartView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Pages 2 and 3 of the Performance Hub. A parameterized line chart
 //  that displays a weekly metric (mileage or average feeling) over

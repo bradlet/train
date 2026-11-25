@@ -1,6 +1,6 @@
 //
 //  HomeUITests.swift
-//  Hybrid AIthleticsUITests
+//  TrainUITests
 //
 //  Functional UI tests for the Home tab: today's training, quick record, and
 //  the coach conversation.

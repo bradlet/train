@@ -1,6 +1,6 @@
 //
 //  ImportCSVConfirmationSheet.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Sheet shown after the user picks a CSV file to import. Summarizes
 //  what will be imported and — critically — makes the distance unit

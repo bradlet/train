@@ -1,6 +1,6 @@
 //
 //  RadialDialGeometry.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Pure geometry and index math for `RadialRatingPicker`. Extracted so the
 //  dial's drag → position → snapped-value behaviour can be unit-tested

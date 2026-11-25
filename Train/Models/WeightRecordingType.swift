@@ -1,6 +1,6 @@
 //
 //  WeightRecordingType.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  How the weight of a recorded strength workout was measured. Differentiating
 //  the recording type lets us graph e.g. 1-rep max over time separately from

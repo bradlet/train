@@ -1,6 +1,6 @@
 //
 //  EditStrengthPlanSheet.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Small sheet for setting an exercise's planned set structure (e.g. 3 sets
 //  of 8 reps). This is plan-only data the user keeps in mind through the

@@ -1,6 +1,6 @@
 //
 //  ExerciseType.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Defines the available exercise types for aerobic training.
 //  Running-focused with cross-training options.

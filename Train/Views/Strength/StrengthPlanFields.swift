@@ -1,6 +1,6 @@
 //
 //  StrengthPlanFields.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  The planned sets × reps editor, shared by the two flows that can set a
 //  plan: adding an exercise from the library (`LibraryExerciseDetailView`)

@@ -1,6 +1,6 @@
 //
 //  RecordWorkoutSheet.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Form sheet for recording a completed workout.
 //  When given a planned exercise, pre-fills from its targets and attaches the

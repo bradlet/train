@@ -1,6 +1,6 @@
 //
 //  CoachLaunchEnvironment.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  SwiftUI environment key that injects the shared `CoachLaunchRouter`.
 //  The default value is a fresh router so previews and tests never see an

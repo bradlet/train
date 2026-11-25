@@ -1,6 +1,6 @@
 //
 //  GoogleSheetsSyncError.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Errors surfaced by the Google Sheets sync stack — the API layer
 //  (`GoogleSheetsAPI`) and the orchestrating coordinator

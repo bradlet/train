@@ -1,6 +1,6 @@
 //
 //  FavoriteWorkoutEditor.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  The pure value and mutation path behind favorite workouts, kept out of the
 //  views so it can be unit-tested (same pattern as `UserLibraryEditor` and

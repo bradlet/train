@@ -1,6 +1,6 @@
 //
 //  CoachChatStore.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Session-scoped state for the coach conversation: the transcript, the
 //  model's load phase, and any proposals awaiting the athlete's decision.

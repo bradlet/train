@@ -1,6 +1,6 @@
 //
 //  PerformanceHubView.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Swipeable three-page container shown at the top of the History tab.
 //  Wraps the summary stat cards (page 1), the weekly mileage chart

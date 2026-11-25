@@ -1,6 +1,6 @@
 //
 //  SeriesGenerator.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Pure expansion of an ExerciseSeriesSpec into dated occurrence values.
 //  No SwiftData, no side effects — fully unit-testable.

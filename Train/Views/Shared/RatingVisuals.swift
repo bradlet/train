@@ -1,6 +1,6 @@
 //
 //  RatingVisuals.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Shared display-name / SF Symbol / tint mappings for the two subjective
 //  workout ratings: how the athlete felt (1–5) and how hard the session was

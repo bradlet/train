@@ -1,6 +1,6 @@
 //
 //  UserExerciseFormSheet.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Form for creating a user's own exercise library entry, with the same
 //  fields bundled catalog entries carry: name, description, primary and

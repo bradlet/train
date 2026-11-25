@@ -1,6 +1,6 @@
 //
 //  AddExerciseSheet.swift
-//  Hybrid AIthletics
+//  Train
 //
 //  Form sheet for creating or editing a planned exercise.
 //  Supports both create (nil exercise) and edit (existing exercise) modes.
