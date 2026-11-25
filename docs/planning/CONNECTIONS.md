@@ -12,7 +12,7 @@
 
 **Problems:**
 - **Three bespoke pipelines.** Each target has its own row mapping, error type, and UI.
-- **Status is hard to see.** A broken Google connection (re-auth every 7 days until the GCP app is published, see #11) shows up only inside a menu.
+- **Status is hard to see.** A broken Google connection (re-auth every 7 days until the GCP app is published, see #27) shows up only inside a menu.
 - **Strength is missing everywhere.**
 - **Import is not idempotent.** There are no stable external IDs, so re-importing can duplicate workouts.
 - **Wrong home.** The History tab is being folded into Cardio → Progress (see [PROGRESS_VIEWS.md](PROGRESS_VIEWS.md)), so the menu has to move anyway.

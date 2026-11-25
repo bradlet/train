@@ -44,7 +44,7 @@ See [docs/AI_COACH.md](docs/AI_COACH.md) for the contributor guide.
 - **Monthly calendar** with colored workout indicators and day-tap detail popovers
 - **Paginated workout log** sorted by most recent, with lazy-loading scroll
 - **CSV export/import** and **Apple Health import** in the toolbar menu
-- **Google Sheets Sync** — opt-in auto export of the entire workout history to a personal Google Sheet on every add/edit/delete (one-way; the sheet is overwritten on every save). See [Google Sheets Sync Setup](#google-sheets-sync-setup) below.
+- **Google Sheets Sync** — opt-in auto export of the entire workout history to a personal Google Sheet on every add/edit/delete (one-way; the sheet is overwritten on every save). See [docs/CONNECTIONS.md](docs/CONNECTIONS.md) for setup.
 
 ## Tech Stack
 
@@ -106,75 +106,7 @@ CloudKit sync is configured but requires a container ID registered in the Apple 
 
 ## Google Sheets Sync Setup
 
-The Google Sheets Sync feature is opt-in: when enabled from the History tab's toolbar menu, the entire workout history is overwritten to a Google Sheet on every add, edit, or delete (debounced to 30 seconds). The sheet itself is created in the user's Google Drive on first enable; the app stores its ID in `AppConfiguration` (CloudKit-synced across devices).
-
-To work, the app needs a Google Cloud Console **OAuth 2.0 iOS Client ID** registered against this app's bundle identifier. Tokens are stored in the iOS Keychain by the `GoogleSignIn-iOS` SDK; the app stores no client secret (iOS OAuth clients are public clients).
-
-### One-time setup (developer side)
-
-#### 1. Add the GoogleSignIn-iOS Swift package
-
-In Xcode: **File → Add Package Dependencies…**, paste `https://github.com/google/GoogleSignIn-iOS`, choose "Up to next major version" from `9.0.0`. Add the **GoogleSignIn** product to the `Hybrid AIthletics` target.
-
-The app's sync code is gated behind `#if canImport(GoogleSignIn)` (mirroring the MLX-Swift pattern), so the project builds and runs even before this dependency is added — sync attempts simply throw `notImplemented` until the SDK is wired up.
-
-#### 2. Create a Google Cloud project and enable the Sheets API
-
-1. Open the [Google Cloud Console](https://console.cloud.google.com/) and create (or pick) a project.
-2. **APIs & Services → Library** → search for **Google Sheets API** → Enable.
-
-#### 3. Configure the OAuth Consent Screen
-
-The app uses the `auth/drive.file` scope, which grants per-file access only to the spreadsheet the app creates — not the rest of the user's Drive. This is a **non-sensitive** scope, so no Google verification or privacy-policy URL is required.
-
-> **Note on the 7-day token expiry:** while the app stays in **Testing** publishing status, Google expires refresh tokens after 7 days. (The no-expiry exemption applies only to apps that request *solely* the basic `openid`/`email`/`profile` scopes — `drive.file`, though non-sensitive for verification purposes, is not one of them.) This is expected: when a token expires the History tab's sync menu shows **"Sign in to resume Sheets Sync"**, which re-authenticates and resumes syncing to the **same** spreadsheet (it never creates a new file). To avoid the weekly expiry entirely, publish the OAuth consent screen to **In production** — for the non-sensitive `drive.file` scope this needs no verification.
-
-1. **APIs & Services → OAuth consent screen** → User type: **External** → Create.
-2. App information: name (e.g. "Hybrid AIthletics"), user support email, developer contact email. The app logo, privacy policy URL, ToS URL, and authorized domains can all be left blank.
-3. **Scopes** step: add `https://www.googleapis.com/auth/drive.file`. Do **not** add `auth/spreadsheets` — that scope is broader (full Drive Sheets access) and would trigger sensitive-scope verification.
-4. **Test users** step: add your own Google account email. Only test users can sign in while the app is in Testing mode.
-5. Save. Publishing status stays at **Testing** indefinitely; no verification needed.
-
-#### 4. Create the iOS OAuth Client ID
-
-1. **APIs & Services → Credentials → + Create Credentials → OAuth client ID**.
-2. Application type: **iOS**.
-3. Bundle ID: paste this app's bundle identifier (visible in Xcode → project → Signing & Capabilities). It looks like `com.bradlet.HybridAIthletics` or similar.
-4. **App Store ID** and **Team ID** fields are optional and can be left blank for development.
-5. Click Create. Copy the **Client ID** (looks like `1234567890-abcdef…apps.googleusercontent.com`).
-
-iOS OAuth clients **do not have a client secret** — they're public clients and use PKCE under the hood. This is correct and expected.
-
-#### 5. Wire the Client ID into the app
-
-Edit `Hybrid AIthletics/Info.plist` and add the following two top-level keys (replace `YOUR_CLIENT_ID` and `YOUR_REVERSED_CLIENT_ID`):
-
-```xml
-<key>GIDClientID</key>
-<string>1234567890-abcdef.apps.googleusercontent.com</string>
-<key>CFBundleURLTypes</key>
-<array>
-    <dict>
-        <key>CFBundleURLSchemes</key>
-        <array>
-            <string>com.googleusercontent.apps.1234567890-abcdef</string>
-        </array>
-    </dict>
-</array>
-```
-
-The `CFBundleURLSchemes` value is the **reversed** form of the Client ID (split on `.`, reverse the order, drop the `.apps.googleusercontent.com` suffix and prepend `com.googleusercontent.apps`). Google Cloud Console shows you the exact reversed form on the iOS Client ID detail page — copy it from there to avoid typos.
-
-#### 6. (Optional) Verify locally
-
-Build and run the app. Open the History tab → toolbar menu → **Google Sheets Sync** → Enable. The OAuth flow should present in an in-app browser, you sign in with the Google account you registered as a test user (Option A) or any Google account (Option B once verified), grant the Sheets scope, and the app creates a new spreadsheet titled "Hybrid AIthletics" in your Drive and writes the workout history.
-
-### What the user sees in-app
-
-- **Disabled** (default): toolbar menu shows **Google Sheets Sync** as a single button. Tapping it shows a confirmation alert explaining export-only behavior. On confirm: OAuth → spreadsheet created → initial sync.
-- **Enabled, healthy**: menu shows **Disable Google Sheets Sync**. Mutations debounce for 30 s then upload silently.
-- **Enabled, last sync failed** (transient network/API error): a red dot overlays the toolbar's `…` icon. Menu shows a **Retry** button with the failure reason.
-- **Enabled but the OAuth token is missing or expired** (a fresh CloudKit-synced device, or the 7-day Testing-mode expiry): menu shows **Sign in to resume Sheets Sync**. Tapping presents OAuth — re-signing in even when a stale, expired session is cached — and then re-syncs to the existing spreadsheet (does not create a new one).
+Setup (the GCP project script, the OAuth console checklist, and the `Info.plist` wiring) lives in [docs/CONNECTIONS.md](docs/CONNECTIONS.md).
 
 ## Running Tests
 

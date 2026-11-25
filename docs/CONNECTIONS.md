@@ -1,0 +1,85 @@
+# Connections
+
+How the app talks to services outside the device. Today that means **Google Sheets Sync**. The planned rework of import, export and sync is in [planning/CONNECTIONS.md](planning/CONNECTIONS.md).
+
+## Google Sheets Sync
+
+Sheets Sync is opt-in. Once it's enabled from the History tab's toolbar menu, the app overwrites the entire workout history to a Google Sheet on every add, edit or delete, debounced to 30 seconds. The app creates the sheet in the user's Google Drive the first time sync is enabled, and stores its ID in `AppConfiguration`.
+
+To sign in, the app needs an **iOS OAuth 2.0 client** registered for its bundle ID. The `GoogleSignIn-iOS` SDK keeps the tokens in the iOS Keychain. iOS OAuth clients are public clients that use PKCE, so there is no client secret.
+
+The app requests only the **`auth/drive.file`** scope. It gives access to just the files the app creates, it's **non-sensitive**, and it needs no Google verification. Never add `auth/spreadsheets`: that scope is sensitive and would trigger verification.
+
+### Current client
+
+| | |
+|---|---|
+| GCP project | `train-ha-prod`, created by [`scripts/gcp/bootstrap.sh`](../scripts/gcp/bootstrap.sh) |
+| Publishing status | In production |
+| Bundle ID | `com.bradlet.train` |
+| Client ID | _pending: recorded once the client is created (#27)_ |
+| Reversed scheme | _pending_ |
+
+> The app ships the old client from the `thompson-projects` GCP project, registered for `bradlet.Hybrid-AIthletics`, until the Train rename (#11) swaps `Info.plist` over to the client above. That old consent screen is still in Testing, so its refresh tokens expire every 7 days. That expiry ends only once the published client is in use. Delete the old client after Train is verified on TestFlight. Leave the `thompson-projects` project itself alone, because other things use it.
+
+### Setup
+
+```mermaid
+flowchart LR
+    S["scripts/gcp/bootstrap.sh<br/>project + Sheets/Drive APIs"] --> C["Console checklist<br/>branding · audience · scope · iOS client"]
+    C --> P["Info.plist<br/>GIDClientID + reversed URL scheme"]
+    P --> V["Verify sign-in<br/>History → Google Sheets Sync"]
+```
+
+#### 1. GoogleSignIn-iOS package
+
+The `GoogleSignIn` product of `https://github.com/google/GoogleSignIn-iOS` (9.x) is linked to the app target. The sync code is gated behind `#if canImport(GoogleSignIn)`, mirroring the MLX pattern, so the project still builds without it; sync then throws `notImplemented`.
+
+#### 2. Run the bootstrap script
+
+```bash
+scripts/gcp/bootstrap.sh                      # project train-ha-prod
+PROJECT_ID=some-other-id scripts/gcp/bootstrap.sh
+```
+
+The script is idempotent. It creates the project if it's missing and enables the **Google Sheets API** and **Google Drive API** if they aren't already on. Re-running it changes nothing. It passes `--project` on every call, so your active gcloud configuration is never changed. No billing account is needed.
+
+#### 3. Console checklist (gcloud can't do these)
+
+The script prints this checklist with deep links into **Google Auth Platform** for the project:
+
+1. **Branding**: app name *Train*, plus the user support and developer contact emails. The logo, privacy policy, ToS and authorized domains can stay blank.
+2. **Audience**: user type **External**, then **Publish app** so the status reads **In production**. With only `drive.file` requested, this needs no verification, and it ends Testing mode's 7-day refresh-token expiry. No test users are needed.
+3. **Data access**: add `https://www.googleapis.com/auth/drive.file`, and nothing else.
+4. **Clients**: **Create client → iOS**, with the app's bundle ID. The App Store ID and Team ID can stay blank. Copy the **Client ID** into [Current client](#current-client).
+
+#### 4. Wire the client into the app
+
+In `Hybrid AIthletics/Info.plist`:
+
+```xml
+<key>GIDClientID</key>
+<string>1234567890-abcdef.apps.googleusercontent.com</string>
+<key>CFBundleURLTypes</key>
+<array>
+    <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+            <string>com.googleusercontent.apps.1234567890-abcdef</string>
+        </array>
+    </dict>
+</array>
+```
+
+The URL scheme is the client ID **reversed**: drop `.apps.googleusercontent.com` and prepend `com.googleusercontent.apps.`. The client's detail page in the console shows the exact value, so copy it from there.
+
+#### 5. Verify
+
+Build and run, then go to **History → toolbar menu → Google Sheets Sync → Enable**. Sign in with any Google account and grant the scope. The app creates a spreadsheet in your Drive and writes the history to it.
+
+### What the user sees in-app
+
+- **Disabled** (the default): the toolbar menu shows **Google Sheets Sync**. Tapping it opens a confirmation explaining that sync is export-only, and confirming runs OAuth, creates the spreadsheet and does the first sync.
+- **Enabled, healthy**: the menu shows **Disable Google Sheets Sync**. Changes wait 30 s, then upload silently.
+- **Enabled, last sync failed** (a transient network or API error): a red dot appears on the toolbar's `…` icon, and the menu shows **Retry** with the reason.
+- **Enabled, but the token is missing or expired**: the menu shows **Sign in to resume Sheets Sync**. This happens on a fresh device or with the Testing-mode 7-day expiry. Signing in again (even over a stale cached session) re-syncs to the **same** spreadsheet; it never creates a new one.
