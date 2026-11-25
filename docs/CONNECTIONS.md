@@ -18,7 +18,7 @@ The app requests only the **`auth/drive.file`** scope. It gives access to just t
 | Publishing status | In production |
 | Bundle ID | `com.bradlet.train` |
 | Team ID | `CB9HS9S84R` |
-| App Store ID | _not set yet: add it to the client once #11 creates the Train App Store Connect record_ |
+| App Store ID | `6839394174` (Train: Built to Endure) |
 | Client ID (`GIDClientID`) | `81188376099-3srh0cv25oblvnoukf7n6tvfqemosggn.apps.googleusercontent.com` |
 | Reversed scheme (`CFBundleURLSchemes`) | `com.googleusercontent.apps.81188376099-3srh0cv25oblvnoukf7n6tvfqemosggn` |
 
