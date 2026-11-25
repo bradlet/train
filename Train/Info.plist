@@ -19,6 +19,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>GIDClientID</key>
+	<string>81188376099-3srh0cv25oblvnoukf7n6tvfqemosggn.apps.googleusercontent.com</string>
 	<key>INAlternativeAppNames</key>
 	<array>
 		<dict>
@@ -34,12 +36,10 @@
 			<string>Train Coach</string>
 		</dict>
 	</array>
-	<key>GIDClientID</key>
-	<string>81188376099-3srh0cv25oblvnoukf7n6tvfqemosggn.apps.googleusercontent.com</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Train uses your microphone so you can dictate messages to your AI coach.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Train uses speech recognition to transcribe what you dictate to your AI coach.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

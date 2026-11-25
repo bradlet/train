@@ -22,14 +22,14 @@
 			containerPortal = 1C1476C92F817B6800DCF85D /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 1C1476D02F817B6800DCF85D;
-			remoteInfo = "Train";
+			remoteInfo = Train;
 		};
 		1C1476ED2F817B6900DCF85D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 1C1476C92F817B6800DCF85D /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 1C1476D02F817B6800DCF85D;
-			remoteInfo = "Train";
+			remoteInfo = Train;
 		};
 		DD00040A2FD0E00000000001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -55,9 +55,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		1C1476D12F817B6800DCF85D /* Train.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Train.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		1C1476E22F817B6900DCF85D /* TrainTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TrainTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		1C1476EC2F817B6900DCF85D /* TrainUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TrainUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1C1476D12F817B6800DCF85D /* Train.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Train.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1C1476E22F817B6900DCF85D /* TrainTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrainTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1C1476EC2F817B6900DCF85D /* TrainUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrainUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1C8168F82F83FE0700E33EF9 /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
 		1C8168FE2F83FE0700E33EF9 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		DD0004012FD0E00000000001 /* CoachVoiceWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CoachVoiceWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -86,17 +86,17 @@
 			exceptions = (
 				1C1476F42F817B6900DCF85D /* Exceptions for "Train" folder in "Train" target */,
 			);
-			path = "Train";
+			path = Train;
 			sourceTree = "<group>";
 		};
 		1C1476E52F817B6900DCF85D /* TrainTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "TrainTests";
+			path = TrainTests;
 			sourceTree = "<group>";
 		};
 		1C1476EF2F817B6900DCF85D /* TrainUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "TrainUITests";
+			path = TrainUITests;
 			sourceTree = "<group>";
 		};
 		DD0004032FD0E00000000001 /* CoachVoiceWidget */ = {
@@ -198,14 +198,14 @@
 			fileSystemSynchronizedGroups = (
 				1C1476D32F817B6800DCF85D /* Train */,
 			);
-			name = "Train";
+			name = Train;
 			packageProductDependencies = (
 				AA0001022FA6B00000000001 /* AICoachCore */,
 				CC0003022FC0D00000000001 /* AICoachRuntime */,
 				1C9E36B82FA2550C0022393D /* GoogleSignIn */,
 				1C9E36BA2FA2550C0022393D /* GoogleSignInSwift */,
 			);
-			productName = "Train";
+			productName = Train;
 			productReference = 1C1476D12F817B6800DCF85D /* Train.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -225,11 +225,11 @@
 			fileSystemSynchronizedGroups = (
 				1C1476E52F817B6900DCF85D /* TrainTests */,
 			);
-			name = "TrainTests";
+			name = TrainTests;
 			packageProductDependencies = (
 				AA0001032FA6B00000000001 /* AICoachCore */,
 			);
-			productName = "TrainTests";
+			productName = TrainTests;
 			productReference = 1C1476E22F817B6900DCF85D /* TrainTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
@@ -249,10 +249,10 @@
 			fileSystemSynchronizedGroups = (
 				1C1476EF2F817B6900DCF85D /* TrainUITests */,
 			);
-			name = "TrainUITests";
+			name = TrainUITests;
 			packageProductDependencies = (
 			);
-			productName = "TrainUITests";
+			productName = TrainUITests;
 			productReference = 1C1476EC2F817B6900DCF85D /* TrainUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
@@ -418,17 +418,19 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "Train/Train.entitlements";
+				CODE_SIGN_ENTITLEMENTS = Train/Train.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 22;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Train/Info.plist";
+				INFOPLIST_FILE = Train/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Train;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Train reads your workout history to track exercises and provide personalized AI coaching insights.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Train does not write data to Apple Health.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Train uses your microphone so you can dictate messages to your AI coach.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Train uses speech recognition to transcribe what you dictate to your AI coach.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -456,17 +458,19 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "Train/Train.entitlements";
+				CODE_SIGN_ENTITLEMENTS = Train/Train.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 22;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Train/Info.plist";
+				INFOPLIST_FILE = Train/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Train;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Train reads your workout history to track exercises and provide personalized AI coaching insights.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Train does not write data to Apple Health.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Train uses your microphone so you can dictate messages to your AI coach.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Train uses speech recognition to transcribe what you dictate to your AI coach.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -669,7 +673,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = "Train";
+				TEST_TARGET_NAME = Train;
 			};
 			name = Debug;
 		};
@@ -688,7 +692,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = "Train";
+				TEST_TARGET_NAME = Train;
 			};
 			name = Release;
 		};
