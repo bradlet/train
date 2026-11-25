@@ -3,6 +3,15 @@
 ## Project
 Hybrid AIthletics — iOS exercise tracking app (SwiftUI + SwiftData + CloudKit).
 
+## Product Vision
+An **opinionated** training app for planning, scheduling, and tracking athletic training. Its core belief, which every feature should promote: **consistent hybrid training — aerobic *and* strength — keeps athletes of every level healthier, less injury-prone, and performing better much later in life.** Aerobic training came first, but strength is a first-class peer, not an add-on tab.
+- **Hybrid by default.** When a feature touches one discipline, consider the other: shared surfaces (Home, History, stats, the coach, sync/export) should represent both, and nothing should make strength feel second-class.
+- **Opinionated, low-friction UX.** Planning and recording must be fast. Prefer a well-chosen default over a configuration screen, and stay high-level where precision adds friction (e.g. strength records one weight per session with a chosen measurement — max, average, … — never per-rep/per-set logs).
+- **The athlete decides what is hard.** Key (hard) workouts are whatever the athlete marks as key, via a per-session flag plus their own per-type defaults. Never infer intensity from exercise type, distance, pace, or RPE, and make every hard-workout analysis (placement, hints, stats) respect that marking.
+- **Strength and cardio quick actions stay visibly distinct.** One-tap strength logging is strength-only and labelled as such; it never sits where it could be mistaken for completing the day's runs.
+- **Target structure: two parallel flows.** Home (Today first, hybrid hub below) · **Cardio** (Plan | Progress) · **Strength** (Plan | Progress). New surfaces fit that pattern rather than adding discipline-specific tabs.
+- Feature plans for this direction live in `docs/planning/` (start at its README).
+
 ## Build & Test
 ```bash
 # Build app
