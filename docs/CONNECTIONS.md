@@ -22,7 +22,7 @@ The app requests only the **`auth/drive.file`** scope. It gives access to just t
 | Client ID (`GIDClientID`) | `81188376099-3srh0cv25oblvnoukf7n6tvfqemosggn.apps.googleusercontent.com` |
 | Reversed scheme (`CFBundleURLSchemes`) | `com.googleusercontent.apps.81188376099-3srh0cv25oblvnoukf7n6tvfqemosggn` |
 
-> The app ships the old client from the `thompson-projects` GCP project, registered for `bradlet.Hybrid-AIthletics`, until the Train rename (#11) swaps `Info.plist` over to the client above. That old consent screen is still in Testing, so its refresh tokens expire every 7 days. That expiry ends only once the published client is in use. Delete the old client after Train is verified on TestFlight. Leave the `thompson-projects` project itself alone, because other things use it.
+> The app uses this client from the Train rename (#11) onward; `Train/Info.plist` holds `GIDClientID` and the reversed scheme. The old client in the `thompson-projects` GCP project (Testing mode, registered for `bradlet.Hybrid-AIthletics`) gets deleted once Train is verified on TestFlight (#11 Phase 5). Leave the `thompson-projects` project itself alone, because other things use it.
 
 ### Setup
 
@@ -65,7 +65,7 @@ The script prints this checklist with deep links into **Google Auth Platform** f
 
 #### 4. Wire the client into the app
 
-In `Hybrid AIthletics/Info.plist`:
+In `Train/Info.plist`:
 
 ```xml
 <key>GIDClientID</key>
