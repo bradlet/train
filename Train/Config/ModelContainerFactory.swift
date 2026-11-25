@@ -32,12 +32,18 @@ enum ModelContainerFactory {
         }
     }
 
-    /// Creates an in-memory ModelContainer for SwiftUI previews and unit tests.
-    /// - Returns: An in-memory ModelContainer with no persistence.
+    /// Creates an in-memory ModelContainer for SwiftUI previews, unit tests and
+    /// `-uiTestSeed` UI tests.
+    ///
+    /// CloudKit is explicitly off: the app target carries an iCloud entitlement,
+    /// and a configuration left at the default `.automatic` would try to mirror
+    /// throwaway fixture data to the athlete's private database.
+    /// - Returns: An in-memory ModelContainer with no persistence and no sync.
     static func makePreviewContainer() -> ModelContainer {
         let config = ModelConfiguration(
             schema: schema,
-            isStoredInMemoryOnly: true
+            isStoredInMemoryOnly: true,
+            cloudKitDatabase: .none
         )
         do {
             return try ModelContainer(for: schema, configurations: [config])

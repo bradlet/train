@@ -340,6 +340,19 @@ struct DoubleDistanceTests {
     }
 }
 
+// MARK: - ModelContainerFactory Tests
+
+struct ModelContainerFactoryTests {
+
+    @Test func previewContainerIsInMemoryAndNeverSyncs() throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let config = try #require(container.configurations.first)
+        #expect(config.isStoredInMemoryOnly)
+        // Fixture data must never mirror to the athlete's iCloud database.
+        #expect(config.cloudKitContainerIdentifier == nil)
+    }
+}
+
 // MARK: - Exercise Model Tests
 
 struct ExerciseModelTests {
