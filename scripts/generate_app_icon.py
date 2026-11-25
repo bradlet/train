@@ -12,7 +12,13 @@ heel tab, thick rocker midsole with aggressive toe spring. The shoe is two
 colours, split along a configurable curve (today the midsole line): a deep
 navy upper over a neon cyan midsole, with a tapered white cut between them and
 tapered speed slashes cut into the heel. The navy has a subtle top-to-bottom
-gradient, the neon a glossy gradient with a specular streak, and the shoe casts a soft drop shadow. Shapes are cubic Béziers in a normalized profile space,
+gradient, the neon a glossy gradient with a specular streak.
+
+Beneath it floats a tilted dumbbell (navy handle, navy inner and neon outer
+weights), so the mark is hybrid: run *and* lift. It is raised until it sits a
+fixed gap from the shoe in every direction, nesting the toe in the angle
+between handle and plate. Shoe and dumbbell cast one soft drop shadow. Shapes
+are cubic Béziers in a normalized profile space,
 rendered supersampled and downscaled for smooth edges. The result is an
 opaque 1024x1024 PNG written over the asset catalog's icon, so Contents.json
 needs no change.
@@ -51,8 +57,8 @@ NEON_STOPS: list[tuple[float, tuple[int, int, int]]] = [
 # Shoe placement: the profile below is drawn toe-right, then rotated (degrees,
 # positive = toe tips down), scaled to this canvas-width fraction, and centred.
 TILT_DEGREES = 6.0
-SHOE_WIDTH = 0.48
-CENTER = (0.66, 0.30)
+SHOE_WIDTH = 0.38
+CENTER = (0.58, 0.22)
 
 # Colour split, in the same profile space as the outline: a curve through the
 # shoe, and the side of it that is NEON (everything else is NAVY). The curve is
@@ -81,6 +87,29 @@ HIGHLIGHT: tuple[list[Point], float] = (
 HIGHLIGHT_COLOR = (255, 255, 255)
 HIGHLIGHT_OPACITY = 0.85
 HIGHLIGHT_BLUR = 0.003
+
+# Dumbbell floating under the shoe, so the mark says run *and* lift while
+# staying compact enough for the corner. Parts are in dumbbell units, scaled so
+# the whole dumbbell spans DUMBBELL_SPAN x the shoe's width; it is centred
+# under the shoe (plus DUMBBELL_SHIFT), tilted, then raised until it comes
+# within DUMBBELL_GAP of the shoe in any direction. The handle and collars are navy.
+DUMBBELL_SPAN = 1.08
+DUMBBELL_GAP = 0.028  # fraction of the canvas, at the closest point
+DUMBBELL_TILT = -14.0  # degrees, positive = right (toe) end down
+DUMBBELL_SHIFT = 0.12  # horizontal nudge from the shoe's centre (+ = toward the toe)
+HANDLE_LENGTH = 0.240  # between the collars
+HANDLE_THICKNESS = 0.026
+COLLAR: tuple[float, float] = (0.016, 0.055)  # (width, height)
+WEIGHTS: list[tuple[float, float]] = [(0.060, 0.190), (0.038, 0.135)]  # (width, height), inner -> outer
+WEIGHT_SPACING = 0.006
+WEIGHT_RADIUS = 0.014
+# One gradient per entry in WEIGHTS (inner -> outer): NAVY_RAMP sets a plate
+# apart from the midsole, NEON_STOPS ties it to it.
+NAVY_RAMP: list[tuple[float, tuple[int, int, int]]] = [(0.0, NAVY_TOP), (1.0, NAVY)]
+WEIGHT_STOPS: list[list[tuple[float, tuple[int, int, int]]]] = [NAVY_RAMP, NEON_STOPS]
+# Specular streak down each weight's left side: (inset from the left edge,
+# width), in dumbbell units.
+WEIGHT_HIGHLIGHT: tuple[float, float] = (0.010, 0.009)
 
 DEFAULT_OUTPUT = (
     Path(__file__).resolve().parent.parent
@@ -237,6 +266,110 @@ def drop_shadow(mask: Image.Image, canvas: int) -> Image.Image:
     return shadow.point(lambda v: round(v * SHADOW_OPACITY))
 
 
+Box = tuple[float, float, float, float]
+
+
+def dumbbell_boxes(canvas: int, center: Point) -> tuple[list[Box], list[list[Box]], float]:
+    """The level dumbbell as pixel boxes around `center`.
+
+    Returns (navy handle + collars, weight boxes grouped by WEIGHTS index, and
+    the pixels per dumbbell unit).
+    """
+    units = HANDLE_LENGTH + 2 * (COLLAR[0] + sum(w for w, _ in WEIGHTS) + WEIGHT_SPACING * (len(WEIGHTS) - 1))
+    scale = DUMBBELL_SPAN * SHOE_WIDTH * canvas / units
+    cx, cy = center
+    span = lambda x0, x1, height: (min(x0, x1), cy - height * scale / 2, max(x0, x1), cy + height * scale / 2)
+
+    navy = [span(cx - HANDLE_LENGTH * scale / 2, cx + HANDLE_LENGTH * scale / 2, HANDLE_THICKNESS)]
+    weights: list[list[Box]] = [[] for _ in WEIGHTS]
+    for side in (-1, 1):
+        edge = cx + side * HANDLE_LENGTH * scale / 2
+        outer = edge + side * COLLAR[0] * scale
+        navy.append(span(edge, outer, COLLAR[1]))
+        edge = outer
+        for i, (width, height) in enumerate(WEIGHTS):
+            outer = edge + side * width * scale
+            weights[i].append(span(edge, outer, height))
+            edge = outer + side * WEIGHT_SPACING * scale
+    return navy, weights, scale
+
+
+def clearance_zone(solid: Image.Image, gap: float, work: int = 1024) -> Image.Image:
+    """`solid` grown by `gap` pixels in every direction, at `work` resolution.
+
+    Anything outside this mask is at least `gap` away from the shoe. Grown by
+    repeated 3x3 max filters, which is quick at the reduced size.
+    """
+    small = solid.resize((work, work), Image.BILINEAR).point(lambda v: 255 if v else 0)
+    for _ in range(max(round(gap * work / solid.width), 1)):
+        small = small.filter(ImageFilter.MaxFilter(3))
+    return small
+
+
+def render_dumbbell(canvas: int, solid: Image.Image) -> tuple[Image.Image, Image.Image]:
+    """Draw the tilted dumbbell under the shoe: returns (its fill, its mask).
+
+    Drawn level around the canvas centre, rotated by DUMBBELL_TILT, then
+    raised from below until it comes within DUMBBELL_GAP of the shoe's
+    silhouette (`solid`) in any direction.
+    """
+    shoe_box = solid.getbbox()
+    pivot = ((shoe_box[0] + shoe_box[2]) / 2 + DUMBBELL_SHIFT * canvas, canvas / 2)
+    navy_boxes, weight_groups, scale = dumbbell_boxes(canvas, pivot)
+
+    handle = Image.new("L", (canvas, canvas), 0)
+    for box in navy_boxes:
+        ImageDraw.Draw(handle).rectangle(box, fill=255)
+    gloss = Image.new("L", (canvas, canvas), 0)
+    inset, width = (v * scale for v in WEIGHT_HIGHLIGHT)
+    plates = []
+    for boxes in weight_groups:
+        plate = Image.new("L", (canvas, canvas), 0)
+        for x0, y0, x1, y1 in boxes:
+            ImageDraw.Draw(plate).rounded_rectangle((x0, y0, x1, y1), radius=WEIGHT_RADIUS * scale, fill=255)
+            pad = (y1 - y0) * 0.18
+            ImageDraw.Draw(gloss).rounded_rectangle(
+                (x0 + inset, y0 + pad, x0 + inset + width, y1 - pad), radius=width / 2, fill=255
+            )
+        plates.append(plate)
+
+    # Tilt every layer about the pivot (PIL rotates counter-clockwise).
+    tilt = lambda im: im.rotate(-DUMBBELL_TILT, resample=Image.BICUBIC, center=pivot)
+    handle, gloss, plates = tilt(handle), tilt(gloss), [tilt(p) for p in plates]
+    weights_mask = Image.new("L", (canvas, canvas), 0)
+    for plate in plates:
+        weights_mask = ImageChops.lighter(weights_mask, plate)
+    shape = ImageChops.lighter(handle, weights_mask)
+
+    # Start well below the shoe and raise the dumbbell until any part of it
+    # would come within DUMBBELL_GAP of the shoe, in any direction. A dumbbell
+    # shifted past the toe can therefore rise beside it, nesting the shoe in
+    # the angle between handle and plate.
+    work = 1024
+    zone = clearance_zone(solid, DUMBBELL_GAP * canvas, work)
+    small = shape.resize((work, work), Image.BILINEAR).point(lambda v: 255 if v else 0)
+    small_box = small.getbbox()
+    step = canvas // work
+    start = zone.getbbox()[3] - small_box[1] + 1  # dumbbell's top just below the zone
+    dy_small = start
+    while small_box[1] + dy_small - 1 > 0:
+        moved = ImageChops.offset(small, 0, dy_small - 1)
+        if ImageChops.multiply(moved, zone).getbbox():
+            break
+        dy_small -= 1
+    dy = dy_small * step
+    drop = lambda im: ImageChops.offset(im, 0, dy)
+    handle, gloss, shape, weights_mask = drop(handle), drop(gloss), drop(shape), drop(weights_mask)
+    plates = [drop(p) for p in plates]
+
+    fill = vertical_gradient(canvas, handle.getbbox(), NAVY_RAMP)
+    for plate, stops in zip(plates, WEIGHT_STOPS):
+        fill.paste(vertical_gradient(canvas, plate.getbbox(), stops), (0, 0), plate)
+    gloss = ImageChops.multiply(gloss.filter(ImageFilter.GaussianBlur(HIGHLIGHT_BLUR * canvas)), weights_mask)
+    fill.paste(HIGHLIGHT_COLOR, (0, 0), gloss.point(lambda v: round(v * HIGHLIGHT_OPACITY)))
+    return fill, shape
+
+
 def render(size: int = SIZE, supersample: int = SUPERSAMPLE) -> Image.Image:
     """Draw the icon and return it as an opaque RGB image of `size` pixels."""
     canvas = size * supersample
@@ -273,8 +406,14 @@ def render(size: int = SIZE, supersample: int = SUPERSAMPLE) -> Image.Image:
     if SPLIT_GAP:
         draw.polygon(stroke_polygon(split, lambda _: SPLIT_GAP * canvas), fill=0)
 
+    # Dumbbell floating under the shoe.
+    dumbbell_fill, dumbbell = render_dumbbell(canvas, solid)
+
+    everything = ImageChops.lighter(solid, dumbbell)
     icon = Image.new("RGB", (canvas, canvas), BACKGROUND)
-    icon.paste(SHADOW_COLOR, (0, 0), drop_shadow(solid, canvas))
+    icon.paste(SHADOW_COLOR, (0, 0), drop_shadow(everything, canvas))
+    icon.paste(BACKGROUND, (0, 0), everything)
+    icon.paste(dumbbell_fill, (0, 0), dumbbell)
     icon.paste(BACKGROUND, (0, 0), solid)
     icon.paste(fill, (0, 0), mask)
     return icon.resize((size, size), Image.LANCZOS)

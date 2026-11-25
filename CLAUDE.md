@@ -42,9 +42,10 @@ uv run scripts/generate_app_icon.py --output /tmp/icon.png   # preview without t
 ## App Icon
 The app icon is **generated, never hand-edited**: `scripts/generate_app_icon.py` draws it and writes `Hybrid AIthletics/Assets.xcassets/AppIcon.appiconset/hai-icon.png` (1024×1024, opaque — iOS rejects alpha; `Contents.json` stays untouched). To change the icon/logo, edit the script and re-run it, then commit the script and the PNG together. Every design knob is a named constant at the top of the script:
 - **Shape**: `START`/`OUTLINE` (the shoe's side profile as cubic Béziers, toe right, y down), `MIDSOLE_CUT` and `SPEED_SLASHES` (tapered white negative-space cuts).
-- **Placement**: `SHOE_WIDTH` (fraction of the canvas) and `CENTER` — the shoe sits small in the top-right corner like the heart in Apple's Health icon; keep it clear of iOS's rounded-corner mask.
+- **Placement**: `SHOE_WIDTH` (fraction of the canvas) and `CENTER` — the shoe (with the dumbbell beneath it) sits small in the top-right corner like the heart in Apple's Health icon; keep it clear of iOS's rounded-corner mask.
 - **Colour**: `NAVY_TOP`→`NAVY` (upper's subtle gradient), `NEON_STOPS` (glossy midsole gradient), `HIGHLIGHT*` (specular streak on the midsole), `SPLIT_CURVE`/`NEON_SIDE` (where navy meets neon — today the midsole line).
-- **Shadow**: `SHADOW_*` (soft drop shadow, cast from the solid outline so the white cuts stay white).
+- **Dumbbell** (the strength half of the mark): `DUMBBELL_SPAN` (width as a multiple of the shoe's), `DUMBBELL_TILT` and `DUMBBELL_SHIFT` (together they nest the toe in the angle between handle and right plate), `DUMBBELL_GAP` (white space kept from the shoe in *every* direction — the dumbbell is raised until it would cross it), the part sizes `HANDLE_*`/`COLLAR`/`WEIGHTS`, and `WEIGHT_STOPS` (one gradient per plate, inner → outer: navy inner, neon outer).
+- **Shadow**: `SHADOW_*` (soft drop shadow, cast from the solid shoe and dumbbell outlines so the white cuts stay white).
 
 Check a change by previewing with `--output` at full size *and* downscaled to ~60 px (home-screen size) before overwriting the asset.
 
