@@ -5,6 +5,7 @@
 Accepted — 2026-04-06
 **Amended — 2026-04-08:** Switched from Gemma 4 E2B (bundled) to Gemma 3 4B QAT (runtime download). See [Amendment](#amendment--2026-04-08) below.
 **Amended — 2026-10-14:** Switched back to Gemma 4 E2B (runtime download, explicit opt-in) on mlx-swift-lm 3.x, and the coach became a tool-calling conversation. See [Amendment](#amendment--2026-10-14) below. **The Decision table below reflects the 2026-04-08 state; the 2026-10-14 amendment supersedes it where they differ.**
+**Context superseded — 2026-11-25:** the app is now free forever, not one-time-payment ([ADR 2](2-rebrand-to-train.md)). That strengthens this decision: a free app can't fund per-token server inference either.
 
 ## Context
 
