@@ -1,6 +1,6 @@
 # Releasing to the App Store
 
-A step-by-step guide for publishing Hybrid AIthletics to the Apple App Store. This guide assumes you have never submitted an app for review before.
+A step-by-step guide for publishing Train to the Apple App Store. This guide assumes you have never submitted an app for review before.
 
 ## Prerequisites
 
@@ -27,33 +27,33 @@ Once approved, you'll have access to [App Store Connect](https://appstoreconnect
 
 ## Step 2: Register a Bundle Identifier
 
-The bundle identifier uniquely identifies your app across all of Apple's systems. Hybrid AIthletics needs one registered in the developer portal.
+The bundle identifier uniquely identifies your app across all of Apple's systems. Train needs one registered in the developer portal.
 
 1. Go to [developer.apple.com/account/resources/identifiers](https://developer.apple.com/account/resources/identifiers/list)
 2. Click the **+** button to register a new identifier
 3. Select **App IDs**, then **App**
 4. Fill in:
-   - **Description:** Hybrid AIthletics
-   - **Bundle ID:** Select "Explicit" and enter your bundle ID (e.g. `com.bradleythompson.HybridAIthletics`). This must match the bundle identifier in Xcode.
+   - **Description:** Train
+   - **Bundle ID:** Select "Explicit" and enter your bundle ID (e.g. `com.bradlet.train`). This must match the bundle identifier in Xcode.
 5. Under **Capabilities**, enable:
    - **CloudKit** (required — the app uses CloudKit sync)
    - **Push Notifications** (required by CloudKit for background sync)
 6. Click **Continue**, then **Register**
 
-**Important:** Open the Xcode project and verify that the bundle identifier in **Signing & Capabilities** matches what you just registered. Go to the project navigator > select the "Hybrid AIthletics" target > **General** tab > **Bundle Identifier**.
+**Important:** Open the Xcode project and verify that the bundle identifier in **Signing & Capabilities** matches what you just registered. Go to the project navigator > select the "Train" target > **General** tab > **Bundle Identifier**.
 
 ## Step 3: Register a CloudKit Container
 
-Hybrid AIthletics syncs data via CloudKit. The container must be registered.
+Train syncs data via CloudKit. The container must be registered.
 
 1. Go to [developer.apple.com/account/resources/identifiers](https://developer.apple.com/account/resources/identifiers/list)
 2. In the dropdown at the top-right, switch from "App IDs" to **iCloud Containers**
 3. Click **+** to register a new container
-4. Enter an identifier, e.g. `iCloud.com.bradleythompson.HybridAIthletics`
+4. Enter an identifier, e.g. `iCloud.com.bradlet.train`
 5. Click **Continue**, then **Register**
 6. Back in Xcode, open **Signing & Capabilities** for the app target
 7. Under the **iCloud** capability, check **CloudKit** and select the container you just created
-8. Verify that `Hybrid_AIthletics.entitlements` contains the correct container ID under `com.apple.developer.icloud-container-identifiers`
+8. Verify that `Train/Train.entitlements` contains the correct container ID under `com.apple.developer.icloud-container-identifiers`
 
 **Reference:** [CloudKit Quick Start](https://developer.apple.com/documentation/cloudkit/enabling_cloudkit_in_your_app)
 
@@ -62,7 +62,7 @@ Hybrid AIthletics syncs data via CloudKit. The container must be registered.
 Code signing proves the app came from you. Xcode can manage this automatically.
 
 1. Open the project in Xcode
-2. Select the **Hybrid AIthletics** target
+2. Select the **Train** target
 3. Go to the **Signing & Capabilities** tab
 4. Check **Automatically manage signing**
 5. Select your **Team** from the dropdown (this is your Apple Developer account)
@@ -83,10 +83,10 @@ App Store Connect is Apple's web portal for managing your app's listing, pricing
 3. Click the **+** button > **New App**
 4. Fill in:
    - **Platforms:** iOS
-   - **Name:** Hybrid AIthletics (this is what users see on the App Store)
+   - **Name:** Train: Built to Endure (this is what users see on the App Store; see [ADR 2](adrs/2-rebrand-to-train.md) and [APP_STORE.md](APP_STORE.md))
    - **Primary Language:** English (U.S.) (or your preferred language)
    - **Bundle ID:** Select the bundle ID you registered in Step 2
-   - **SKU:** A unique internal identifier (e.g. `hybrid-aithletics-001`). Not visible to users.
+   - **SKU:** A unique internal identifier (e.g. `train-001`). Not visible to users.
    - **User Access:** Full Access (unless you have team members to restrict)
 5. Click **Create**
 
@@ -105,9 +105,7 @@ Before submitting for review, you need to fill out the app's metadata. From your
 - Select the countries/regions to distribute in
 
 ### App Privacy (sidebar)
-Apple requires a privacy nutrition label. Hybrid AIthletics collects:
-- **Health & Fitness data** (workout distance, duration) — linked to user via CloudKit
-- **Identifiers** (CloudKit record IDs) — used for syncing
+Apple requires a privacy nutrition label. Under Apple's definition, "collected" means sent off the device somewhere the *developer* can access it. Train has no servers, analytics or ads, and its off-device copies all live in places only the athlete can reach: their private CloudKit database, and their own Google Sheet. So the label is **Data Not Collected**. Re-check this whenever a feature changes where data goes (ads especially), and keep it consistent with the [privacy policy](https://bradlet.com/train/privacy/).
 
 Fill in the privacy questionnaire honestly based on what data the app accesses.
 
@@ -170,13 +168,13 @@ You can also archive and export via the CLI, then upload with the **Transporter*
 ```bash
 # Archive
 xcodebuild archive \
-  -scheme "Hybrid AIthletics" \
-  -archivePath ./build/HybridAIthletics.xcarchive \
+  -scheme Train \
+  -archivePath ./build/Train.xcarchive \
   -destination 'generic/platform=iOS'
 
 # Export IPA for App Store upload
 xcodebuild -exportArchive \
-  -archivePath ./build/HybridAIthletics.xcarchive \
+  -archivePath ./build/Train.xcarchive \
   -exportPath ./build/export \
   -exportOptionsPlist ExportOptions.plist
 ```
@@ -193,7 +191,7 @@ After your build finishes processing in App Store Connect (5–30 minutes, you'l
 
 Internal testers are members of your App Store Connect team (up to 100 people). As the account owner, you are automatically eligible.
 
-1. Go to [appstoreconnect.apple.com](https://appstoreconnect.apple.com) > **My Apps** > **Hybrid AIthletics**
+1. Go to [appstoreconnect.apple.com](https://appstoreconnect.apple.com) > **My Apps** > **Train: Built to Endure**
 2. Click the **TestFlight** tab
 3. Under **Internal Testing**, click **+** to create a group (e.g. "Internal")
 4. Add yourself as a tester using your Apple ID
@@ -216,7 +214,7 @@ The remaining steps (10–12) are only needed when you're ready to publish to th
 
 Once the build finishes processing in App Store Connect:
 
-1. Go to [appstoreconnect.apple.com](https://appstoreconnect.apple.com) > **My Apps** > **Hybrid AIthletics**
+1. Go to [appstoreconnect.apple.com](https://appstoreconnect.apple.com) > **My Apps** > **Train: Built to Endure**
 2. Under the version (1.0), scroll to the **Build** section
 3. Click **+** and select the build you uploaded
 4. Fill in the **App Review Information** section:

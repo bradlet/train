@@ -11,7 +11,7 @@ This guide covers two cases:
 2. [Physical iPhone](#2-physical-iphone) — you download a snapshot of the app's
    container through Xcode, then open the database from that snapshot.
 
-The app's bundle identifier is **`bradlet.Hybrid-AIthletics`** throughout.
+The app's bundle identifier is **`com.bradlet.train`** throughout.
 
 ---
 
@@ -39,7 +39,7 @@ SELECT name, date, completed FROM exercises WHERE series_id IS NOT NULL ORDER BY
 scripts/inspect-store.sh -q "SELECT COUNT(*) AS done FROM workouts;"
 
 # A container downloaded from a physical device (see §2):
-scripts/inspect-store.sh ~/Downloads/HybridAIthletics.xcappdata
+scripts/inspect-store.sh ~/Downloads/Train.xcappdata
 ```
 
 The rest of this doc explains what the script does under the hood, so you can also
@@ -88,7 +88,7 @@ app's data container so you don't have to chase the random UUIDs in the path:
 
 ```bash
 # Resolve the data container of the app on the booted simulator
-APP=$(xcrun simctl get_app_container booted "bradlet.Hybrid-AIthletics" data)
+APP=$(xcrun simctl get_app_container booted "com.bradlet.train" data)
 
 # Open an interactive sqlite3 session against the store
 sqlite3 "$APP/Library/Application Support/default.store"
@@ -149,13 +149,13 @@ There's no live filesystem path to a device's app container, so you take a
 
 1. Plug in the iPhone and open Xcode.
 2. **Window ▸ Devices and Simulators** (⇧⌘2), select your iPhone.
-3. Under **Installed Apps**, select **Hybrid AIthletics**.
+3. Under **Installed Apps**, select **Train**.
 4. Click the **⋯ / gear** button below the list → **Download Container…**
 5. Save the `.xcappdata` bundle somewhere (e.g. `~/Downloads`).
 
 (CLI equivalent, if you prefer: `xcrun devicectl device copy from --device <UDID>
---domain-type appDataContainer --domain-identifier bradlet.Hybrid-AIthletics
---source / --destination ~/Downloads/HybridAIthletics.xcappdata`.)
+--domain-type appDataContainer --domain-identifier com.bradlet.train
+--source / --destination ~/Downloads/Train.xcappdata`.)
 
 ### Step 2 — Find the store inside the snapshot
 
@@ -163,7 +163,7 @@ A `.xcappdata` is just a folder. Reveal it in Finder (right-click → **Show Pac
 Contents**) or use the shell:
 
 ```bash
-BUNDLE=~/Downloads/HybridAIthletics.xcappdata     # adjust to your saved name
+BUNDLE=~/Downloads/Train.xcappdata     # adjust to your saved name
 find "$BUNDLE" -name "default.store" -print
 ```
 

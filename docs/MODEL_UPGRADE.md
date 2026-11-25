@@ -64,7 +64,7 @@ runtime, becomes the better choice:
    - yields `CoachEvent`s (`.textChunk`, `.action`, `.rejectedToolCall`)
    - decodes every tool call through `CoachToolDecoder`
    - supports `isModelCached`, `isModelReady`, `loadModel()`, `onDownloadProgress`, and `approximateDownloadBytes`, so the opt-in download flow keeps working
-3. Inject it in `Hybrid_AIthleticsApp.makeCoachForLaunch()`.
+3. Inject it in `TrainApp.makeCoachForLaunch()`.
 4. Remove the MLX dependencies if nothing else uses them.
 
 The `AICoachService` / `CoachEvent` boundary exists so that no view, store, or test code has to change.

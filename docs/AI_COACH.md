@@ -1,6 +1,6 @@
 # AI Coach — Contributor Guide
 
-Everything you need to know to work on the Hybrid AIthletics AI coach: what it is, how a message
+Everything you need to know to work on the Train AI coach: what it is, how a message
 becomes a model turn and a model turn becomes a change to the athlete's data, why the code is shaped
 the way it is, and how to change it safely.
 
@@ -80,9 +80,9 @@ capability ceiling, a large one-time download, and tight memory limits on iOS.
 
 ```mermaid
 flowchart TB
-    subgraph App["iOS app (Hybrid AIthletics target)"]
+    subgraph App["iOS app (Train target)"]
         direction TB
-        Root["Hybrid_AIthleticsApp<br/>injects services via @Environment"]
+        Root["TrainApp<br/>injects services via @Environment"]
         subgraph Views["Views/Home"]
             Home["HomeView<br/>owns @Query, builds snapshot,<br/>applies accepted proposals"]
             Card["CoachEntryCard"]
@@ -155,8 +155,8 @@ The code is in three layers, and the boundaries between them are enforced on pur
 |---|---|---|---|---|
 | **AICoachCore** | `Packages/AICoachCore/` | Foundation | MLX, SwiftData, SwiftUI, app code | Shared with the eval CLI; trivially unit-testable with `swift test` |
 | **AICoachRuntime** | `Packages/AICoachRuntime/` | AICoachCore, MLX (gated), swift-transformers | SwiftData, SwiftUI, app code | The only place MLX types exist. Shared by the app and `Evals/`, so evals run the exact generation code the app ships |
-| **Coach services** | `Hybrid AIthletics/Services/AICoach/` | AICoachCore, AICoachRuntime, SwiftData | SwiftUI views, MLX | Adapts the runtime to `AICoachService`; owns app state |
-| **Views** | `Hybrid AIthletics/Views/Home/` | AICoachCore, services via `@Environment` | MLX | Views pattern-match `CoachEvent`/`CoachAction`, never MLX `Generation` |
+| **Coach services** | `Train/Services/AICoach/` | AICoachCore, AICoachRuntime, SwiftData | SwiftUI views, MLX | Adapts the runtime to `AICoachService`; owns app state |
+| **Views** | `Train/Views/Home/` | AICoachCore, services via `@Environment` | MLX | Views pattern-match `CoachEvent`/`CoachAction`, never MLX `Generation` |
 
 Consequences you will run into:
 
@@ -611,7 +611,7 @@ populates its form from it. The athlete saves through the normal path.
 
 ## 12. CoachChatStore
 
-`@MainActor @Observable`, created once in `Hybrid_AIthleticsApp` and injected via
+`@MainActor @Observable`, created once in `TrainApp` and injected via
 `@Environment(\.coachChat)`. Like `GoogleSheetsSyncCoordinator`, it is app-scope state, **not a
 ViewModel**: it owns no queries and makes no view decisions.
 
@@ -695,7 +695,7 @@ Siri is the one path where the athlete speaks *before* the app opens, because Si
 
 ```mermaid
 flowchart LR
-    W["CoachVoiceWidget tap"] -->|"widgetURL hybridaithletics://coach/voice"| U["onOpenURL →<br/>CoachLaunchRoute.entry(from:)"]
+    W["CoachVoiceWidget tap"] -->|"widgetURL com.bradlet.train://coach/voice"| U["onOpenURL →<br/>CoachLaunchRoute.entry(from:)"]
     S["Siri: AskCoachIntent(message)"] -->|"openAppWhenRun"| R
     T["Siri: TalkToCoachIntent"] -->|"openAppWhenRun"| R
     U --> R["CoachLaunchRouter.shared.pending"]
@@ -711,8 +711,8 @@ flowchart LR
     Q --> Send
 ```
 
-- **Deep links** (`CoachLaunchRoute`): `hybridaithletics://coach/voice` gives `.voice(autoSend: true)`
-  and `hybridaithletics://coach?message=…` gives `.message`. The scheme is registered in `Info.plist`.
+- **Deep links** (`CoachLaunchRoute`): `com.bradlet.train://coach/voice` gives `.voice(autoSend: true)`
+  and `com.bradlet.train://coach?message=…` gives `.message`. The scheme is registered in `Info.plist`.
   Every other URL returns `nil` and falls through to the Google sign-in handler. The widget spells
   the voice URL out (an extension can't link app code), and `CoachLaunchRouteTests` pins the literal.
 - **`CoachLaunchRouter`** is app-scope and holds one pending entry. It is `shared` because an App
@@ -727,9 +727,9 @@ flowchart LR
   is still loading the weights while the athlete talks.
 - **Never auto-downloads.** If the weights are missing, the draft stays in the composer beside the
   download prompt. The explicit opt-in rule (§6) holds for external entries too.
-- **Siri phrases.** Every App Shortcut phrase must contain `\(.applicationName)`, and "Hybrid
-  AIthletics" is hard to say. `INAlternativeAppNames` in `Info.plist` registers "AI Coach" and
-  "Coach" as synonyms for that slot, so `"Tell my \(.applicationName)"` is spoken as **"Tell my AI
+- **Siri phrases.** Every App Shortcut phrase must contain `\(.applicationName)`, and "Tell my
+  Train" sounds odd. `INAlternativeAppNames` in `Info.plist` registers "AI Coach", "Coach" and
+  "Train Coach" as synonyms for that slot, so `"Tell my \(.applicationName)"` is spoken as **"Tell my AI
   coach"**. `AskCoachIntent` asks a follow-up question for the message, because a phrase can't
   carry free-form text. If a device doesn't pick up the synonym, the athlete can rename the
   shortcut in the Shortcuts app.
@@ -746,19 +746,19 @@ The project rule from `CLAUDE.md`: **every new feature ships with unit tests, at
 |---|---|---|
 | `AICoachPromptBuilderTests`, `GenerationConfigTests`, formatting tests | `Packages/AICoachCore/Tests/AICoachCoreTests/PromptBuilderTests.swift` | Line formats, omission rules, metric/imperial, strength section, presets |
 | `CoachToolSchemaTests`, `CoachToolDecoderTests`, `CoachProposalCodableTests`, `CoachChatPromptTests` | `…/CoachToolTests.swift` | Schema shape, every decode path and rejection, chat turns, date anchor |
-| `CoachTypeConversionTests`, `CoachStrengthConversionTests` | `Hybrid AIthleticsTests/Hybrid_AIthleticsTests.swift` | SwiftData ↔ core bridging |
+| `CoachTypeConversionTests`, `CoachStrengthConversionTests` | `TrainTests/TrainTests.swift` | SwiftData ↔ core bridging |
 | `CoachProposalApplierTests` | same | Every apply path and failure |
 | `CoachChatStoreTests` | same | Phases, send/stream, first-proposal-wins, snapshot-once, clear |
 | `StubAICoachServiceTests`, `AICoachDownloadProgressTests`, `VoiceDraftTests`, `StubCoachSpeechServiceTests` | same | Service doubles and helpers |
 | `CoachModelPresetTests`, `CoachRuntimeTests`, `CoachEventMappingTests`, `HuggingFaceDownloadPatternTests`, `ByteRateMeterTests` | `Packages/AICoachRuntime/Tests/AICoachRuntimeTests/` | Preset, tool-call → event mapping, download helpers (no model) |
 | `CoachEvalKitTests` | `Evals/Tests/CoachEvalKitTests/` | Eval transcript folding, expectations, runner, reports, scenario library |
-| `HomeUITests` | `Hybrid AIthleticsUITests/HomeUITests.swift` | Chat send, proposals, accept/dismiss, rejection, clear, persistence across navigation, voice, the download CTA and progress flow |
+| `HomeUITests` | `TrainUITests/HomeUITests.swift` | Chat send, proposals, accept/dismiss, rejection, clear, persistence across navigation, voice, the download CTA and progress flow |
 
 ```bash
 cd Packages/AICoachCore && swift test                    # fast, no simulator
 cd Packages/AICoachRuntime && swift test                 # no model, no simulator
-xcodebuild test -scheme "Hybrid AIthletics" -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:"Hybrid AIthleticsTests"
-xcodebuild test -scheme "Hybrid AIthletics" -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:"Hybrid AIthleticsUITests/HomeUITests"
+xcodebuild test -scheme Train -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:"TrainTests"
+xcodebuild test -scheme Train -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:"TrainUITests/HomeUITests"
 ```
 
 ### Stubs and launch arguments
@@ -899,7 +899,7 @@ Because `CoachAction` is an exhaustive switch, the compiler points you at most o
 
 Write a new `AICoachService` conformance that yields `CoachEvent`s, decodes through
 `CoachToolDecoder`, and builds turns with `AICoachPromptBuilder.buildChatTurns`. Inject it in
-`Hybrid_AIthleticsApp.makeCoachForLaunch()`. No view or store code should need to change.
+`TrainApp.makeCoachForLaunch()`. No view or store code should need to change.
 
 ---
 
@@ -940,7 +940,7 @@ Write a new `AICoachService` conformance that yields `CoachEvent`s, decodes thro
 | `…/CoachExerciseType.swift`, `CoachMuscleGroup.swift` | Core mirrors of app enums |
 | `…/GenerationConfig.swift` | Sampling presets |
 | `…/DistanceFormatting.swift`, `DurationFormatting.swift` | Prompt formatting helpers |
-| `Hybrid AIthletics/Services/AICoach/AICoachService.swift` | Protocol, `AICoachDownloadProgress`, `AICoachError` |
+| `Train/Services/AICoach/AICoachService.swift` | Protocol, `AICoachDownloadProgress`, `AICoachError` |
 | `…/MLXAICoachService.swift` | Production service: adapts `CoachRuntime` to `AICoachService` |
 | `Packages/AICoachRuntime/Sources/AICoachRuntime/CoachRuntime.swift` | Model load, `streamChat` (turns → generate → tool call → `CoachEvent`), `streamText` |
 | `…/CoachModelPreset.swift` | `CoachModelPreset.production`: model id, tool dialect, EOS tokens, size |
@@ -951,12 +951,12 @@ Write a new `AICoachService` conformance that yields `CoachEvent`s, decodes thro
 | `…/CoachProposalApplier.swift` | Applies accepted proposals, `WorkoutPrefill` |
 | `…/CoachTypeConversions.swift` | SwiftData → AICoachCore bridges |
 | `…/CoachSpeechService.swift`, `LiveCoachSpeechService.swift`, `StubCoachSpeechService.swift` | Dictation |
-| `Hybrid AIthletics/Config/AICoachEnvironment.swift`, `CoachChatEnvironment.swift`, `CoachSpeechEnvironment.swift` | Environment keys (stub defaults) |
-| `Hybrid AIthletics/Hybrid_AIthleticsApp.swift` | Root injection, `-uiTestSeed` / `-uiTestCoachNotDownloaded` |
-| `Hybrid AIthletics/Views/Home/HomeView.swift` | Snapshot builder, proposal application, entry points |
+| `Train/Config/AICoachEnvironment.swift`, `CoachChatEnvironment.swift`, `CoachSpeechEnvironment.swift` | Environment keys (stub defaults) |
+| `Train/TrainApp.swift` | Root injection, `-uiTestSeed` / `-uiTestCoachNotDownloaded` |
+| `Train/Views/Home/HomeView.swift` | Snapshot builder, proposal application, entry points |
 | `…/CoachLaunchRoute.swift`, `CoachIntents.swift`, `Config/CoachLaunchEnvironment.swift` | Widget deep links, Siri intents, launch router |
 | `CoachVoiceWidget/CoachVoiceWidget.swift` | Home / Lock Screen widget (a deep link only, no mic) |
-| `Hybrid AIthletics/Views/Home/CoachChatView.swift` | Chat UI, `CoachMessageBubble`, `ProposalCard` |
-| `Hybrid AIthletics/Views/Home/CoachEntryCard.swift` | Home card |
+| `Train/Views/Home/CoachChatView.swift` | Chat UI, `CoachMessageBubble`, `ProposalCard` |
+| `Train/Views/Home/CoachEntryCard.swift` | Home card |
 | `Evals/` | `coach-eval` CLI and `CoachEvalKit` (see `docs/EVALS_GUIDE.md`) |
 | `docs/adrs/1-use-lightweight-onboard-llm.md` | Why on-device |

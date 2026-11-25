@@ -13,7 +13,7 @@ One ordered path through everything planned on 2026-11-24. Do one step at a time
    2. rename locally
    3. rename the repo
    4. publish to App Store Connect and TestFlight
-   5. decommission hybrid-aithletics
+   5. decommission the old app and repo
 
    This also enables CloudKit, which has never been on. Production CloudKit schemas can only be added to, so if you want a clean schema, hold the *production* schema deployment until step 4 lands.
 

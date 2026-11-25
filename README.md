@@ -1,6 +1,6 @@
-# Hybrid AIthletics
+# Train
 
-Hybrid AIletics (pronunciation: `/eɪˈθlɛtɪks/`; "ay-THLET-iks") is an iOS exercise tracking application designed for hybrid athletes with a focus on endurance training. It is a *personal* fitness application, explicitly without social aspects to support the notion that our fitness journies should not be built on comparison but through self-motivation to reach our own health and fitness goals.
+**Train: Built to Endure** (formerly *Hybrid AIthletics*, see [ADR 2](docs/adrs/2-rebrand-to-train.md)) is a free iOS app for planning and tracking hybrid training: endurance and strength as equal partners. It is a *personal* fitness application, explicitly without social aspects to support the notion that our fitness journies should not be built on comparison but through self-motivation to reach our own health and fitness goals.
 
 The app helps plan weekly training routines, record completed workouts, and track mileage over time. It also provides dynamic exercise program insights and suggestions utilizing onboard AI. We explicitly opt to use small language models which can run entirely on your own mobile device for several key reasons:
 
@@ -60,7 +60,7 @@ See [docs/AI_COACH.md](docs/AI_COACH.md) for the contributor guide.
 ## Project Layout
 
 ```
-Hybrid AIthletics/
+Train/
   Models/           SwiftData @Model classes and enums
   Config/           ModelContainer factory, environment keys (units, week start, aiCoach, coachChat, …), UI test fixtures
   Extensions/       Date arithmetic, distance/duration/pace and weight formatting
@@ -80,7 +80,7 @@ Hybrid AIthletics/
     Settings/         Preferences (units, week start)
     Shared/           Cross-tab form sections and rating dials
   ContentView.swift   Root TabView
-  Hybrid_AIthleticsApp.swift  App entry point (injects services)
+  TrainApp.swift  App entry point (injects services)
 Packages/AICoachCore/ Shared coach library: prompt builder, tools, decoder, generation config
 Packages/AICoachRuntime/ Coach model runtime (MLX): model preset, download, generation loop
 Evals/                AI coach evals against the real model on Metal (see docs/EVALS_GUIDE.md)
@@ -90,7 +90,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for architecture documentation,
 
 ## Building
 
-Open `Hybrid AIthletics.xcodeproj` in Xcode 15+ and build for an iOS 17+ simulator or device.
+Open `Train.xcodeproj` in Xcode 15+ and build for an iOS 17+ simulator or device.
 
 ### AI Coach Model
 
@@ -100,9 +100,7 @@ The AI coach model (~4.3 GB, Gemma 4 E2B 4-bit) is not bundled. It downloads fro
 
 ### CloudKit Setup
 
-CloudKit sync is configured but requires a container ID registered in the Apple Developer portal. Update the container identifier in:
-1. `Hybrid_AIthletics.entitlements` — `icloud-container-identifiers` array
-2. Apple Developer portal — register the iCloud container
+SwiftData syncs to the athlete's private CloudKit database in the container **`iCloud.com.bradlet.train`**, declared in `Train/Train.entitlements`. It was registered by adding the iCloud (CloudKit), Push Notifications and Background Modes → Remote notifications capabilities to the Train target in Xcode (Signing & Capabilities). The production schema is additive only; see the CloudKit note in `CLAUDE.md` before changing a model.
 
 ## Google Sheets Sync Setup
 
@@ -118,8 +116,8 @@ Run from Xcode (Cmd+U) or via CLI:
 
 ```bash
 # Run all unit tests on macOS
-xcodebuild test -scheme "Hybrid AIthletics" \
-  -only-testing:"Hybrid AIthleticsTests"
+xcodebuild test -scheme Train \
+  -only-testing:"TrainTests"
 ```
 
 Unit tests run on macOS and don't require a simulator. They're fast and test all SwiftData models, CSV parsing, date/distance formatting, and logic layer code. Tests use `StubAICoachService` so the model is not needed.
@@ -130,9 +128,9 @@ Run UI tests with:
 
 ```bash
 # Run all UI tests on iPhone 17 simulator
-xcodebuild test -scheme "Hybrid AIthletics" \
+xcodebuild test -scheme Train \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -only-testing:"Hybrid AIthleticsUITests"
+  -only-testing:"TrainUITests"
 ```
 
 UI tests exercise the full app in the simulator and validate multi-step flows like calendar navigation, workout recording, and deletion.

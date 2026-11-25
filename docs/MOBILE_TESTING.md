@@ -1,6 +1,6 @@
 # Mobile Testing on iPhone
 
-A guide for installing and testing Hybrid AIthletics on a physical iPhone for real-world testing and personal use.
+A guide for installing and testing Train on a physical iPhone for real-world testing and personal use.
 
 ## Prerequisites
 
@@ -26,8 +26,8 @@ Before you can run the app on your iPhone, you'll need:
 
 Code signing proves the app came from you. Xcode can manage this automatically:
 
-1. Open the Hybrid AIthletics project in Xcode
-2. Select the **Hybrid AIthletics** target in the project navigator
+1. Open the Train project in Xcode
+2. Select the **Train** target in the project navigator
 3. Go to the **Signing & Capabilities** tab
 4. Check **Automatically manage signing**
 5. Select your **Team** from the dropdown (your Apple ID account)
@@ -36,7 +36,7 @@ Code signing proves the app came from you. Xcode can manage this automatically:
 If you see errors:
 - Make sure your Apple ID is listed in **Settings > Accounts**
 - Try clicking **Download Manual Profiles** if automatic management fails
-- Ensure your bundle identifier is unique (e.g., `com.yourname.HybridAIthletics`)
+- Ensure your bundle identifier is unique (e.g., `com.yourname.train`)
 
 ### 3. Connect Your iPhone
 
@@ -85,7 +85,7 @@ Alternatively, build from the terminal:
 
 ```bash
 xcodebuild \
-  -scheme "Hybrid AIthletics" \
+  -scheme Train \
   -destination 'platform=iOS,name=iPhone 17 Pro' \
   -configuration Debug \
   build-for-testing
@@ -150,8 +150,8 @@ Unit tests run on your Mac and don't require a simulator. They test data models,
 
 ```bash
 # Run all unit tests
-xcodebuild test -scheme "Hybrid AIthletics" \
-  -only-testing:"Hybrid AIthleticsTests"
+xcodebuild test -scheme Train \
+  -only-testing:"TrainTests"
 ```
 
 This is fast and ideal for development iteration. Tests use a stub AI coach service, so the Gemma model is not needed.
@@ -162,9 +162,9 @@ UI tests require a simulator and exercise the full app interface — calendar in
 
 ```bash
 # Run all UI tests on iPhone 17 simulator
-xcodebuild test -scheme "Hybrid AIthletics" \
+xcodebuild test -scheme Train \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -only-testing:"Hybrid AIthleticsUITests"
+  -only-testing:"TrainUITests"
 ```
 
 ### History Tab Functional Tests
@@ -172,9 +172,9 @@ xcodebuild test -scheme "Hybrid AIthletics" \
 To run only the History tab UI tests:
 
 ```bash
-xcodebuild test -scheme "Hybrid AIthletics" \
+xcodebuild test -scheme Train \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -only-testing:"Hybrid AIthleticsUITests/HistoryUITests"
+  -only-testing:"TrainUITests/HistoryUITests"
 ```
 
 ### AICoachCore Package Tests
@@ -210,7 +210,7 @@ cd Packages/AICoachCore && swift test
 
 ### CloudKit sync not working
 - Ensure you're signed in to iCloud on your iPhone (**Settings > [Your Name] > iCloud**)
-- Verify the CloudKit container ID in `Hybrid_AIthletics.entitlements` matches your registered container in the Apple Developer portal
+- Verify the CloudKit container ID in `Train/Train.entitlements` matches your registered container in the Apple Developer portal
 - Check network connectivity
 
 ## Uninstalling the App

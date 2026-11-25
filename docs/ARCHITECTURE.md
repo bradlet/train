@@ -2,7 +2,7 @@
 
 ## Overview
 
-Hybrid AIthletics uses a flat-layered architecture with SwiftUI + SwiftData. There are no ViewModels — SwiftData's `@Query` macro provides reactive data binding directly in views.
+Train uses a flat-layered architecture with SwiftUI + SwiftData. There are no ViewModels — SwiftData's `@Query` macro provides reactive data binding directly in views.
 
 ## Layers
 
@@ -73,7 +73,7 @@ All calendar arithmetic lives in `Date+Week.swift`. Two week conventions coexist
 - **The user's `AppConfiguration.weekStartDay`** governs weekly *aggregation* (mileage buckets, "This Week" stats — passed into `WorkoutAggregations` as `firstWeekday`) and the Aerobic Training *weekly* calendar (day order, week boundaries, navigation, header totals) via the `firstWeekday:` variants (`daysInWeek(firstWeekday:)`, `startOfWeek(firstWeekday:)`, `endOfWeek(firstWeekday:)`).
 
 ### Drag-and-drop
-Exercises use a lightweight `ExerciseDragItem` (carrying only a UUID) as the `Transferable` payload. The custom UTType `com.hybridaithletics.exercise` is registered in Info.plist via `UTExportedTypeDeclarations`. The drop handler (`WeeklyCalendarView`) looks up the exercise by ID and sets its `date` to the target day. Full model objects are never serialized for drag transfer.
+Exercises use a lightweight `ExerciseDragItem` (carrying only a UUID) as the `Transferable` payload. The custom UTType `com.bradlet.train.exercise` is registered in Info.plist via `UTExportedTypeDeclarations`. The drop handler (`WeeklyCalendarView`) looks up the exercise by ID and sets its `date` to the target day. Full model objects are never serialized for drag transfer.
 
 ### Recurring exercise series
 Recurring plans are **eager bulk inserts of concrete `Exercise` rows** — there are no templates and no virtual instances.
@@ -198,7 +198,7 @@ App tests use `ModelContainerFactory.makePreviewContainer()` for isolated in-mem
 
 ### Functional UI tests
 
-Functional UI tests live in `Hybrid AIthleticsUITests/` (XCTest + `XCUIApplication`; Swift Testing doesn't integrate with XCUI): `HomeUITests` (Home tab, coach chat, proposals, voice entry, model download flow — run with `-uiTestCoachNotDownloaded` for the download cases), `AerobicTrainingUITests`, `StrengthLibraryUITests`, `RatingPickerUITests`, and `HistoryUITests`.
+Functional UI tests live in `TrainUITests/` (XCTest + `XCUIApplication`; Swift Testing doesn't integrate with XCUI): `HomeUITests` (Home tab, coach chat, proposals, voice entry, model download flow — run with `-uiTestCoachNotDownloaded` for the download cases), `AerobicTrainingUITests`, `StrengthLibraryUITests`, `RatingPickerUITests`, and `HistoryUITests`.
 
 `HistoryUITests.swift` validates the History tab end-to-end:
 

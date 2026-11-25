@@ -225,7 +225,7 @@ Planned extension points, in the order they were designed in:
 
 ## Testing
 
-Unit tests live in `Hybrid AIthleticsTests/Hybrid_AIthleticsTests.swift`:
+Unit tests live in `TrainTests/TrainTests.swift`:
 
 - Model defaults, explicit init, Codable round-trips, and SwiftData persistence
   (`StrengthExerciseTests`, `StrengthWorkoutTests`, enum tests).
