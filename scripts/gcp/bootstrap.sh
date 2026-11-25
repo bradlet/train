@@ -44,7 +44,7 @@ log "Using gcloud account: $ACCOUNT"
 if gcloud projects describe "$PROJECT_ID" --format='value(projectId)' >/dev/null 2>&1; then
   log "Project $PROJECT_ID exists, skipping."
 else
-  log "Creating project $PROJECT_ID ($PROJECT_NAME)…"
+  log "Creating project ${PROJECT_ID} (${PROJECT_NAME})..."
   gcloud projects create "$PROJECT_ID" --name="$PROJECT_NAME" \
     || die "could not create $PROJECT_ID. If the ID is taken by another account, set PROJECT_ID to a new one."
 fi
@@ -56,7 +56,7 @@ for api in "${APIS[@]}"; do
   if [[ "$enabled" == "$api" ]]; then
     log "API $api already enabled, skipping."
   else
-    log "Enabling $api…"
+    log "Enabling ${api}..."
     gcloud services enable "$api" --project="$PROJECT_ID"
   fi
 done
