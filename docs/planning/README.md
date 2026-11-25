@@ -4,6 +4,7 @@ Design drafts for upcoming work, in support of the Product Vision in `CLAUDE.md`
 
 | Doc | What it covers |
 |---|---|
+| **[EXECUTION_PLAN.md](EXECUTION_PLAN.md)** | **Start here:** the single ordered plan across every doc and issue |
 | [STRENGTH_ROADMAP.md](STRENGTH_ROADMAP.md) | Making strength first-class: lift-owned history, fast recording, weekly loop, Strength → Progress, planning aids, Home hybrid hub, hints |
 | [TRAINING_PLANS.md](TRAINING_PLANS.md) | Generic plans (cardio, strength, hybrid): steady weeks ↔ multi-week programs, targets and nudges, presets (issue #10) |
 | [PROGRESS_VIEWS.md](PROGRESS_VIEWS.md) | Consistent Cardio/Strength Progress segments, the training-inclusion opt-in, summary vs specific scopes |
