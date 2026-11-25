@@ -113,7 +113,7 @@ WEIGHT_HIGHLIGHT: tuple[float, float] = (0.010, 0.009)
 
 DEFAULT_OUTPUT = (
     Path(__file__).resolve().parent.parent
-    / "Hybrid AIthletics/Assets.xcassets/AppIcon.appiconset/hai-icon.png"
+    / "Hybrid AIthletics/Assets.xcassets/AppIcon.appiconset/app-icon.png"
 )
 
 Point = tuple[float, float]
