@@ -24,6 +24,12 @@ PROJECT_ID="${PROJECT_ID:-train-ha-prod}"
 PROJECT_NAME="${PROJECT_NAME:-Train}"
 BUNDLE_ID="${BUNDLE_ID:-com.bradlet.train}"
 SCOPE="https://www.googleapis.com/auth/drive.file"
+# Publishing the consent screen requires a public home page, privacy policy
+# and terms of service on an authorized domain you own (sources: bradlet.github.io repo).
+HOME_PAGE="https://bradlet.com/train/"
+PRIVACY_POLICY="https://bradlet.com/train/privacy/"
+TERMS="https://bradlet.com/train/terms/"
+AUTHORIZED_DOMAIN="bradlet.com"
 # Sheets + Drive are global APIs and the project holds no regional resources,
 # so there's no REGION. Add one here if that ever changes.
 APIS=(sheets.googleapis.com drive.googleapis.com)
@@ -69,6 +75,12 @@ Done with what gcloud can do. Finish these in the console (Google Auth Platform)
 
   1. Branding      $CONSOLE/branding?project=$PROJECT_ID
        App name: $PROJECT_NAME. Set the user support and developer contact emails.
+       Required to publish: home page $HOME_PAGE,
+       privacy policy $PRIVACY_POLICY,
+       terms of service $TERMS,
+       authorized domain $AUTHORIZED_DOMAIN (verify it first in Google Search
+       Console as a Domain property, signed in as the project owner).
+       Logo: the app icon. Branding verification then runs automatically.
   2. Audience      $CONSOLE/audience?project=$PROJECT_ID
        User type: External. Then "Publish app" so the status is In production.
        (drive.file is non-sensitive: no Google verification. Publishing ends
@@ -78,6 +90,7 @@ Done with what gcloud can do. Finish these in the console (Google Auth Platform)
        Never add auth/spreadsheets (sensitive, triggers verification).
   4. Clients       $CONSOLE/clients?project=$PROJECT_ID
        Create client → Application type: iOS → Bundle ID: $BUNDLE_ID
+       Team ID: CB9HS9S84R. App Store ID: once the App Store record exists.
        Copy the Client ID (….apps.googleusercontent.com).
   5. Record the Client ID in docs/CONNECTIONS.md, and set GIDClientID plus the
      reversed-client URL scheme in the app's Info.plist (see that doc).

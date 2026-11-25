@@ -17,8 +17,10 @@ The app requests only the **`auth/drive.file`** scope. It gives access to just t
 | GCP project | `train-ha-prod`, created by [`scripts/gcp/bootstrap.sh`](../scripts/gcp/bootstrap.sh) |
 | Publishing status | In production |
 | Bundle ID | `com.bradlet.train` |
-| Client ID | _pending: recorded once the client is created (#27)_ |
-| Reversed scheme | _pending_ |
+| Team ID | `CB9HS9S84R` |
+| App Store ID | _not set yet: add it to the client once #11 creates the Train App Store Connect record_ |
+| Client ID (`GIDClientID`) | `81188376099-3srh0cv25oblvnoukf7n6tvfqemosggn.apps.googleusercontent.com` |
+| Reversed scheme (`CFBundleURLSchemes`) | `com.googleusercontent.apps.81188376099-3srh0cv25oblvnoukf7n6tvfqemosggn` |
 
 > The app ships the old client from the `thompson-projects` GCP project, registered for `bradlet.Hybrid-AIthletics`, until the Train rename (#11) swaps `Info.plist` over to the client above. That old consent screen is still in Testing, so its refresh tokens expire every 7 days. That expiry ends only once the published client is in use. Delete the old client after Train is verified on TestFlight. Leave the `thompson-projects` project itself alone, because other things use it.
 
@@ -48,10 +50,18 @@ The script is idempotent. It creates the project if it's missing and enables the
 
 The script prints this checklist with deep links into **Google Auth Platform** for the project:
 
-1. **Branding**: app name *Train*, plus the user support and developer contact emails. The logo, privacy policy, ToS and authorized domains can stay blank.
-2. **Audience**: user type **External**, then **Publish app** so the status reads **In production**. With only `drive.file` requested, this needs no verification, and it ends Testing mode's 7-day refresh-token expiry. No test users are needed.
+1. **Branding**: app name *Train*, plus the user support and developer contact emails. Publishing an External app requires all of these; Publish stays disabled until they're set, even if no field shows an error:
+   - **App home page:** `https://bradlet.com/train/`
+   - **Privacy policy:** `https://bradlet.com/train/privacy/`
+   - **Terms of service:** `https://bradlet.com/train/terms/` (a real terms page, not a reused one: Google checks each link is what it claims to be)
+   - **Authorized domain:** `bradlet.com`
+
+   All three pages are static HTML in the `bradlet.github.io` repo (`public/train/`), deliberately unlinked from the rest of the site. Keep the privacy policy in step with what the app actually sends off the device.
+
+   The **authorized domain must be verified** in [Google Search Console](https://search.google.com/search-console) first, as a **Domain** property, by an owner of the GCP project. `bradlet.com`'s DNS is on Cloudflare, so the verification TXT record lives there; leave the existing TXT records (SPF for mail, older verifications) in place. The **logo** is the app icon (`scripts/generate_app_icon.py`). With the domain verified, Google's branding verification ran automatically and passed quickly, logo included.
+2. **Audience**: user type **External**, then **Publish app** so the status reads **In production**. With only the non-sensitive `drive.file` scope, there's no scope review, and it ends Testing mode's 7-day refresh-token expiry. No test users are needed.
 3. **Data access**: add `https://www.googleapis.com/auth/drive.file`, and nothing else.
-4. **Clients**: **Create client → iOS**, with the app's bundle ID. The App Store ID and Team ID can stay blank. Copy the **Client ID** into [Current client](#current-client).
+4. **Clients**: **Create client → iOS**, with the app's bundle ID. Team ID `CB9HS9S84R`. The App Store ID only exists once the App Store Connect record does; add it then. Copy the **Client ID** into [Current client](#current-client).
 
 #### 4. Wire the client into the app
 
