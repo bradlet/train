@@ -85,7 +85,7 @@ classDiagram
 
 ## 2. Recording speed
 
-> **R1–R3 built in #14** (2026-11-26). As shipped: the starting measurement is **Average** (not Max); the default measurement is remembered from the last valued record and changed by picking another; the whole-day sheet also opens from a *Log day* button on every board lane, and its rows start unticked. R4 is #15.
+> **R1–R3 built in #14** (2026-11-26). As shipped: the starting measurement is **Average** (not Max); the default measurement is remembered from the last valued record and changed by picking another; the whole-day sheet also opens from a *Log day* button on every board lane, and its rows start unticked. R4 shipped in #15.
 
 - **R1 — Prefill last session.** The value and measurement prefill from the lift's latest record. A ± stepper nudges the value by a sensible increment (5 lb / 2.5 kg, 1 rep, 15 s, 10 m), so typing is the exception.
 - **R2 — Per-lift default measurement.** Remembered from the last record and editable on the lift. Never pick "Max" again for a lift you track as Avg.
@@ -93,6 +93,8 @@ classDiagram
 - **R4 — Missed-lift carryover.** Home's Today section adds a "Still to do this week" group: active-plan lifts from earlier days in the current week (by your week-start setting) with no record yet. One tap records them for today. The template never changes, and nothing carries across a week boundary.
 
 ## 3. Weekly loop on the board
+
+> **W1, W2 and R4 built in #15** (2026-11-26). As shipped: the ✓ and the carryover are per card (`slotID`). The new best is a brief banner on the presenting view, not a lasting badge, and it compares within one metric and measurement. A first-ever value is not a best.
 
 - **W1 — Current-week checkmarks.** A card recorded in the current week shows a ✓ and that week's value instead of "No records yet" or a stale date. The same applies to Home's strength rows. It resets on its own when the week rolls over.
 - **W2 — PR badge on save.** A brief "New best" when a record beats the lift's previous best for that metric and measurement. This is the trend-only motivator.

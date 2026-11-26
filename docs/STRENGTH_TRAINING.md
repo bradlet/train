@@ -205,6 +205,26 @@ sequenceDiagram
   from each lane's *Log day* button (dated to that weekday's most recent occurrence,
   `Date.mostRecent(weekdayIndex:)`) and from Home's Log Lift when today has several lifts.
 
+### The weekly loop (#15)
+
+All three rules are pure functions in `Services/Strength/StrengthWeek.swift`, and the
+week follows the athlete's week-start setting (`@Environment(\.weekStartDay)`).
+
+- **Checkmarks.** `StrengthWeek.recordsBySlot` gives each card's latest record dated this
+  week. A ✓ is per card (its `slotID`), not per lift, so the same lift on two days is
+  ticked separately. Cards and Home's rows show the ✓ with that week's value in green, and
+  it resets on its own when the week rolls over.
+- **Still to do this week.** `StrengthWeek.carryover` lists active cards from lanes earlier
+  in the week than today with no record this week, ordered by day and then board order.
+  Home → Today shows them beneath today's lifts, each tagged with its day. Tapping one
+  records it today against its own card, which ticks it and drops it from the list. The
+  board is never changed, and nothing carries across a week boundary.
+- **New best.** `StrengthPersonalBest.isNewBest` passes a valued record that beats every
+  earlier valued record of the same lift, metric and measurement; higher is better for
+  every metric. A first value or a "done" record never counts. Both record sheets report
+  bests through `onNewBest`, and Home and the board show a brief banner
+  (`.newBestBanner`) with a success haptic, so saving never waits on it.
+
 ## AI Coach Serialization
 
 The strength board is part of the coaching snapshot:
