@@ -29,6 +29,18 @@ struct StrengthDayColumn: View {
     let onAddExercise: () -> Void
     /// Called to log the lane's active lifts in one sheet.
     let onLogDay: () -> Void
+    /// The lane's "Done as planned" button (#26), or `nil` to hide it.
+    var asPlanned: AsPlannedAction? = nil
+
+    /// A one-tap "as planned" log for this lane.
+    struct AsPlannedAction {
+        /// Button title, e.g. "Done as planned" or "Done as planned · Tue".
+        let title: String
+        /// Logs every pending card at once.
+        let log: () -> Void
+        /// Opens the whole-day sheet pre-ticked instead.
+        let logWithChanges: () -> Void
+    }
     /// Called when a card is dropped: move `id` to this day's section
     /// (`offloaded`), inserting before `target` (nil = append at end).
     let onDrop: (_ id: UUID, _ offloaded: Bool, _ target: StrengthExercise?) -> Void
@@ -71,6 +83,24 @@ struct StrengthDayColumn: View {
         .accessibilityIdentifier("strengthDayColumn.\(dayIndex)")
     }
 
+    /// The lane's one-tap "Done as planned" button; long-press for the
+    /// whole-day sheet pre-ticked. Strength only — it never touches cardio.
+    private func asPlannedButton(_ action: AsPlannedAction) -> some View {
+        Button(action: action.log) {
+            Label(action.title, systemImage: "dumbbell.fill")
+                .font(.caption.weight(.semibold))
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .tint(.green)
+        .contextMenu {
+            Button(action: action.logWithChanges) {
+                Label("Log with changes…", systemImage: "slider.horizontal.3")
+            }
+        }
+        .accessibilityIdentifier("strengthDayColumn.logAsPlanned.\(dayIndex)")
+    }
+
     /// Builds one droppable section (active plan or offloaded) of the column.
     private func section(
         title: String,
@@ -101,6 +131,9 @@ struct StrengthDayColumn: View {
                     .accessibilityLabel("Add exercise")
                     .accessibilityIdentifier("strengthDayColumn.add.\(dayIndex)")
                 }
+            }
+            if !offloaded, let asPlanned {
+                asPlannedButton(asPlanned)
             }
             if exercises.isEmpty {
                 Text(emptyHint)

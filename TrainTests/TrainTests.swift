@@ -5095,6 +5095,17 @@ struct StrengthDayLogTests {
         )
     }
 
+    @Test func allTickedTicksEveryRowAndKeepsValues() {
+        let rows = [row("Squat", value: "185", done: false), row("Row", done: true)]
+        let ticked = StrengthDayLog.allTicked(rows)
+        let allDone = ticked.allSatisfy { $0.isDone }
+        let tickedDrafts = ticked.map { $0.draft }
+        let originalDrafts = rows.map { $0.draft }
+        #expect(allDone)
+        #expect(tickedDrafts == originalDrafts)
+        #expect(StrengthDayLog.allTicked([]).isEmpty)
+    }
+
     @Test func saveNeedsATickedRow() {
         #expect(!StrengthDayLog.canSave([], useMetricUnits: false))
         #expect(!StrengthDayLog.canSave([row("A", value: "100", done: false)], useMetricUnits: false))

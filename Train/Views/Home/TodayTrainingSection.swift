@@ -29,6 +29,11 @@ struct TodayTrainingSection: View {
     let onEditAerobic: (Exercise) -> Void
     /// Called to record a session against a strength exercise.
     let onRecordStrength: (StrengthExercise) -> Void
+    /// Logs today's unrecorded lifts as planned (#26); `nil` hides the
+    /// button (nothing left to log today).
+    var onLogAsPlanned: (() -> Void)? = nil
+    /// Opens the whole-day sheet pre-ticked ("Log with changes…").
+    var onLogWithChanges: () -> Void = {}
 
     /// Shared across the aerobic cards so only one shows its delete button.
     @State private var swipeDeleteActiveID: UUID?
@@ -55,11 +60,11 @@ struct TodayTrainingSection: View {
                 }
 
                 if !strength.isEmpty {
-                    if !aerobic.isEmpty {
-                        Text("Strength")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 4)
+                    // The as-planned button always sits in this strength
+                    // header — below the cardio cards, attached to the lift
+                    // rows — so it can never read as completing a run.
+                    if !aerobic.isEmpty || onLogAsPlanned != nil {
+                        strengthHeader
                     }
                     VStack(spacing: 8) {
                         ForEach(strength) { exercise in
@@ -82,6 +87,35 @@ struct TodayTrainingSection: View {
     }
 
     // MARK: - Subviews
+
+    /// "Strength", plus the one-tap "Log lifts as planned" button.
+    private var strengthHeader: some View {
+        HStack {
+            Text("Strength")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Spacer()
+            if let onLogAsPlanned {
+                Button(action: onLogAsPlanned) {
+                    Label("Log lifts as planned", systemImage: "dumbbell.fill")
+                        .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+                .controlSize(.small)
+                .tint(.green)
+                .contextMenu {
+                    Button(action: onLogWithChanges) {
+                        Label("Log with changes…", systemImage: "slider.horizontal.3")
+                    }
+                }
+                .accessibilityIdentifier("home.logAsPlanned")
+            }
+        }
+        .padding(.top, 4)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("home.strengthSection")
+    }
 
     /// "Still to do this week": earlier days' unrecorded lifts. Tapping one
     /// records it for today against its own card, which ticks that card.

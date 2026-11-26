@@ -40,9 +40,10 @@ struct HomeView: View {
     @State private var recordingStrength: StrengthExercise?
     /// The "New best" banner after a strength save beats a lift's best.
     @State private var newBest: NewBestAnnouncement?
-    /// Whether the lift picker for today's lane is showing.
-    /// Whether the whole-day sheet for today's lane is shown.
-    @State private var isLogDayPresented = false
+    /// The whole-day sheet being shown, if any.
+    @State private var logDayRequest: LogStrengthDayRequest?
+    /// The last one-tap "as planned" log, while its toast shows.
+    @State private var plannedLog: PlannedDayLogResult?
     /// Whether the exercise library is showing (used when today's lane is empty).
     @State private var isLibraryPresented = false
     /// A coach workout proposal the athlete accepted, pending confirmation in
@@ -66,6 +67,12 @@ struct HomeView: View {
     /// Today's active strength lane.
     private var todayStrength: [StrengthExercise] {
         TodayTraining.strength(allStrengthExercises, on: Date())
+    }
+
+    /// Today's lifts not yet recorded today — what "Log lifts as planned"
+    /// would log.
+    private var todayAsPlannedPending: [StrengthExercise] {
+        PlannedDayLogger.pending(todayStrength, on: Date(), records: allStrengthRecords)
     }
 
     var body: some View {
@@ -118,7 +125,13 @@ struct HomeView: View {
                                 editingExercise = exercise
                             }
                         },
-                        onRecordStrength: { recordingStrength = $0 }
+                        onRecordStrength: { recordingStrength = $0 },
+                        onLogAsPlanned: logAsPlannedAction,
+                        onLogWithChanges: {
+                            logDayRequest = LogStrengthDayRequest(
+                                slots: todayAsPlannedPending, date: Date(), startTicked: true
+                            )
+                        }
                     )
 
                     QuickRecordSection(
@@ -131,7 +144,7 @@ struct HomeView: View {
                             } else if todayStrength.count == 1 {
                                 recordingStrength = todayStrength[0]
                             } else {
-                                isLogDayPresented = true
+                                logDayRequest = LogStrengthDayRequest(slots: todayStrength, date: Date())
                             }
                         }
                     )
@@ -149,6 +162,7 @@ struct HomeView: View {
             }
             .background(Color(.systemGroupedBackground))
             .newBestBanner($newBest)
+            .plannedLogToast($plannedLog, onUndo: undoPlannedLog, onAdjust: adjustPlannedLog)
             .navigationTitle("Home")
             .navigationBarTitleDisplayMode(.inline)
             .settingsToolbarButton()
@@ -208,8 +222,12 @@ struct HomeView: View {
                     addLiftFromLibrary(entry, plan: plan)
                 }
             }
-            .sheet(isPresented: $isLogDayPresented) {
-                LogStrengthDaySheet(slots: todayStrength) { newBest = NewBestAnnouncement(liftNames: $0) }
+            .sheet(item: $logDayRequest) { request in
+                LogStrengthDaySheet(
+                    slots: request.slots,
+                    date: request.date,
+                    startTicked: request.startTicked
+                ) { newBest = NewBestAnnouncement(liftNames: $0) }
             }
             .alert(
                 "Couldn't apply that",
@@ -426,6 +444,35 @@ struct HomeView: View {
     }
 
     // MARK: - Strength
+
+    /// The Home "Log lifts as planned" action, or `nil` once nothing is
+    /// left to log today.
+    private var logAsPlannedAction: (() -> Void)? {
+        todayAsPlannedPending.isEmpty ? nil : { logTodayAsPlanned() }
+    }
+
+    /// One tap: logs today's unrecorded lifts as planned (strength only).
+    private func logTodayAsPlanned() {
+        guard let result = PlannedDayLogger.log(todayStrength, on: Date(), in: modelContext) else { return }
+        plannedLog = result
+        if !result.newBests.isEmpty { newBest = NewBestAnnouncement(liftNames: result.newBests) }
+    }
+
+    /// Removes the records a one-tap log wrote.
+    private func undoPlannedLog(_ result: PlannedDayLogResult) {
+        withAnimation { PlannedDayLogger.undo(result, in: modelContext) }
+    }
+
+    /// Swaps a one-tap log for the whole-day sheet, pre-ticked with the
+    /// same values.
+    private func adjustPlannedLog(_ result: PlannedDayLogResult) {
+        PlannedDayLogger.undo(result, in: modelContext)
+        logDayRequest = LogStrengthDayRequest(
+            slots: result.slotIDs.compactMap { id in allStrengthExercises.first { $0.id == id } },
+            date: result.date,
+            startTicked: true
+        )
+    }
 
     /// Adds a library entry to today's lane and immediately opens recording,
     /// which is what "Log Lift" with an empty lane is asking for.

@@ -6,7 +6,9 @@
 //  card, each prefilled from that lift's last session with − / + nudges.
 //  Tick what you did and Save records every ticked row against its card.
 //  Rows start unticked — ticking is the action, so nothing is logged by
-//  accident ("Log lifts as planned", #26, is the one-tap version).
+//  accident. "Log lifts as planned" (#26) is the one-tap version; its
+//  Adjust and "Log with changes…" paths open this sheet pre-ticked, and
+//  *Tick all* here is the same express path.
 //
 
 import SwiftUI
@@ -63,6 +65,16 @@ enum StrengthDayLog {
         }
     }
 
+    /// The rows with every lift ticked — the sheet's *Tick all*, and how
+    /// the as-planned paths open it.
+    static func allTicked(_ rows: [StrengthDayLogRow]) -> [StrengthDayLogRow] {
+        rows.map { row in
+            var ticked = row
+            ticked.isDone = true
+            return ticked
+        }
+    }
+
     /// Save needs at least one ticked row, and every ticked row valid
     /// (blank is valid: it logs "done").
     static func canSave(_ rows: [StrengthDayLogRow], useMetricUnits: Bool) -> Bool {
@@ -85,6 +97,18 @@ enum StrengthDayLog {
     }
 }
 
+/// A request to open the whole-day sheet: which cards, for which day, and
+/// whether they open ticked (the as-planned Adjust paths, #26).
+struct LogStrengthDayRequest: Identifiable {
+    let id = UUID()
+    /// The cards to list, in board order.
+    let slots: [StrengthExercise]
+    /// The day being logged.
+    let date: Date
+    /// Whether every row opens ticked.
+    var startTicked: Bool = false
+}
+
 /// Sheet for logging several lifts from one day at once.
 struct LogStrengthDaySheet: View {
     /// The lane's active cards, in board order.
@@ -99,15 +123,25 @@ struct LogStrengthDaySheet: View {
     @State private var date: Date
     @State private var rows: [StrengthDayLogRow] = []
     @State private var didLoad = false
+    /// Whether rows open ticked (the as-planned Adjust paths).
+    private let startTicked: Bool
 
     /// Creates the sheet.
     /// - Parameters:
     ///   - slots: The lane's active cards, in board order.
     ///   - date: The day being logged (defaults to today).
+    ///   - startTicked: Whether every row opens ticked (#26's Adjust and
+    ///     "Log with changes…"); otherwise rows open unticked.
     ///   - onNewBest: Called with the names of lifts whose saved record is a
     ///     new best (only when there is at least one).
-    init(slots: [StrengthExercise], date: Date = Date(), onNewBest: @escaping ([String]) -> Void = { _ in }) {
+    init(
+        slots: [StrengthExercise],
+        date: Date = Date(),
+        startTicked: Bool = false,
+        onNewBest: @escaping ([String]) -> Void = { _ in }
+    ) {
         self.slots = slots
+        self.startTicked = startTicked
         self.onNewBest = onNewBest
         self._date = State(initialValue: date)
     }
@@ -124,7 +158,16 @@ struct LogStrengthDaySheet: View {
                         rowView($row, index: index)
                     }
                 } header: {
-                    Text("Lifts")
+                    HStack {
+                        Text("Lifts")
+                        Spacer()
+                        if rows.contains(where: { !$0.isDone }) {
+                            Button("Tick all") { rows = StrengthDayLog.allTicked(rows) }
+                                .font(.caption.weight(.semibold))
+                                .textCase(nil)
+                                .accessibilityIdentifier("logDay.tickAll")
+                        }
+                    }
                 } footer: {
                     Text("Tick what you did. Values start from your last session; leave one blank to log it as done.")
                 }
@@ -144,7 +187,8 @@ struct LogStrengthDaySheet: View {
             .onAppear {
                 guard !didLoad else { return }
                 didLoad = true
-                rows = StrengthDayLog.rows(for: slots, in: modelContext, useMetricUnits: useMetricUnits, date: date)
+                let loaded = StrengthDayLog.rows(for: slots, in: modelContext, useMetricUnits: useMetricUnits, date: date)
+                rows = startTicked ? StrengthDayLog.allTicked(loaded) : loaded
             }
         }
     }

@@ -26,7 +26,9 @@ struct StrengthTrainingView: View {
     /// Whether the exercise library sheet is presented.
     @State private var showLibrary = false
     /// The weekday lane being logged in the whole-day sheet (nil = hidden).
-    @State private var loggingDay: LogDayRequest?
+    @State private var loggingDay: LogStrengthDayRequest?
+    /// The last one-tap "as planned" log, while its toast shows.
+    @State private var plannedLog: PlannedDayLogResult?
     /// The card a session is being recorded from (nil = sheet hidden).
     @State private var recordingExercise: StrengthExercise?
     /// The "New best" banner after a save beats a lift's best.
@@ -47,7 +49,15 @@ struct StrengthTrainingView: View {
                         weekRecords: weekRecords,
                         onRecord: { recordingExercise = $0 },
                         onAddExercise: { showLibrary = true },
-                        onLogDay: { loggingDay = LogDayRequest(dayIndex: dayIndex) },
+                        onLogDay: {
+                            // Dated to that weekday's most recent occurrence,
+                            // so earlier days this week can be backfilled.
+                            loggingDay = LogStrengthDayRequest(
+                                slots: StrengthBoardPlanner.lane(allExercises, day: dayIndex, offloaded: false),
+                                date: Date().mostRecent(weekdayIndex: dayIndex)
+                            )
+                        },
+                        asPlanned: asPlannedAction(for: dayIndex),
                         onDrop: { id, offloaded, target in
                             handleDrop(id: id, day: dayIndex, offloaded: offloaded, target: target)
                         },
@@ -83,11 +93,58 @@ struct StrengthTrainingView: View {
         }
         .sheet(item: $loggingDay) { request in
             LogStrengthDaySheet(
-                slots: StrengthBoardPlanner.lane(allExercises, day: request.dayIndex, offloaded: false),
-                date: Date().mostRecent(weekdayIndex: request.dayIndex)
+                slots: request.slots,
+                date: request.date,
+                startTicked: request.startTicked
             ) { newBest = NewBestAnnouncement(liftNames: $0) }
         }
         .newBestBanner($newBest)
+        .plannedLogToast($plannedLog, onUndo: undoPlannedLog, onAdjust: adjustPlannedLog)
+    }
+
+    // MARK: - Done as planned (#26)
+
+    /// The lane's "Done as planned" button, or `nil` to hide it: a day
+    /// still to come this week, or nothing left to log that day.
+    private func asPlannedAction(for dayIndex: Int) -> StrengthDayColumn.AsPlannedAction? {
+        let now = Date()
+        guard let date = PlannedDayLogger.logDate(forLane: dayIndex, now: now, firstWeekday: weekStartDay) else {
+            return nil
+        }
+        let lane = StrengthBoardPlanner.lane(allExercises, day: dayIndex, offloaded: false)
+        guard !PlannedDayLogger.pending(lane, on: date, records: allRecords).isEmpty else { return nil }
+        let isToday = Calendar.current.isDate(date, inSameDayAs: now)
+        return StrengthDayColumn.AsPlannedAction(
+            title: isToday ? "Done as planned" : "Done as planned · \(Calendar.current.shortWeekdaySymbols[dayIndex])",
+            log: {
+                guard let result = PlannedDayLogger.log(lane, on: date, in: modelContext) else { return }
+                plannedLog = result
+                if !result.newBests.isEmpty { newBest = NewBestAnnouncement(liftNames: result.newBests) }
+            },
+            logWithChanges: {
+                loggingDay = LogStrengthDayRequest(
+                    slots: PlannedDayLogger.pending(lane, on: date, records: allRecords),
+                    date: date,
+                    startTicked: true
+                )
+            }
+        )
+    }
+
+    /// Removes the records a one-tap log wrote.
+    private func undoPlannedLog(_ result: PlannedDayLogResult) {
+        withAnimation { PlannedDayLogger.undo(result, in: modelContext) }
+    }
+
+    /// Swaps a one-tap log for the whole-day sheet, pre-ticked with the
+    /// same values, so one lift can be nudged or unticked.
+    private func adjustPlannedLog(_ result: PlannedDayLogResult) {
+        PlannedDayLogger.undo(result, in: modelContext)
+        loggingDay = LogStrengthDayRequest(
+            slots: result.slotIDs.compactMap { id in allExercises.first { $0.id == id } },
+            date: result.date,
+            startTicked: true
+        )
     }
 
     // MARK: - Day Strip
@@ -183,11 +240,3 @@ struct StrengthTrainingView: View {
         .modelContainer(ModelContainerFactory.makePreviewContainer())
 }
 
-/// A request to log one weekday lane in the whole-day sheet. The date
-/// defaults to that weekday's most recent occurrence, so earlier days this
-/// week can be backfilled.
-struct LogDayRequest: Identifiable {
-    let id = UUID()
-    /// The lane (Sunday=0 ... Saturday=6).
-    let dayIndex: Int
-}

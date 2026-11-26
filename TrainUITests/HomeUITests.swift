@@ -230,6 +230,81 @@ final class HomeUITests: XCTestCase {
         )
     }
 
+    // MARK: - Log lifts as planned (#26)
+
+    /// One tap logs today's lifts, strength only: the button sits in the
+    /// strength section, the toast reports the count, and Undo removes
+    /// exactly those records while the cardio card stays as it was.
+    @MainActor
+    func testLogLiftsAsPlannedThenUndo() throws {
+        let app = launchApp()
+        let section = app.otherElements["home.strengthSection"]
+        XCTAssertTrue(section.waitForExistence(timeout: 5), "the strength header should show")
+        let button = section.buttons["home.logAsPlanned"]
+        XCTAssertTrue(button.exists, "the as-planned button lives in the strength section")
+        XCTAssertTrue(app.staticTexts["Test Workout 1"].exists)
+
+        button.tap()
+        let message = app.staticTexts["plannedLog.message"]
+        XCTAssertTrue(message.waitForExistence(timeout: 5), "a toast should confirm the log")
+        XCTAssertEqual(message.label, "Logged 2 lifts")
+        XCTAssertTrue(app.descendants(matching: .any)["home.strengthWeekCheck.Test Lift 1"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["home.logAsPlanned"].exists, "nothing is left to log today")
+        XCTAssertTrue(app.staticTexts["Test Workout 1"].exists, "cardio is untouched")
+
+        app.buttons["plannedLog.undo"].tap()
+        XCTAssertTrue(app.buttons["home.logAsPlanned"].waitForExistence(timeout: 5), "undo brings the button back")
+        XCTAssertFalse(app.descendants(matching: .any)["home.strengthWeekCheck.Test Lift 1"].exists, "undo removes the records")
+        XCTAssertTrue(app.staticTexts["Test Workout 1"].exists, "cardio is untouched")
+    }
+
+    /// Adjust swaps the one-tap log for the whole-day sheet, pre-ticked
+    /// with the same values.
+    @MainActor
+    func testAdjustOpensTheDaySheetPreTicked() throws {
+        let app = launchApp()
+        let button = app.buttons["home.logAsPlanned"]
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        button.tap()
+        let adjust = app.buttons["plannedLog.adjust"]
+        XCTAssertTrue(adjust.waitForExistence(timeout: 5))
+        adjust.tap()
+
+        let save = app.buttons["logDay.save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5), "the whole-day sheet should open")
+        XCTAssertTrue(save.isEnabled, "rows open ticked")
+        XCTAssertFalse(app.buttons["logDay.tickAll"].exists, "everything is already ticked")
+        XCTAssertEqual(app.textFields["logDay.0.valueField"].value as? String, "135", "same value as the tap")
+        app.buttons["logDay.0.increment"].tap()
+        save.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home.strengthWeekCheck.Test Lift 1"].waitForExistence(timeout: 5),
+            "the adjusted log is saved"
+        )
+        XCTAssertTrue(app.descendants(matching: .any)["newBestBanner"].firstMatch.exists, "140 beats 135")
+    }
+
+    /// The board's lane button logs today's lane as planned.
+    @MainActor
+    func testBoardDoneAsPlanned() throws {
+        let app = launchApp()
+        app.tabBars.buttons["Strength"].tap()
+        let today = Calendar.current.component(.weekday, from: Date()) - 1
+        let button = app.buttons["strengthDayColumn.logAsPlanned.\(today)"]
+        XCTAssertTrue(button.waitForExistence(timeout: 5), "today's lane offers Done as planned")
+        XCTAssertFalse(
+            app.buttons["strengthDayColumn.logAsPlanned.\((today + 1) % 7)"].exists,
+            "a day still to come has no button"
+        )
+        button.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["strengthCard.weekCheck.Test Lift 2"].waitForExistence(timeout: 5),
+            "the lane's cards are ticked"
+        )
+        XCTAssertFalse(button.exists, "nothing left to log in the lane")
+    }
+
     // MARK: - Coach chat
 
     @MainActor
