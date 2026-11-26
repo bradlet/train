@@ -7,15 +7,15 @@ One ordered path through everything planned on 2026-11-24. Do one step at a time
 ## Plan
 
 ### A. Rebrand and infrastructure
-1. **#27** Scripted GCP project and new Google OAuth client, with the consent screen published to production.
-2. **#11** Rebrand to **Train**, following its phases in order:
+1. ✅ **#27** Scripted GCP project and new Google OAuth client, with the consent screen published to production.
+2. ✅ **#11** Rebrand to **Train** (*Train: Built to Endure*, [ADR 2](../adrs/2-rebrand-to-train.md)), following its phases in order:
    1. brand discussion and ADR
    2. rename locally
    3. rename the repo
    4. publish to App Store Connect and TestFlight
    5. decommission the old app and repo
 
-   This also enables CloudKit, which has never been on. Production CloudKit schemas can only be added to, so if you want a clean schema, hold the *production* schema deployment until step 4 lands.
+   CloudKit is now on (development only). Deploying the *production* schema and checking two-device sync is **#30**. Production schemas can only be added to, so the model changes in #13 should land before #30.
 
 ### B. Foundation
 3. **#12** App structure: Home · Cardio (Plan | Progress) · Strength (Plan | Progress). History becomes Cardio → Progress. Docs: [README](README.md), [PROGRESS_VIEWS](PROGRESS_VIEWS.md)
