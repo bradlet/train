@@ -29,6 +29,10 @@ struct StrengthDayColumn: View {
     var onGroup: ((StrengthExercise) -> Void)? = nil
     /// Opens a card's history.
     var onHistory: ((StrengthExercise) -> Void)? = nil
+    /// Duplicates a card onto another day (#18).
+    var onDuplicate: ((StrengthExercise, Int) -> Void)? = nil
+    /// Copies this day's active plan onto another day (#18).
+    var onCopyDay: ((Int) -> Void)? = nil
     /// Called when the user taps a card to record a weight entry.
     let onRecord: (StrengthExercise) -> Void
     /// Called when the user taps the add button to open the exercise library.
@@ -121,6 +125,22 @@ struct StrengthDayColumn: View {
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
                 Spacer()
+                if !offloaded && !exercises.isEmpty, let onCopyDay {
+                    Menu {
+                        Section("Copy this day to") {
+                            ForEach(0..<7, id: \.self) { day in
+                                if day != dayIndex {
+                                    Button(Calendar.current.weekdaySymbols[day]) { onCopyDay(day) }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityLabel("Copy day")
+                    .accessibilityIdentifier("strengthDayColumn.copyDay.\(dayIndex)")
+                }
                 if !offloaded && !exercises.isEmpty {
                     Button(action: onLogDay) {
                         Image(systemName: "checklist")
@@ -157,6 +177,7 @@ struct StrengthDayColumn: View {
                         assignment: assignments[exercise.id],
                         onGroup: onGroup.map { handler in { handler(exercise) } },
                         onHistory: onHistory.map { handler in { handler(exercise) } },
+                        onDuplicate: onDuplicate.map { handler in { day in handler(exercise, day) } },
                         onRecord: { onRecord(exercise) },
                         onMoveToDay: { day in onMoveToDay(exercise, day) },
                         onToggleOffloaded: {

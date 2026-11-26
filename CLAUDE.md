@@ -197,6 +197,7 @@ Views/
 - `Services/Strength/StrengthSlotResolver.swift` — `LiftTarget`, card → lift resolution, and `MovementGroupStore` (unit-tested)
 - `Services/Strength/StrengthProgress.swift` — Strength → Progress rules: lift summaries (sparkline/latest/best in the lift's measurement), list sections, per-measurement series and PR markers (same rule as the save banner), week headline, group rotation counts; `StrengthRecordEditor` is the record edit/delete path (unit-tested)
 - `Views/Strength/StrengthProgressView.swift` / `LiftDetailView.swift` / `GroupProgressView.swift` — the lift list, a lift's chart + sessions (+ `EditStrengthRecordSheet`), a group's members + rotation strip
+- `Views/Strength/StrengthBoardCopier.swift` — copy a day / duplicate a card, never doubling a lift or group on the target day; `MuscleBalance` maps cards to the five `BodyRegion`s by pattern, then muscle (unit-tested); `MuscleBalanceStrip.swift` draws it
 - `Views/Strength/MovementGroupEditorSheet.swift` — group editor; `MovementGroupDraft` owns its rules (unit-tested)
 - `Views/Strength/NewBestBanner.swift` — the transient "New best" banner modifier and its message
 - `Views/Strength/StrengthPlanFields.swift` — `StrengthPlanDraft` (plan form state + `apply(to:)`) and the shared sets × reps form section used by both the add-from-library and edit-plan flows

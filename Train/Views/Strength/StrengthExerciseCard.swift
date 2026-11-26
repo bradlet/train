@@ -45,6 +45,8 @@ struct StrengthExerciseCard: View {
     var onGroup: (() -> Void)? = nil
     /// Opens the lift's (or group's) history in Strength → Progress.
     var onHistory: (() -> Void)? = nil
+    /// Duplicates the card onto another day's plan (#18).
+    var onDuplicate: ((Int) -> Void)? = nil
     /// Called when the user taps the card to record a session.
     let onRecord: () -> Void
     /// Called when the user picks a destination day from the context menu.
@@ -173,6 +175,17 @@ struct StrengthExerciseCard: View {
                 }
             } label: {
                 Label("Move to Day", systemImage: "calendar")
+            }
+            if let onDuplicate {
+                Menu {
+                    ForEach(0..<7, id: \.self) { dayIndex in
+                        if dayIndex != exercise.weekdayIndex {
+                            Button(Calendar.current.weekdaySymbols[dayIndex]) { onDuplicate(dayIndex) }
+                        }
+                    }
+                } label: {
+                    Label("Duplicate to Day", systemImage: "plus.square.on.square")
+                }
             }
             Button { onToggleOffloaded() } label: {
                 Label(

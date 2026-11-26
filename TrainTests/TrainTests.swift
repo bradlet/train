@@ -6464,6 +6464,97 @@ struct StrengthTrainingOptOutTests {
     }
 }
 
+// MARK: - StrengthBoardCopier Tests
+
+struct StrengthBoardCopierTests {
+
+    private func card(_ name: String, day: Int, order: Int = 0, library: String? = nil, group: String? = nil, offloaded: Bool = false) -> StrengthExercise {
+        StrengthExercise(name: name, libraryExerciseID: library, muscleGroup: .chest, weekdayIndex: day,
+                         isOffloaded: offloaded, sortOrder: order, plannedSets: 3, plannedReps: 8, groupID: group)
+    }
+
+    @Test func aCopyKeepsTheLiftPlanAndGroup() {
+        let original = card("Bench", day: 1, library: "barbell-bench-press")
+        let copy = StrengthBoardCopier.copy(of: original, toDay: 4, sortOrder: 2)
+        #expect(copy.id != original.id)
+        #expect(copy.liftKey == original.liftKey, "copies share the lift's history")
+        #expect(copy.weekdayIndex == 4)
+        #expect(copy.sortOrder == 2)
+        #expect(!copy.isOffloaded)
+        #expect(copy.plannedSets == 3 && copy.plannedReps == 8)
+        let grouped = StrengthBoardCopier.copy(of: card("Chest Press", day: 1, group: "group-chest-press"), toDay: 2, sortOrder: 0)
+        #expect(grouped.groupID == "group-chest-press")
+    }
+
+    @Test func copyingADayAppendsAndSkipsWhatIsAlreadyPlanned() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let bench = card("Bench", day: 1, order: 0, library: "barbell-bench-press")
+        let row = card("Row", day: 1, order: 1, library: "barbell-row")
+        let press = card("Chest Press", day: 1, order: 2, group: "group-chest-press")
+        let existing = card("Bench", day: 4, order: 0, library: "barbell-bench-press")
+        let all = [bench, row, press, existing]
+        all.forEach(context.insert)
+
+        let outcome = StrengthBoardCopier.copy([bench, row, press], toDay: 4, all: all, in: context)
+        #expect(outcome.copied == ["Row", "Chest Press"])
+        #expect(outcome.skipped == ["Bench"])
+        let thursday = StrengthBoardPlanner.lane(try context.fetch(FetchDescriptor<StrengthExercise>()), day: 4, offloaded: false)
+        #expect(thursday.map(\.name) == ["Bench", "Row", "Chest Press"])
+        #expect(thursday.map(\.sortOrder) == [0, 1, 2])
+    }
+
+    @Test func aGroupAndALiftAreDifferentPlans() {
+        #expect(StrengthBoardCopier.planKey(card("Chest Press", day: 1, group: "g")) != StrengthBoardCopier.planKey(card("Chest Press", day: 1)))
+    }
+
+    @Test func messagesSayWhatHappened() {
+        #expect(StrengthBoardCopier.message(.init(copied: ["A", "B"], skipped: []), dayName: "Thursday") == "Copied 2 lifts to Thursday")
+        #expect(StrengthBoardCopier.message(.init(copied: ["A"], skipped: ["B", "C"]), dayName: "Friday") == "Copied 1 lift to Friday · 2 already there")
+        #expect(StrengthBoardCopier.message(.init(copied: [], skipped: ["A"]), dayName: "Monday") == "Nothing new to copy to Monday")
+    }
+}
+
+// MARK: - MuscleBalance Tests
+
+struct MuscleBalanceTests {
+
+    private let groups = StrengthSlotResolver.byID(MovementGroupCatalog.bundled)
+    private let library = MuscleBalance.bundledLibraryByID
+
+    private func card(_ name: String, muscle: MuscleGroup = .other, library id: String? = nil, group: String? = nil, offloaded: Bool = false) -> StrengthExercise {
+        StrengthExercise(name: name, libraryExerciseID: id, muscleGroup: muscle, isOffloaded: offloaded, groupID: group)
+    }
+
+    @Test func patternsMapToRegions() {
+        #expect(MuscleBalance.regions(for: .verticalPush) == [.push])
+        #expect(MuscleBalance.regions(for: .hinge) == [.legsBack])
+        #expect(MuscleBalance.regions(for: .singleLeg) == [.legsFront, .legsBack])
+        #expect(MuscleBalance.regions(for: MovementPattern.core) == [.core])
+    }
+
+    @Test func aCardUsesItsGroupThenLibraryPatternThenMuscle() {
+        #expect(MuscleBalance.regions(for: card("Squat", group: "group-squat"), groups: groups, library: library) == [.legsFront])
+        // Romanian Deadlift is a Hamstrings entry with the hinge pattern.
+        #expect(MuscleBalance.regions(for: card("RDL", muscle: .quads, library: "romanian-deadlift"), groups: groups, library: library) == [.legsBack])
+        #expect(MuscleBalance.regions(for: card("Curl", muscle: .biceps), groups: groups, library: library) == [.pull])
+        #expect(MuscleBalance.regions(for: card("Mystery"), groups: groups, library: library).isEmpty)
+    }
+
+    @Test func coverageIgnoresOffloadedCards() {
+        let cards = [
+            card("Bench", library: "barbell-bench-press"),
+            card("Plank", library: "plank"),
+            card("Row", library: "barbell-row", offloaded: true),
+        ]
+        #expect(MuscleBalance.covered(cards, groups: groups, library: library) == [.push, .core])
+        #expect(MuscleBalance.covered([], groups: groups, library: library).isEmpty)
+    }
+
+    @Test func fullBodyCoversEveryLimbRegion() {
+        #expect(MuscleBalance.regions(for: .fullBody) == [.push, .pull, .legsFront, .legsBack])
+    }
+}
+
 // MARK: - StrengthLiftKey Tests
 
 struct StrengthLiftKeyTests {

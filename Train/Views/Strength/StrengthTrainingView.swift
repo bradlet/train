@@ -36,6 +36,8 @@ struct StrengthTrainingView: View {
     @State private var groupEdit: SlotGroupEdit?
     /// A card's history, pushed from its context menu (#16).
     @State private var historyRoute: StrengthProgressRoute?
+    /// A copy confirmation (#18).
+    @State private var notice: String?
     /// The "New best" banner after a save beats a lift's best.
     @State private var newBest: NewBestAnnouncement?
 
@@ -48,6 +50,9 @@ struct StrengthTrainingView: View {
         )
         VStack(spacing: 0) {
             dayStrip
+            MuscleBalanceStrip(covered: MuscleBalance.covered(
+                allExercises, groups: groups, library: MuscleBalance.bundledLibraryByID
+            ))
             Divider()
             TabView(selection: $selectedDay) {
                 ForEach(0..<7, id: \.self) { dayIndex in
@@ -60,6 +65,10 @@ struct StrengthTrainingView: View {
                         onGroup: { slot in groupEdit = SlotGroupEdit(slot: slot, groups: groups) },
                         onHistory: { slot in
                             historyRoute = slot.groupID.map(StrengthProgressRoute.group) ?? .lift(slot.liftKey)
+                        },
+                        onDuplicate: { slot, day in copy([slot], toDay: day) },
+                        onCopyDay: { day in
+                            copy(StrengthBoardPlanner.lane(allExercises, day: dayIndex, offloaded: false), toDay: day)
                         },
                         onRecord: { recordingExercise = $0 },
                         onAddExercise: { showLibrary = true },
@@ -130,6 +139,7 @@ struct StrengthTrainingView: View {
         .navigationDestination(item: $historyRoute) { route in
             StrengthProgressDestination(route: route)
         }
+        .transientNotice($notice)
         .newBestBanner($newBest)
         .plannedLogToast($plannedLog, onUndo: undoPlannedLog, onAdjust: adjustPlannedLog)
     }
@@ -247,6 +257,15 @@ struct StrengthTrainingView: View {
             modelContext.insert(exercise)
             StrengthLiftRegistry.findOrCreate(for: exercise, metric: entry.primaryMetric, in: modelContext)
         }
+    }
+
+    /// Copies cards onto another day, leaving the board on the current
+    /// day (like a move), and confirms with a notice.
+    private func copy(_ cards: [StrengthExercise], toDay day: Int) {
+        let outcome = withAnimation {
+            StrengthBoardCopier.copy(cards, toDay: day, all: allExercises, in: modelContext)
+        }
+        notice = StrengthBoardCopier.message(outcome, dayName: Calendar.current.weekdaySymbols[day])
     }
 
     /// Every movement group, built-in and the athlete's, by id.

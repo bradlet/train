@@ -113,6 +113,10 @@ classDiagram
 
 ## 5. Planning aids (guided defaults)
 
+> **A2 and A3 built in #18** (2026-11-26).
+> - **Balance strip:** Push · Pull · Quads · Posterior · Core sits under the board's day chips. Coverage comes from each card's group or library *pattern*, falling back to its muscle group. Offloaded cards don't count.
+> - **Copy and duplicate:** *Copy this day to…* is in each lane header, and *Duplicate to Day* is on each card. A copy keeps the lift or group and its sets × reps, so it shares the lift's history. A card whose lift or group is already planned on the target day is skipped, and a notice says how many were copied.
+
 - **A1 — Starter templates** → moved to [TRAINING_PLANS.md](TRAINING_PLANS.md) §8 (presets, shared with cardio and hybrid plans).
 - **A2 — Muscle balance glance.** A slim header on the board showing which regions this week's active plan covers (push, pull, legs-front, legs-back/posterior chain, core). Missing regions are dimmed.
 - **A3 — Copy a day / duplicate a card.** Copy a whole lane to another day, or duplicate one card to another day. Duplicates share the lift's history (thanks to F1).
