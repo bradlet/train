@@ -2,7 +2,8 @@
 //  StrengthTrainingView.swift
 //  Train
 //
-//  Top-level view for the Strength tab: a kanban-style weekly board. One
+//  Strength → Plan: a kanban-style weekly board. Hosted by `StrengthView`,
+//  which owns the navigation bar. One
 //  column per day (Sunday-Saturday), swipeable left/right like a project
 //  management board. Each column has the day's active plan plus a lower
 //  "offloaded" section for exercises kept in mind but out of the week's plan.
@@ -27,54 +28,51 @@ struct StrengthTrainingView: View {
     @State private var recordingExercise: StrengthExercise?
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                dayStrip
-                Divider()
-                TabView(selection: $selectedDay) {
-                    ForEach(0..<7, id: \.self) { dayIndex in
-                        StrengthDayColumn(
-                            dayIndex: dayIndex,
-                            allExercises: allExercises,
-                            latestRecords: StrengthLiftRegistry.latestByLiftKey(allRecords),
-                            onRecord: { recordingExercise = $0 },
-                            onAddExercise: { showLibrary = true },
-                            onDrop: { id, offloaded, target in
-                                handleDrop(id: id, day: dayIndex, offloaded: offloaded, target: target)
-                            },
-                            onMoveToDay: { exercise, day in
-                                moveToDay(exercise, day: day)
-                            },
-                            onDelete: { exercise in
-                                withAnimation { modelContext.delete(exercise) }
-                            }
-                        )
-                        .tag(dayIndex)
-                    }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-            }
-            .navigationTitle("Strength")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showLibrary = true
-                    } label: {
-                        Label("Exercise Library", systemImage: "books.vertical")
-                    }
-                    .accessibilityIdentifier("strength.libraryButton")
+        VStack(spacing: 0) {
+            dayStrip
+            Divider()
+            TabView(selection: $selectedDay) {
+                ForEach(0..<7, id: \.self) { dayIndex in
+                    StrengthDayColumn(
+                        dayIndex: dayIndex,
+                        allExercises: allExercises,
+                        latestRecords: StrengthLiftRegistry.latestByLiftKey(allRecords),
+                        onRecord: { recordingExercise = $0 },
+                        onAddExercise: { showLibrary = true },
+                        onDrop: { id, offloaded, target in
+                            handleDrop(id: id, day: dayIndex, offloaded: offloaded, target: target)
+                        },
+                        onMoveToDay: { exercise, day in
+                            moveToDay(exercise, day: day)
+                        },
+                        onDelete: { exercise in
+                            withAnimation { modelContext.delete(exercise) }
+                        }
+                    )
+                    .tag(dayIndex)
                 }
             }
-            .sheet(isPresented: $showLibrary) {
-                ExerciseLibrarySheet(provider: .withUserLibrary(container: modelContext.container)) { entry, plan in
-                    addFromLibrary(entry, plan: plan)
+            .tabViewStyle(.page(indexDisplayMode: .never))
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showLibrary = true
+                } label: {
+                    Label("Exercise Library", systemImage: "books.vertical")
                 }
-            }
-            .sheet(item: $recordingExercise) { exercise in
-                RecordStrengthSheet(slot: exercise)
+                .accessibilityIdentifier("strength.libraryButton")
             }
         }
+        .sheet(isPresented: $showLibrary) {
+            ExerciseLibrarySheet(provider: .withUserLibrary(container: modelContext.container)) { entry, plan in
+                addFromLibrary(entry, plan: plan)
+            }
+        }
+        .sheet(item: $recordingExercise) { exercise in
+            RecordStrengthSheet(slot: exercise)
+        }
+    
     }
 
     // MARK: - Day Strip
@@ -166,6 +164,6 @@ struct StrengthTrainingView: View {
 }
 
 #Preview {
-    StrengthTrainingView()
+    NavigationStack { StrengthTrainingView() }
         .modelContainer(ModelContainerFactory.makePreviewContainer())
 }

@@ -2,8 +2,9 @@
 //  SettingsView.swift
 //  Train
 //
-//  App-wide preferences sheet, opened from the History tab's toolbar.
-//  Edits the singleton `AppConfiguration` (SwiftData, CloudKit-synced).
+//  App-wide preferences sheet, opened from the gear on every tab. Edits the
+//  singleton `AppConfiguration`, and hosts Data (import, export, Sheets
+//  sync) until the Connections dashboard (#23).
 //
 
 import SwiftUI
@@ -18,6 +19,13 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var configurations: [AppConfiguration]
+    @Query private var allExercises: [Exercise]
+
+    /// Recorded exercises, most recent first, for CSV export. `workout !=
+    /// nil` can't be a `#Predicate`, so this filters in memory.
+    private var completedExercises: [Exercise] {
+        allExercises.filter(\.isCompleted).sorted { $0.date > $1.date }
+    }
 
     /// Weekday display names indexed by Calendar weekday - 1 (Sunday first).
     private static let weekdaySymbols = Calendar.current.weekdaySymbols
@@ -44,6 +52,7 @@ struct SettingsView: View {
                             .accessibilityIdentifier("settings.useMetricUnits")
                     }
                 }
+                WorkoutDataSection(completedExercises: completedExercises)
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)

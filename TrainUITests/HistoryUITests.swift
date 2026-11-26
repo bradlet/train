@@ -31,10 +31,13 @@ final class HistoryUITests: XCTestCase {
         app.launchArguments.append("-uiTestSeed")
         app.launch()
 
-        // Tab bar label set in ContentView.swift:26 — `Label("History", ...)`.
-        let historyTab = app.tabBars.buttons["History"]
-        XCTAssertTrue(historyTab.waitForExistence(timeout: 5), "History tab should exist")
-        historyTab.tap()
+        // History is Cardio → Progress (#12).
+        let cardioTab = app.tabBars.buttons["Cardio"]
+        XCTAssertTrue(cardioTab.waitForExistence(timeout: 5), "Cardio tab should exist")
+        cardioTab.tap()
+        let progress = app.segmentedControls["cardio.segment"].buttons["Progress"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 5), "Cardio should offer a Progress segment")
+        progress.tap()
         return app
     }
 

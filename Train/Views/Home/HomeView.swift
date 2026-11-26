@@ -140,6 +140,7 @@ struct HomeView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Home")
             .navigationBarTitleDisplayMode(.inline)
+            .settingsToolbarButton()
             // Reflect model availability on the card. Deliberately a
             // filesystem check only: it neither downloads nor loads, so the
             // landing tab never pulls gigabytes of weights into memory.

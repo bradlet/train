@@ -35,7 +35,8 @@ final class RatingPickerUITests: XCTestCase {
         app.launchArguments.append("-uiTestSeed")
         app.launch()
 
-        app.tabBars.buttons["History"].tap()
+        app.tabBars.buttons["Cardio"].tap()
+        app.segmentedControls["cardio.segment"].buttons["Progress"].tap()
         let firstRow = app.staticTexts["Test Workout 1"]
         XCTAssertTrue(firstRow.waitForExistence(timeout: 5), "seeded row should exist")
         firstRow.tap()

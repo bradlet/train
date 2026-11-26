@@ -65,7 +65,8 @@ final class FavoritesUITests: XCTestCase {
 
         app.navigationBars["Record Workout"].buttons["Save"].tap()
 
-        app.tabBars.buttons["History"].tap()
+        app.tabBars.buttons["Cardio"].tap()
+        app.segmentedControls["cardio.segment"].buttons["Progress"].tap()
         XCTAssertTrue(
             app.staticTexts[seededFavorite].waitForExistence(timeout: 5),
             "the recorded favorite should appear in History"

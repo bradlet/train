@@ -2,7 +2,8 @@
 //  AerobicTrainingView.swift
 //  Train
 //
-//  Top-level view for the Aerobic Training tab.
+//  Cardio → Plan (formerly the Training tab, #12). Hosted by `CardioView`,
+//  which owns the navigation bar.
 //  Shows a monthly calendar with exercise dots, a weekly calendar with
 //  planned exercises, mileage stats, and sheets for adding/recording.
 //
@@ -89,80 +90,77 @@ struct AerobicTrainingView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    MonthlyCalendarView(
-                        selectedMonth: $selectedMonth,
-                        items: monthCalendarItems,
-                        onDayTap: handleMonthDayTap
-                    )
-                    .padding(.bottom, 8)
-                    Divider()
-                    weekHeader
-                    Divider()
-                    WeeklyCalendarView(
-                        days: selectedWeek.daysInWeek(firstWeekday: weekStartDay),
-                        exercises: weekExercises,
-                        onAdd: { date in
-                            addExerciseRequest = AddExerciseRequest(date: date)
-                        },
-                        onQuickAdd: { date in
-                            quickAddRequest = QuickAddRequest(date: date)
-                        },
-                        onRecord: { exercise in
-                            recordingExercise = exercise
-                        },
-                        onEdit: { exercise in
-                            // Completed exercises open the unified planned +
-                            // completed editor; planned-only ones open the
-                            // plan editor.
-                            if exercise.isCompleted {
-                                detailExercise = exercise
-                            } else {
-                                editingExercise = exercise
-                            }
-                        },
-                        navigationRequest: exerciseNavigationRequest
-                    )
-                    .id(selectedWeek)
-                    .transition(.push(from: weekSlideEdge))
-                }
-            }
-            .navigationTitle("Aerobic Training")
-            .navigationBarTitleDisplayMode(.inline)
-            .sheet(item: $addExerciseRequest) { request in
-                AddExerciseSheet(exercise: nil, defaultDate: request.date, favorites: favorites)
-                    .onDisappear {
-                        // After scheduling, navigate to and highlight the day so the
-                        // user sees their new exercise in the weekly view.
-                        exerciseNavigationRequest = ExerciseNavigationRequest(targetDate: request.date)
-                    }
-            }
-            .sheet(item: $recordingExercise) { exercise in
-                RecordWorkoutSheet(exercise: exercise, defaultDate: exercise.date)
-            }
-            .sheet(item: $editingExercise) { exercise in
-                AddExerciseSheet(exercise: exercise, defaultDate: exercise.date)
-            }
-            .sheet(item: $detailExercise) { exercise in
-                WorkoutDetailSheet(exercise: exercise)
-            }
-            .sheet(item: $quickAddRequest) { request in
-                RecordWorkoutSheet(exercise: nil, defaultDate: request.date, favorites: favorites)
-            }
-            .onChange(of: exerciseNavigationRequest) { _, newValue in
-                guard let request = newValue else { return }
-                Task { @MainActor in
-                    try? await Task.sleep(for: .seconds(2.5))
-                    if exerciseNavigationRequest?.id == request.id {
-                        withAnimation(.easeInOut(duration: 0.4)) {
-                            exerciseNavigationRequest = nil
+        ScrollView {
+            VStack(spacing: 0) {
+                MonthlyCalendarView(
+                    selectedMonth: $selectedMonth,
+                    items: monthCalendarItems,
+                    onDayTap: handleMonthDayTap
+                )
+                .padding(.bottom, 8)
+                Divider()
+                weekHeader
+                Divider()
+                WeeklyCalendarView(
+                    days: selectedWeek.daysInWeek(firstWeekday: weekStartDay),
+                    exercises: weekExercises,
+                    onAdd: { date in
+                        addExerciseRequest = AddExerciseRequest(date: date)
+                    },
+                    onQuickAdd: { date in
+                        quickAddRequest = QuickAddRequest(date: date)
+                    },
+                    onRecord: { exercise in
+                        recordingExercise = exercise
+                    },
+                    onEdit: { exercise in
+                        // Completed exercises open the unified planned +
+                        // completed editor; planned-only ones open the
+                        // plan editor.
+                        if exercise.isCompleted {
+                            detailExercise = exercise
+                        } else {
+                            editingExercise = exercise
                         }
+                    },
+                    navigationRequest: exerciseNavigationRequest
+                )
+                .id(selectedWeek)
+                .transition(.push(from: weekSlideEdge))
+            }
+        }
+        .sheet(item: $addExerciseRequest) { request in
+            AddExerciseSheet(exercise: nil, defaultDate: request.date, favorites: favorites)
+                .onDisappear {
+                    // After scheduling, navigate to and highlight the day so the
+                    // user sees their new exercise in the weekly view.
+                    exerciseNavigationRequest = ExerciseNavigationRequest(targetDate: request.date)
+                }
+        }
+        .sheet(item: $recordingExercise) { exercise in
+            RecordWorkoutSheet(exercise: exercise, defaultDate: exercise.date)
+        }
+        .sheet(item: $editingExercise) { exercise in
+            AddExerciseSheet(exercise: exercise, defaultDate: exercise.date)
+        }
+        .sheet(item: $detailExercise) { exercise in
+            WorkoutDetailSheet(exercise: exercise)
+        }
+        .sheet(item: $quickAddRequest) { request in
+            RecordWorkoutSheet(exercise: nil, defaultDate: request.date, favorites: favorites)
+        }
+        .onChange(of: exerciseNavigationRequest) { _, newValue in
+            guard let request = newValue else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2.5))
+                if exerciseNavigationRequest?.id == request.id {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        exerciseNavigationRequest = nil
                     }
                 }
             }
         }
+    
     }
 
     // MARK: - Month Calendar Navigation
@@ -338,6 +336,6 @@ private struct ProgressStat: View {
 }
 
 #Preview {
-    AerobicTrainingView()
+    NavigationStack { AerobicTrainingView() }
         .modelContainer(ModelContainerFactory.makePreviewContainer())
 }

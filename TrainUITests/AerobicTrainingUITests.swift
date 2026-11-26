@@ -28,10 +28,10 @@ final class AerobicTrainingUITests: XCTestCase {
         app.launchArguments.append("-uiTestSeed")
         app.launch()
 
-        // Ensure the Training tab is active (it's the first tab)
-        let trainingTab = app.tabBars.buttons["Training"]
-        XCTAssertTrue(trainingTab.waitForExistence(timeout: 5), "Training tab should exist")
-        trainingTab.tap()
+        // Cardio opens on its Plan segment (the weekly calendar).
+        let cardioTab = app.tabBars.buttons["Cardio"]
+        XCTAssertTrue(cardioTab.waitForExistence(timeout: 5), "Cardio tab should exist")
+        cardioTab.tap()
         return app
     }
 

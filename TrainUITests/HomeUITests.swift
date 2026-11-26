@@ -71,24 +71,25 @@ final class HomeUITests: XCTestCase {
     }
 
     @MainActor
-    func testHomeTabCoexistsWithTheOtherThree() throws {
+    func testHomeTabCoexistsWithCardioAndStrength() throws {
         let app = launchApp()
         let tabs = app.tabBars.buttons
-        for label in ["Home", "Training", "Strength", "History"] {
+        for label in ["Home", "Cardio", "Strength"] {
             XCTAssertTrue(
                 tabs[label].waitForExistence(timeout: 5),
                 "\(label) tab should exist"
             )
         }
+        XCTAssertEqual(tabs.count, 3, "History folded into Cardio → Progress (#12)")
     }
 
     @MainActor
     func testAskCoachToolbarButtonIsGoneFromTraining() throws {
         let app = launchApp()
-        app.tabBars.buttons["Training"].tap()
+        app.tabBars.buttons["Cardio"].tap()
         XCTAssertTrue(
-            app.staticTexts["Aerobic Training"].waitForExistence(timeout: 5),
-            "Training tab should load"
+            app.segmentedControls["cardio.segment"].waitForExistence(timeout: 5),
+            "Cardio tab should load"
         )
         // The one-shot entry point was retired in favor of the Home chat.
         XCTAssertFalse(
@@ -516,7 +517,7 @@ extension HomeUITests {
     func testWidgetLinkDictatesAndSendsWithoutATap() throws {
         let app = launchApp()
         // Start somewhere other than Home: the link must bring Home forward.
-        app.tabBars.buttons["History"].tap()
+        app.tabBars.buttons["Cardio"].tap()
         app.open(Self.voiceLink)
 
         // The stub hears its canned phrase and then goes quiet, so the pause

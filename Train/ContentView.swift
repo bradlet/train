@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  Train
 //
-//  Root view containing the four-tab navigation structure.
+//  Root view: Home · Cardio (Plan | Progress) · Strength (Plan | Progress).
 //  Reads the unit configuration and injects it into the environment.
 //
 
@@ -32,15 +32,12 @@ struct ContentView: View {
             HomeView()
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(AppTab.home)
-            AerobicTrainingView()
-                .tabItem { Label("Training", systemImage: "figure.run") }
-                .tag(AppTab.training)
-            StrengthTrainingView()
+            CardioView()
+                .tabItem { Label("Cardio", systemImage: "figure.run") }
+                .tag(AppTab.cardio)
+            StrengthView()
                 .tabItem { Label("Strength", systemImage: "dumbbell") }
                 .tag(AppTab.strength)
-            HistoryView()
-                .tabItem { Label("History", systemImage: "clock") }
-                .tag(AppTab.history)
         }
         .onChange(of: coachLauncher.pending, initial: true) { _, pending in
             if pending != nil { selectedTab = .home }
@@ -60,7 +57,7 @@ struct ContentView: View {
 
 /// The app's top-level tabs.
 enum AppTab: Hashable {
-    case home, training, strength, history
+    case home, cardio, strength
 }
 
 #Preview {

@@ -4669,6 +4669,111 @@ struct LiftMeasurementTests {
     }
 }
 
+// MARK: - LiftMetric Tests
+
+struct LiftMetricTests {
+
+    @Test func hasFourMetricsWithStableRawValues() {
+        #expect(LiftMetric.allCases.map(\.rawValue) == ["weight", "reps", "time", "distance"])
+    }
+
+    @Test func onlyWeightAndRepsUseAMeasurement() {
+        #expect(LiftMetric.weight.usesMeasurement)
+        #expect(LiftMetric.reps.usesMeasurement)
+        #expect(!LiftMetric.time.usesMeasurement)
+        #expect(!LiftMetric.distance.usesMeasurement)
+    }
+
+    @Test func unitLabelsFollowTheUnitPreference() {
+        #expect(LiftMetric.weight.unitLabel(metric: false) == "lb")
+        #expect(LiftMetric.weight.unitLabel(metric: true) == "kg")
+        #expect(LiftMetric.reps.unitLabel(metric: true) == "reps")
+        #expect(LiftMetric.time.unitLabel(metric: false) == "")
+        #expect(LiftMetric.distance.unitLabel(metric: false) == "yd")
+        #expect(LiftMetric.distance.unitLabel(metric: true) == "m")
+    }
+
+    @Test func displayAndStoredValuesRoundTrip() {
+        for metric in LiftMetric.allCases {
+            for useMetric in [false, true] {
+                let stored = metric.storedValue(fromDisplay: 40, metric: useMetric)
+                let display = metric.displayValue(fromStored: stored, metric: useMetric)
+                #expect(abs(display - 40) < 0.0001, "\(metric) metric=\(useMetric)")
+            }
+        }
+    }
+
+    @Test func distanceIsStoredInMiles() {
+        #expect(LiftMetric.distance.storedValue(fromDisplay: 1760, metric: false) == 1)
+        #expect(abs(LiftMetric.distance.storedValue(fromDisplay: 1609.344, metric: true) - 1) < 0.0001)
+    }
+
+    @Test func weightIsStoredInPounds() {
+        #expect(LiftMetric.weight.storedValue(fromDisplay: 185, metric: false) == 185)
+        #expect(abs(LiftMetric.weight.storedValue(fromDisplay: 100, metric: true) - 220.462) < 0.001)
+    }
+
+    @Test func nilValueFormatsAsDone() {
+        for metric in LiftMetric.allCases {
+            #expect(metric.formatted(nil, metric: false) == "Done")
+        }
+    }
+
+    @Test func formatsEachMetric() {
+        #expect(LiftMetric.weight.formatted(185, metric: false) == "185 lb")
+        #expect(LiftMetric.reps.formatted(12, metric: false) == "12 reps")
+        #expect(LiftMetric.reps.formatted(1, metric: false) == "1 rep")
+        #expect(LiftMetric.time.formatted(90, metric: false) == "1:30")
+        #expect(LiftMetric.distance.formatted(40 / 1760, metric: false) == "40 yd")
+        #expect(LiftMetric.distance.formatted(20 / 1609.344, metric: true) == "20 m")
+    }
+
+    @Test func clockFormattingEdgeCases() {
+        #expect(LiftMetric.formattedClock(seconds: 0) == "0:00")
+        #expect(LiftMetric.formattedClock(seconds: 5) == "0:05")
+        #expect(LiftMetric.formattedClock(seconds: 59) == "0:59")
+        #expect(LiftMetric.formattedClock(seconds: 60) == "1:00")
+        #expect(LiftMetric.formattedClock(seconds: 3600) == "1:00:00")
+        #expect(LiftMetric.formattedClock(seconds: 3725) == "1:02:05")
+        #expect(LiftMetric.formattedClock(seconds: -3) == "0:00")
+    }
+}
+
+// MARK: - TrainingSegment Tests
+
+struct TrainingSegmentTests {
+
+    @Test func planComesBeforeProgress() {
+        #expect(TrainingSegment.allCases == [.plan, .progress])
+        #expect(TrainingSegment.plan.title == "Plan")
+        #expect(TrainingSegment.progress.title == "Progress")
+    }
+}
+
+// MARK: - SettingsBadge Tests
+
+struct SettingsBadgeTests {
+
+    @Test func noBadgeWhenSheetsSyncIsOff() {
+        #expect(SettingsBadge.forSheetsSync(.failed("x"), isEnabled: false) == nil)
+        #expect(SettingsBadge.forSheetsSync(.syncing, isEnabled: false) == nil)
+    }
+
+    @Test func syncingShowsTheSyncingBadge() {
+        #expect(SettingsBadge.forSheetsSync(.syncing, isEnabled: true) == .syncing)
+    }
+
+    @Test func failuresAndSignOutNeedAttention() {
+        #expect(SettingsBadge.forSheetsSync(.failed("offline"), isEnabled: true) == .attention)
+        #expect(SettingsBadge.forSheetsSync(.needsAuth, isEnabled: true) == .attention)
+    }
+
+    @Test func healthyStatesShowNoBadge() {
+        #expect(SettingsBadge.forSheetsSync(.idle, isEnabled: true) == nil)
+        #expect(SettingsBadge.forSheetsSync(.success(Date()), isEnabled: true) == nil)
+    }
+}
+
 // MARK: - MuscleGroup Tests
 
 struct MuscleGroupTests {
