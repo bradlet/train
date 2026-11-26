@@ -43,6 +43,8 @@ struct StrengthExerciseCard: View {
     /// Opens the group editor ("Edit Group" on a group card, "Make This a
     /// Group" on a single-lift card); `nil` hides the item.
     var onGroup: (() -> Void)? = nil
+    /// Opens the lift's (or group's) history in Strength → Progress.
+    var onHistory: (() -> Void)? = nil
     /// Called when the user taps the card to record a session.
     let onRecord: () -> Void
     /// Called when the user picks a destination day from the context menu.
@@ -149,6 +151,11 @@ struct StrengthExerciseCard: View {
             }
             Button { showPlanEditor = true } label: {
                 Label("Edit Plan", systemImage: "list.number")
+            }
+            if let onHistory {
+                Button(action: onHistory) {
+                    Label("History", systemImage: "chart.line.uptrend.xyaxis")
+                }
             }
             if let onGroup {
                 Button(action: onGroup) {

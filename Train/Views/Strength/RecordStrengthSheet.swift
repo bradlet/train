@@ -62,6 +62,14 @@ struct RecordStrengthSheet: View {
                         LabeledContent("Exercise", value: slot.name)
                     }
                     DatePicker("Date", selection: $draft.date, displayedComponents: .date)
+                    if let target {
+                        NavigationLink {
+                            LiftDetailView(liftKey: target.liftKey)
+                        } label: {
+                            Label("History", systemImage: "chart.line.uptrend.xyaxis")
+                        }
+                        .accessibilityIdentifier("recordStrength.history")
+                    }
                 } header: {
                     Text(group.map { "Session · \($0.name)" } ?? "Session")
                 } footer: {

@@ -29,7 +29,7 @@ One ordered path through everything planned on 2026-11-24. Do one step at a time
 
 ### D. Progress
 8a. ✅ **#31** Chart clean-up before the Progress views reuse it: 1Y (two-week averages) and All (monthly averages) scales, the 6M x-axis "…" bug (a label on every week of alternate months), at most five labels, and per-chart gap styles (mileage zero, feeling dashed bridge). Added here because #16 depends on it.
-9. **#16** Strength → Progress: lift list, lift detail, PRs. Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §4
+9. ✅ **#16** Strength → Progress: lift list, lift detail, PRs. Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §4. Shipped with the #24 group view and a week headline. The weekly chart and muscle-coverage parts of P3, and the plan-target step line, wait for later steps.
 10. **#17** Cardio → Progress refactor: training-inclusion opt-in and scoped views. Doc: [PROGRESS_VIEWS](PROGRESS_VIEWS.md)
 
 ### E. Hybrid planning

@@ -155,7 +155,36 @@ enum UITestFixtures {
                 )
             ))
         }
+        seedStrengthHistory(into: context, from: start)
         try? context.save()
+    }
+
+    /// Six months of Barbell Bench Press (Max and Average, a few sessions
+    /// logged as done) and some Chest Press group members, for Strength →
+    /// Progress screenshots (#16).
+    private static func seedStrengthHistory(into context: ModelContext, from start: Date) {
+        let calendar = Calendar.current
+        let bench = StrengthLift(liftKey: "barbell-bench-press", name: "Barbell Bench Press", libraryExerciseID: "barbell-bench-press", muscleGroup: .chest)
+        bench.defaultMeasurement = .max
+        context.insert(bench)
+        context.insert(StrengthLift(liftKey: "dumbbell-bench-press", name: "Dumbbell Bench Press", libraryExerciseID: "dumbbell-bench-press", muscleGroup: .chest))
+        context.insert(StrengthLift(liftKey: "back-squat", name: "Back Squat", libraryExerciseID: "back-squat", muscleGroup: .quads))
+        for week in 1..<26 {
+            guard let day = calendar.date(byAdding: .day, value: -week * 7, to: start) else { continue }
+            let progress = Double(26 - week)
+            let isDone = week % 9 == 0
+            context.insert(StrengthRecord(liftKey: "barbell-bench-press", date: day,
+                                          value: isDone ? nil : 155 + progress * 2.5 - Double(week % 3) * 5,
+                                          metric: .weight, measurement: .max))
+            if week % 2 == 0 {
+                context.insert(StrengthRecord(liftKey: "barbell-bench-press", date: day.addingTimeInterval(3_600),
+                                              value: 135 + progress * 2, metric: .weight, measurement: .average))
+            }
+            if week % 3 == 0 {
+                context.insert(StrengthRecord(liftKey: "dumbbell-bench-press", date: day, value: 50 + progress, metric: .weight, measurement: .average))
+            }
+            context.insert(StrengthRecord(liftKey: "back-squat", date: day, value: 205 + progress * 3, metric: .weight, measurement: .average))
+        }
     }
 
     /// Replaces any favorites with a single known one, so the Home chip and

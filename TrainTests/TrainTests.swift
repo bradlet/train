@@ -6079,6 +6079,216 @@ struct PerformanceTimeWindowTests {
     }
 }
 
+// MARK: - StrengthProgress Tests
+
+struct StrengthProgressTests {
+
+    private func at(_ day: Int) -> Date { Date(timeIntervalSince1970: Double(day) * 86_400) }
+
+    private func record(
+        _ key: String,
+        _ value: Double?,
+        _ measurement: LiftMeasurement? = .average,
+        day: Int,
+        metric: LiftMetric = .weight
+    ) -> StrengthRecord {
+        StrengthRecord(liftKey: key, date: at(day), value: value, metric: metric, measurement: measurement)
+    }
+
+    /// A "bench" record.
+    private func record(
+        _ value: Double?,
+        _ measurement: LiftMeasurement? = .average,
+        day: Int,
+        metric: LiftMetric = .weight
+    ) -> StrengthRecord {
+        record("bench", value, measurement, day: day, metric: metric)
+    }
+
+    @Test func summariesCoverEveryLiftWithHistoryNewestFirst() {
+        let bench = StrengthLift(liftKey: "bench", name: "Bench", muscleGroup: .chest)
+        let squat = StrengthLift(liftKey: "squat", name: "Squat", muscleGroup: .quads)
+        let unused = StrengthLift(liftKey: "curl", name: "Curl")
+        let records = [record("bench", 100, day: 1), record("squat", 200, day: 5), record("gone-lift", 50, day: 3)]
+        let summaries = StrengthProgress.summaries(lifts: [bench, squat, unused], records: records)
+        #expect(summaries.map(\.liftKey) == ["squat", "gone-lift", "bench"], "lifts without a row still show; lifts without records don't")
+        #expect(summaries.first { $0.liftKey == "bench" }?.muscleGroup == .chest)
+    }
+
+    @Test func summaryUsesTheLiftsMeasurementForLatestBestAndSparkline() {
+        let lift = StrengthLift(liftKey: "bench", name: "Bench")
+        lift.defaultMeasurement = .max
+        let records = [
+            record(nil, nil, day: 9),
+            record(150, .average, day: 8),
+            record(205, .max, day: 7),
+            record(215, .max, day: 4),
+            record(195, .max, day: 2),
+        ]
+        let summary = StrengthProgress.summaries(lifts: [lift], records: records)[0]
+        #expect(summary.measurement == .max)
+        #expect(summary.latestValue == 205)
+        #expect(summary.bestValue == 215)
+        #expect(summary.sparkline == [195, 215, 205])
+        #expect(summary.lastDone == at(9), "a done record still counts as done")
+        #expect(summary.recordCount == 5)
+    }
+
+    @Test func timeLiftsHaveNoMeasurement() {
+        let plank = StrengthLift(liftKey: "plank", name: "Plank", primaryMetric: .time)
+        let summary = StrengthProgress.summaries(lifts: [plank], records: [record("plank", 60, nil, day: 1, metric: .time), record("plank", 90, nil, day: 2, metric: .time)])[0]
+        #expect(summary.measurement == nil)
+        #expect(summary.bestValue == 90)
+    }
+
+    @Test func displayNameFallsBackToTheKey() {
+        #expect(StrengthProgress.displayName(forKey: "name:landmine press") == "Landmine Press")
+        #expect(StrengthProgress.displayName(forKey: "barbell-bench-press") == "Barbell Bench Press")
+        #expect(StrengthProgress.displayName(forKey: "unknown-id") == "unknown-id")
+    }
+
+    @Test func sectionsGroupFilterAndSearch() {
+        let summaries = StrengthProgress.summaries(
+            lifts: [
+                StrengthLift(liftKey: "squat", name: "Squat", muscleGroup: .quads),
+                StrengthLift(liftKey: "bench", name: "Bench", muscleGroup: .chest),
+                StrengthLift(liftKey: "fly", name: "Fly", muscleGroup: .chest),
+            ],
+            records: [record("squat", 1, day: 1), record("bench", 1, day: 1), record("fly", 1, day: 1)]
+        )
+        let all = StrengthProgress.sections(summaries, searchText: "", muscleGroup: nil)
+        #expect(all.map(\.group) == [.chest, .quads], "MuscleGroup order")
+        #expect(all[0].lifts.map(\.name) == ["Bench", "Fly"])
+        #expect(StrengthProgress.sections(summaries, searchText: "", muscleGroup: .quads).map(\.group) == [.quads])
+        #expect(StrengthProgress.sections(summaries, searchText: "FL", muscleGroup: nil).flatMap(\.lifts).map(\.name) == ["Fly"])
+        #expect(StrengthProgress.sections(summaries, searchText: "zzz", muscleGroup: nil).isEmpty)
+    }
+
+    @Test func personalBestsMatchTheSaveTimeRule() {
+        let first = record(100, .max, day: 1)
+        let higher = record(110, .max, day: 2)
+        let tie = record(110, .max, day: 3)
+        let otherMeasurement = record(90, .average, day: 4)
+        let higherAverage = record(95, .average, day: 5)
+        let done = record(nil, nil, day: 6)
+        let bests = StrengthProgress.personalBests([done, higherAverage, otherMeasurement, tie, higher, first])
+        #expect(bests == [higher.id, higherAverage.id], "a first value or a tie is never a best; measurements compete separately")
+    }
+
+    @Test func seriesSplitByMeasurementSkipDoneRecordsAndHonourSince() {
+        let records = [
+            record(100, .max, day: 1),
+            record(nil, nil, day: 2),
+            record(80, .average, day: 3),
+            record(110, .max, day: 10),
+            record(30, nil, day: 4, metric: .reps),
+        ]
+        let series = StrengthProgress.series(records, metric: .weight)
+        #expect(series.map(\.measurement) == [.max, .average])
+        #expect(series[0].points.map(\.value) == [100, 110])
+        #expect(series[0].points[1].isPersonalBest)
+        #expect(series.flatMap(\.points).count == 3, "done and other-metric records are not plotted")
+        let recent = StrengthProgress.series(records, metric: .weight, since: at(5))
+        #expect(recent.map(\.measurement) == [.max])
+        #expect(StrengthProgress.series([], metric: .weight).isEmpty)
+    }
+
+    @Test func timeSeriesIsOneLine() {
+        let series = StrengthProgress.series([record("plank", 60, nil, day: 1, metric: .time)], metric: .time)
+        #expect(series.count == 1)
+        #expect(series[0].label == "Value")
+    }
+
+    @Test func thisWeekCountsLiftsAndDistinctDays() {
+        let thursday = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 15))!
+        func on(_ day: Int, _ hour: Int = 9) -> StrengthRecord {
+            StrengthRecord(liftKey: "k", date: Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour))!)
+        }
+        let records = [on(23), on(23, 18), on(25), on(20), on(30)]
+        let week = StrengthProgress.thisWeek(records, now: thursday, firstWeekday: 2)
+        #expect(week.lifts == 3)
+        #expect(week.days == 2)
+    }
+
+    @Test func rotationCountsCoverEveryMemberInOrder() {
+        let now = at(100)
+        let group = MovementGroup(id: "g", name: "Press", members: [
+            GroupMember(libraryID: "bench", name: "Bench", muscleGroup: .chest, primaryMetric: .weight),
+            GroupMember(libraryID: "incline", name: "Incline", muscleGroup: .chest, primaryMetric: .weight),
+        ])
+        let records = [record("bench", 1, day: 99), record("bench", 1, day: 90), record("bench", 1, day: 10), record("other", 1, day: 99)]
+        let counts = StrengthProgress.rotationCounts(group, records: records, now: now)
+        #expect(counts.map(\.member.libraryID) == ["bench", "incline"])
+        #expect(counts.map(\.count) == [2, 0], "only the last 8 weeks count; a zero flags an unreached member")
+    }
+
+    @Test func groupsWithHistoryNeedAMemberRecord() {
+        let groups = MovementGroupCatalog.bundled
+        let shown = StrengthProgress.groupsWithHistory(groups, records: [record("back-squat", 1, day: 1)])
+        #expect(shown.map(\.id) == ["group-squat"])
+    }
+}
+
+// MARK: - StrengthRecordEditor Tests
+
+struct StrengthRecordEditorTests {
+
+    @Test func draftLoadsTheRecordsValues() {
+        let record = StrengthRecord(liftKey: "bench", date: Date(timeIntervalSince1970: 0), value: 185, metric: .weight, measurement: .max, notes: "Felt good")
+        let draft = StrengthRecordEditor.draft(for: record, useMetricUnits: false)
+        #expect(draft.valueText == "185")
+        #expect(draft.measurement == .max)
+        #expect(draft.notes == "Felt good")
+        #expect(draft.date == record.date)
+    }
+
+    @Test func applyWritesValuesAndKeepsTheLiftAndCard() {
+        let slot = UUID()
+        let record = StrengthRecord(liftKey: "bench", slotID: slot, value: 185, metric: .weight, measurement: .max)
+        var draft = StrengthRecordEditor.draft(for: record, useMetricUnits: false)
+        draft.valueText = "190"
+        draft.measurement = .average
+        draft.notes = "  new  "
+        #expect(StrengthRecordEditor.apply(draft, to: record, useMetricUnits: false))
+        #expect(record.value == 190)
+        #expect(record.measurement == .average)
+        #expect(record.notes == "new")
+        #expect(record.liftKey == "bench")
+        #expect(record.slotID == slot)
+    }
+
+    @Test func blankingTheValueMakesItDoneWithoutAMeasurement() {
+        let record = StrengthRecord(liftKey: "bench", value: 185, metric: .weight, measurement: .max)
+        var draft = StrengthRecordEditor.draft(for: record, useMetricUnits: false)
+        draft.valueText = ""
+        #expect(StrengthRecordEditor.apply(draft, to: record, useMetricUnits: false))
+        #expect(record.value == nil)
+        #expect(record.measurement == nil)
+    }
+
+    @Test func anInvalidValueChangesNothing() {
+        let record = StrengthRecord(liftKey: "bench", value: 185, metric: .weight, measurement: .max)
+        var draft = StrengthRecordEditor.draft(for: record, useMetricUnits: false)
+        draft.valueText = "-5"
+        #expect(!StrengthRecordEditor.apply(draft, to: record, useMetricUnits: false))
+        #expect(record.value == 185)
+    }
+
+    @Test func metricValuesRoundTrip() {
+        let record = StrengthRecord(liftKey: "bench", value: 220.462, metric: .weight, measurement: .max)
+        let draft = StrengthRecordEditor.draft(for: record, useMetricUnits: true)
+        #expect(draft.valueText == "100")
+    }
+
+    @Test func deleteRemovesTheRecord() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let record = StrengthRecord(liftKey: "bench", value: 100)
+        context.insert(record)
+        StrengthRecordEditor.delete(record, in: context)
+        #expect(try context.fetch(FetchDescriptor<StrengthRecord>()).isEmpty)
+    }
+}
+
 // MARK: - StrengthLiftKey Tests
 
 struct StrengthLiftKeyTests {

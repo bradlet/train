@@ -34,6 +34,8 @@ struct StrengthTrainingView: View {
     @State private var recordingExercise: StrengthExercise?
     /// The group editor, for "Edit Group" / "Make This a Group" (#24).
     @State private var groupEdit: SlotGroupEdit?
+    /// A card's history, pushed from its context menu (#16).
+    @State private var historyRoute: StrengthProgressRoute?
     /// The "New best" banner after a save beats a lift's best.
     @State private var newBest: NewBestAnnouncement?
 
@@ -56,6 +58,9 @@ struct StrengthTrainingView: View {
                         weekRecords: weekRecords,
                         assignments: assignments,
                         onGroup: { slot in groupEdit = SlotGroupEdit(slot: slot, groups: groups) },
+                        onHistory: { slot in
+                            historyRoute = slot.groupID.map(StrengthProgressRoute.group) ?? .lift(slot.liftKey)
+                        },
                         onRecord: { recordingExercise = $0 },
                         onAddExercise: { showLibrary = true },
                         onLogDay: {
@@ -121,6 +126,9 @@ struct StrengthTrainingView: View {
                 date: request.date,
                 startTicked: request.startTicked
             ) { newBest = NewBestAnnouncement(liftNames: $0) }
+        }
+        .navigationDestination(item: $historyRoute) { route in
+            StrengthProgressDestination(route: route)
         }
         .newBestBanner($newBest)
         .plannedLogToast($plannedLog, onUndo: undoPlannedLog, onAdjust: adjustPlannedLog)

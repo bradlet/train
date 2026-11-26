@@ -101,6 +101,12 @@ classDiagram
 
 ## 4. Strength → Progress segment
 
+> **P1 and P2 built in #16** (2026-11-26), along with the #24 group view.
+> - The list's header shows this week's lifts and strength days, a slice of P3. The weekly chart and muscle-group coverage are still to come.
+> - The detail chart steps at each session, and a "done" session is a gap. PRs use the same rule as the save-time banner.
+> - A record can be edited from the detail view or swiped away.
+> - The target step line waits for plan targets (TRAINING_PLANS).
+
 - **P1 — Lift list.** Every lift with history, including lifts no longer on the board. Each shows a sparkline, latest value, best value, and last-done date, grouped by muscle group and searchable.
 - **P2 — Lift detail.** A chart with one series per measurement type (no-value records as gaps), PR markers, and a record list with edit and delete. Mirror the `WorkoutDetailSheet` / `WorkoutEditor` pattern. It's reachable from the card context menu and from a chart button on the record sheet.
 - **P3 — Strength summary.** Weekly strength days and lifts done, plus muscle-group coverage across recent weeks (counts, not tonnage).

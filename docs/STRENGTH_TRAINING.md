@@ -253,6 +253,29 @@ A card can plan a **movement** instead of one lift (`StrengthExercise.groupID`).
   - The card menu has Edit Group / Make This a Group (`MovementGroupEditorSheet`).
   - The library has a **Groups** chip.
 
+### Strength → Progress (#16)
+
+```mermaid
+flowchart LR
+    List[StrengthProgressView<br/>week headline · chips · search] -->|lift row| Detail[LiftDetailView<br/>chart · PRs · sessions]
+    List -->|group row| Group[GroupProgressView<br/>rotation strip · members]
+    Group -->|member| Detail
+    Card[Board card ▸ History] --> Detail
+    Card -->|group card| Group
+    Sheet[Record sheet ▸ History] --> Detail
+    Detail -->|tap a session| Edit[EditStrengthRecordSheet]
+```
+
+- **The list** shows every lift with history, including lifts no longer on the board.
+  - `StrengthProgress.summaries` gives each one a sparkline, latest value, best value and last-done date in the lift's own measurement.
+  - Lifts are grouped by muscle group, with filter chips and search.
+  - Movement groups with history get their own section.
+- **The detail chart** has one line per measurement.
+  - Lines step at each session, because a number holds until the next one.
+  - A "done" session is a gap.
+  - Stars mark personal bests (`StrengthProgress.personalBests`, the same rule as the save-time banner).
+- **The session list** opens `EditStrengthRecordSheet` (edits go through `StrengthRecordEditor`) and supports swipe to delete.
+
 ## AI Coach Serialization
 
 The strength board is part of the coaching snapshot:

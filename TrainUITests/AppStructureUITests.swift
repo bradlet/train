@@ -45,10 +45,10 @@ final class AppStructureUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Recent Workouts"].waitForExistence(timeout: 2))
     }
 
-    /// Strength opens on the board; its Progress segment is a placeholder
-    /// until the lift list lands (#16).
+    /// Strength opens on the board; its Progress segment is the lift list
+    /// (#16).
     @MainActor
-    func testStrengthProgressShowsThePlaceholder() {
+    func testStrengthProgressShowsTheLiftList() {
         let app = launch()
         app.tabBars.buttons["Strength"].tap()
 
@@ -58,9 +58,10 @@ final class AppStructureUITests: XCTestCase {
 
         segment.buttons["Progress"].tap()
         XCTAssertTrue(
-            app.staticTexts["Lift progress is coming"].waitForExistence(timeout: 5),
-            "Strength → Progress shows its placeholder"
+            app.staticTexts["strengthProgress.weekLifts"].waitForExistence(timeout: 5),
+            "Strength → Progress shows the week's headline"
         )
+        XCTAssertTrue(app.buttons["strengthProgress.lift.Test Lift 1"].exists, "and the lift list")
     }
 
     /// Every tab has the Settings gear, and Settings holds the data actions

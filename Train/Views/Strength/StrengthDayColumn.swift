@@ -27,6 +27,8 @@ struct StrengthDayColumn: View {
     var assignments: [UUID: GroupAssignment] = [:]
     /// Opens the group editor for a card.
     var onGroup: ((StrengthExercise) -> Void)? = nil
+    /// Opens a card's history.
+    var onHistory: ((StrengthExercise) -> Void)? = nil
     /// Called when the user taps a card to record a weight entry.
     let onRecord: (StrengthExercise) -> Void
     /// Called when the user taps the add button to open the exercise library.
@@ -154,6 +156,7 @@ struct StrengthDayColumn: View {
                         weekRecord: weekRecords[exercise.id],
                         assignment: assignments[exercise.id],
                         onGroup: onGroup.map { handler in { handler(exercise) } },
+                        onHistory: onHistory.map { handler in { handler(exercise) } },
                         onRecord: { onRecord(exercise) },
                         onMoveToDay: { day in onMoveToDay(exercise, day) },
                         onToggleOffloaded: {
