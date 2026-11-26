@@ -48,6 +48,12 @@ final class StrengthExercise {
     /// `muscleGroup` mirror the group; the lift it records is the group's
     /// up-next member (`GroupRotation`), never `liftKey`.
     var groupID: String? = nil
+    /// The card's target (#20, steady plans), in its lift's metric and
+    /// internal unit (lb, reps, seconds, miles), or `nil` for a trend-only
+    /// lift. Changes are logged as `StrengthTargetChange`s.
+    var targetValue: Double? = nil
+    /// "Not yet" on a target nudge hides it until this date.
+    var nudgeSnoozedUntil: Date? = nil
 
     /// Primary muscle group, denormalized from the library for card display.
     /// Unknown stored raw values (e.g. synced from a newer app version) read

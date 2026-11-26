@@ -67,15 +67,21 @@ enum PlannedDayLogger {
         targets: [UUID: LiftTarget] = [:],
         on date: Date,
         lifts: [StrengthLift],
-        records: [StrengthRecord]
+        records: [StrengthRecord],
+        isLightWeek: Bool = false,
+        useMetricUnits: Bool = false
     ) -> [StrengthRecord] {
         slots.map { slot in
             let target = targets[slot.id] ?? LiftTarget(slot: slot)
             let lift = StrengthLiftRegistry.lift(forKey: target.liftKey, in: lifts)
             let metric = lift?.primaryMetric ?? target.defaultMetric
             let history = records.filter { $0.liftKey == target.liftKey }
-            let prefill = StrengthPrefill.make(metric: metric, lift: lift, records: history)
-            return StrengthRecord(
+            // A card's target is the plan (#20); it wins over the last value.
+            let goal = target.liftKey == slot.liftKey
+                ? StrengthTargets.weekTarget(for: slot, metric: metric, isLightWeek: isLightWeek, useMetricUnits: useMetricUnits)
+                : nil
+            let prefill = StrengthPrefill.make(metric: metric, lift: lift, records: history, target: goal)
+            let made = StrengthRecord(
                 liftKey: target.liftKey,
                 slotID: slot.id,
                 date: date,
@@ -83,6 +89,8 @@ enum PlannedDayLogger {
                 metric: metric,
                 measurement: prefill.value == nil ? nil : prefill.measurement
             )
+            made.isLight = isLightWeek
+            return made
         }
     }
 
@@ -112,7 +120,9 @@ enum PlannedDayLogger {
         _ lane: [StrengthExercise],
         on date: Date,
         in context: ModelContext,
-        firstWeekday: Int = AppConfiguration.defaultWeekStartDay
+        firstWeekday: Int = AppConfiguration.defaultWeekStartDay,
+        isLightWeek: Bool = false,
+        useMetricUnits: Bool = false
     ) -> PlannedDayLogResult? {
         let allRecords = (try? context.fetch(FetchDescriptor<StrengthRecord>())) ?? []
         let todo = pending(lane, on: date, records: allRecords)
@@ -123,7 +133,8 @@ enum PlannedDayLogger {
             StrengthLiftRegistry.findOrCreate(for: target, metric: target.defaultMetric, in: context)
         }
         let lifts = (try? context.fetch(FetchDescriptor<StrengthLift>())) ?? []
-        let made = records(for: todo, targets: targets, on: date, lifts: lifts, records: allRecords)
+        let made = records(for: todo, targets: targets, on: date, lifts: lifts, records: allRecords,
+                           isLightWeek: isLightWeek, useMetricUnits: useMetricUnits)
         var bests: [String] = []
         for (slot, record) in zip(todo, made) {
             let previous = allRecords.filter { $0.liftKey == record.liftKey }

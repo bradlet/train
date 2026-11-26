@@ -36,6 +36,9 @@ final class StrengthRecord {
     private var measurementRaw: String? = nil
     /// Optional post-session notes.
     var notes: String = ""
+    /// Whether it was logged during a light week (#20), so trends can tell
+    /// a planned dip from a regression.
+    var isLight: Bool = false
 
     /// The metric the value was recorded in. Stored per record so a later
     /// change to the lift's metric never reinterprets old values. Unknown

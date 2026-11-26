@@ -32,7 +32,9 @@ struct StrengthPrefill: Equatable {
     ///   - metric: The metric being recorded.
     ///   - lift: The lift, if it exists yet.
     ///   - records: The lift's records, in any order.
-    static func make(metric: LiftMetric, lift: StrengthLift?, records: [StrengthRecord]) -> StrengthPrefill {
+    ///   - target: The card's target this week (#20); when set, the value
+    ///     starts on it instead of the last session.
+    static func make(metric: LiftMetric, lift: StrengthLift?, records: [StrengthRecord], target: Double? = nil) -> StrengthPrefill {
         let newestFirst = records.sorted { $0.date > $1.date }
         let measurement = lift?.defaultMeasurement
             ?? newestFirst.first(where: { $0.measurement != nil })?.measurement
@@ -41,7 +43,7 @@ struct StrengthPrefill: Equatable {
         let match = metric.usesMeasurement
             ? valued.first(where: { $0.measurement == measurement }) ?? valued.first
             : valued.first
-        return StrengthPrefill(measurement: measurement, value: match?.value)
+        return StrengthPrefill(measurement: measurement, value: target ?? match?.value)
     }
 
     /// Resolves a card's metric and prefill from a context — includes lifts
@@ -60,12 +62,17 @@ struct StrengthPrefill: Equatable {
     /// - Parameters:
     ///   - target: The lift being recorded.
     ///   - context: The context to fetch from.
-    static func resolve(for target: LiftTarget, in context: ModelContext) -> (metric: LiftMetric, prefill: StrengthPrefill) {
+    ///   - slotTarget: The card's target this week, if any (#20).
+    static func resolve(
+        for target: LiftTarget,
+        in context: ModelContext,
+        slotTarget: Double? = nil
+    ) -> (metric: LiftMetric, prefill: StrengthPrefill) {
         let key = target.liftKey
         let lifts = (try? context.fetch(FetchDescriptor<StrengthLift>(predicate: #Predicate { $0.liftKey == key }))) ?? []
         let records = (try? context.fetch(FetchDescriptor<StrengthRecord>(predicate: #Predicate { $0.liftKey == key }))) ?? []
         let lift = StrengthLiftRegistry.lift(forKey: key, in: lifts)
         let metric = lift?.primaryMetric ?? target.defaultMetric
-        return (metric, make(metric: metric, lift: lift, records: records))
+        return (metric, make(metric: metric, lift: lift, records: records, target: slotTarget))
     }
 }

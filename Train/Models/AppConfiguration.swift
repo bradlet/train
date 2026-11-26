@@ -64,6 +64,10 @@ final class AppConfiguration {
         set { keyDayStrategyRaw = newValue.rawValue }
     }
 
+    /// The start of a one-off light week (#20), or `nil`. Light only while
+    /// it is the current week, so it reverts on its own.
+    var lightWeekStart: Date? = nil
+
     /// Weekday lanes (Sunday=0 ... Saturday=6) whose strength plan "Arrange my
     /// week" never moves, comma-joined (#25). Access through `pinnedWeekdays`.
     var pinnedWeekdaysRaw: String = ""
