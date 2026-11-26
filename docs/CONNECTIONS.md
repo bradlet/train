@@ -4,7 +4,7 @@ How the app talks to services outside the device. Today that means **Google Shee
 
 ## Google Sheets Sync
 
-Sheets Sync is opt-in. Once it's enabled from the History tab's toolbar menu, the app overwrites the entire workout history to a Google Sheet on every add, edit or delete, debounced to 30 seconds. The app creates the sheet in the user's Google Drive the first time sync is enabled, and stores its ID in `AppConfiguration`.
+Sheets Sync is opt-in. Once it's enabled in **Settings → Google Sheets**, the app overwrites the entire workout history to a Google Sheet on every add, edit or delete, debounced to 30 seconds. The app creates the sheet in the user's Google Drive the first time sync is enabled, and stores its ID in `AppConfiguration`.
 
 To sign in, the app needs an **iOS OAuth 2.0 client** registered for its bundle ID. The `GoogleSignIn-iOS` SDK keeps the tokens in the iOS Keychain. iOS OAuth clients are public clients that use PKCE, so there is no client secret.
 
@@ -85,11 +85,11 @@ The URL scheme is the client ID **reversed**: drop `.apps.googleusercontent.com`
 
 #### 5. Verify
 
-Build and run, then go to **History → toolbar menu → Google Sheets Sync → Enable**. Sign in with any Google account and grant the scope. The app creates a spreadsheet in your Drive and writes the history to it.
+Build and run, then open **Settings (the gear on any tab) → Google Sheets → Sync to Google Sheets**. Sign in with any Google account and grant the scope. The app creates a spreadsheet in your Drive and writes the history to it.
 
 ### What the user sees in-app
 
-- **Disabled** (the default): the toolbar menu shows **Google Sheets Sync**. Tapping it opens a confirmation explaining that sync is export-only, and confirming runs OAuth, creates the spreadsheet and does the first sync.
-- **Enabled, healthy**: the menu shows **Disable Google Sheets Sync**. Changes wait 30 s, then upload silently.
-- **Enabled, last sync failed** (a transient network or API error): a red dot appears on the toolbar's `…` icon, and the menu shows **Retry** with the reason.
-- **Enabled, but the token is missing or expired**: the menu shows **Sign in to resume Sheets Sync**. This happens on a fresh device or with the Testing-mode 7-day expiry. Signing in again (even over a stale cached session) re-syncs to the **same** spreadsheet; it never creates a new one.
+- **Disabled** (the default): Settings shows **Sync to Google Sheets**. Tapping it opens a confirmation explaining that sync is export-only, and confirming runs OAuth, creates the spreadsheet and does the first sync.
+- **Enabled, healthy**: Settings shows **Synced** and **Turn Off Google Sheets Sync**. Changes wait 30 s, then upload silently.
+- **Enabled, last sync failed** (a transient network or API error): a red dot appears on the Settings gear, and Settings shows **Retry Sync** with the reason.
+- **Enabled, but the token is missing or expired**: Settings shows **Sign in to Resume Sync** (and the gear gets a red dot). This happens on a fresh device or with the Testing-mode 7-day expiry. Signing in again (even over a stale cached session) re-syncs to the **same** spreadsheet; it never creates a new one.

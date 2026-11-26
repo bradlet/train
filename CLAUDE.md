@@ -20,7 +20,7 @@ xcodebuild -scheme Train -destination 'platform=iOS Simulator,name=iPhone 17 Pro
 # Run app unit tests
 xcodebuild test -scheme Train -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:"TrainTests"
 
-# Run History tab functional UI tests
+# Run Cardio → Progress (former History tab) functional UI tests
 xcodebuild test -scheme Train -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:"TrainUITests/HistoryUITests"
 
 # Run AICoachCore / AICoachRuntime package tests (no model)
@@ -52,7 +52,8 @@ Check a change by previewing with `--output` at full size *and* downscaled to ~6
 ## Architecture
 The AI coach has a full contributor guide in `docs/AI_COACH.md`, and its evals have `docs/EVALS_GUIDE.md` — keep both in step with the coach notes below.
 
-- **No ViewModels** — `@Query` in top-level views only (`HomeView`, `AerobicTrainingView`, `StrengthTrainingView`, `HistoryView`, `SettingsView`, `ContentView`). Child views receive data as `let` parameters. App-scope observable state that isn't a ViewModel (owns no queries, makes no view decisions) is a `@MainActor @Observable` service injected via `@Environment` — see `GoogleSheetsSyncCoordinator` and `CoachChatStore`.
+- **App structure (#12)**: tabs are Home · Cardio · Strength. `CardioView` and `StrengthView` own each tab's `NavigationStack` and a `TrainingSegmentPicker` (Plan | Progress) in the bar; the segments are `AerobicTrainingView` (Cardio → Plan), `HistoryView` (Cardio → Progress), `StrengthTrainingView` (Strength → Plan) and `StrengthProgressPlaceholder` (Strength → Progress, until #16). Segment views never wrap themselves in a `NavigationStack`; they add toolbar items to the host's. Every tab gets the Settings gear via `.settingsToolbarButton()` (it also carries the Sheets-sync status dot, `SettingsBadge`), and import/export/Sheets sync live in Settings → Data (`WorkoutDataSection`) until the Connections dashboard (#23).
+- **No ViewModels** — `@Query` in top-level views only (`HomeView`, `AerobicTrainingView`, `StrengthTrainingView`, `HistoryView`, `SettingsView`, `ContentView`; the tab hosts `CardioView`/`StrengthView` own no queries). Child views receive data as `let` parameters. App-scope observable state that isn't a ViewModel (owns no queries, makes no view decisions) is a `@MainActor @Observable` service injected via `@Environment` — see `GoogleSheetsSyncCoordinator` and `CoachChatStore`.
 - **Models**: `Exercise` (a planned and/or recorded activity), `Workout` (its recorded actuals — a Codable value JSON-encoded on the exercise, not a `@Model`), `StrengthExercise` (strength board card — a *slot* for a lift), `StrengthLift` (a lift's identity + primary metric), `StrengthRecord` (one recorded strength session), `UserLibraryExercise` (custom library entries), `FavoriteWorkout` (saved aerobic presets), `AppConfiguration` (preferences), `ExerciseType` (enum)
 - **Distance storage**: Always miles internally. Display conversion via `Double.formattedDistance(metric:)`. Unit preference via `@Environment(\.useMetricUnits)`.
 - **Week start**: Monthly calendar grids are always Sunday-first — standard `Calendar.current` week (see `Date+Week.swift`). The user's `AppConfiguration.weekStartDay` (1=Sun…7=Sat, injected via `@Environment(\.weekStartDay)`) governs (a) weekly *aggregation* (mileage buckets, "This Week" stats — threaded into `WorkoutAggregations` as `firstWeekday`) and (b) the Aerobic Training *weekly* calendar: its day ordering, week boundaries, navigation, and header mileage totals use the `firstWeekday:` variants (`daysInWeek(firstWeekday:)`, `startOfWeek(firstWeekday:)`, `endOfWeek(firstWeekday:)`) so the topmost swimlane is the configured week start. The no-arg Sunday-first helpers remain for monthly views and must not change.
@@ -123,10 +124,11 @@ Services/
   WorkoutCSV/       CSV import/export
 Views/
   Home/             Home tab (today's training, quick record, coach chat)
-  AerobicTraining/  Training tab
-  History/          History tab (calendar, workout list, detail sheet)
-  Strength/         Strength tab
-  Settings/         Preferences (units, week start)
+  Cardio/           Cardio tab host (Plan | Progress)
+  AerobicTraining/  Cardio → Plan (weekly calendar)
+  History/          Cardio → Progress (calendar, workout list, detail sheet)
+  Strength/         Strength tab host + Strength → Plan (board); Progress placeholder
+  Settings/         Preferences, the Settings gear, and Data (import/export, Sheets sync)
   Shared/           Cross-tab building blocks (e.g. WorkoutFormFields)
 ```
 

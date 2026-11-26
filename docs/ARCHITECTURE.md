@@ -59,7 +59,7 @@ A saved aerobic preset (name, type, distance, duration, counts-toward-mileage) w
 ## Key Design Decisions
 
 ### @Query placement
-Only top-level views own `@Query` properties: the tab roots (`HomeView`, `AerobicTrainingView`, `StrengthTrainingView`, `HistoryView`), `ContentView`, and `SettingsView`. All child views receive data as plain `let` parameters. This minimizes SwiftData subscription overhead — each `@Query` causes its entire view subtree to re-evaluate on any change to the queried model type.
+Only top-level views own `@Query` properties: the tab and segment roots (`HomeView`, `AerobicTrainingView` = Cardio → Plan, `HistoryView` = Cardio → Progress, `StrengthTrainingView` = Strength → Plan), `ContentView`, and `SettingsView`. The tab hosts `CardioView` and `StrengthView` own only the navigation bar and the Plan | Progress picker. All child views receive data as plain `let` parameters. This minimizes SwiftData subscription overhead — each `@Query` causes its entire view subtree to re-evaluate on any change to the queried model type.
 
 The exercise-reading views use an **unfiltered** `@Query private var allExercises: [Exercise]` and derive what they need in computed vars: `HistoryView` filters to completed exercises (`workout != nil`) and sorts by `date` descending in memory; `AerobicTrainingView` filters by week. The completed/planned split is done in memory because a `#Predicate` cannot reach inside the JSON-encoded `workoutData` blob that backs `workout`. This is cheap at single-user scale.
 
@@ -200,7 +200,7 @@ App tests use `ModelContainerFactory.makePreviewContainer()` for isolated in-mem
 
 Functional UI tests live in `TrainUITests/` (XCTest + `XCUIApplication`; Swift Testing doesn't integrate with XCUI): `HomeUITests` (Home tab, coach chat, proposals, voice entry, model download flow — run with `-uiTestCoachNotDownloaded` for the download cases), `AerobicTrainingUITests`, `StrengthLibraryUITests`, `RatingPickerUITests`, and `HistoryUITests`.
 
-`HistoryUITests.swift` validates the History tab end-to-end:
+`HistoryUITests.swift` validates Cardio → Progress (the former History tab) end-to-end:
 
 - First-page rendering (10 rows), prev/next button enablement at page boundaries
 - Forward/backward page navigation via `workoutList.prevPage` / `workoutList.nextPage` identifiers

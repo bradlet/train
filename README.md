@@ -12,11 +12,13 @@ We don't withhold any features from the free app. Upgrade one time only to suppo
 
 ## Features
 
-### Home (Tab 1)
+The app has three tabs: **Home**, **Cardio** and **Strength**. Cardio and Strength each split into **Plan | Progress**, so the two disciplines work the same way. A gear on every tab opens Settings.
+
+### Home
 - **Today's training** — the day's planned aerobic sessions and strength lane, with quick record and "Log Lift" shortcuts
 - **Coach entry** — a card that opens the AI coach conversation, plus a mic button for voice-first entry (see [AI Coach](#ai-coach))
 
-### Aerobic Training (Tab 2)
+### Cardio → Plan
 - **Weekly calendar** with one swimlane per day, ordered from your configured week-start day (Settings)
 - **Drag-and-drop** to reschedule exercises between days
 - **Mileage header** showing planned vs. completed miles for the current week with progress indicator
@@ -28,22 +30,25 @@ We don't withhold any features from the free app. Upgrade one time only to suppo
 - **On-device, conversational running coach** powered by Google's Gemma 4 E2B running locally via [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm), reached from the Home tab by typing or by voice
 - Sees the last four weeks of recorded workouts — including two optional radial-dial ratings, **"How did it feel?" (1–5, Very Weak → Very Strong)** and **"How hard was it?" (RPE 1–10)** — the next two weeks of scheduled exercises, and your weekly strength board
 - **Acts through tool calls you approve**: it can propose changes to a planned session, record a workout you describe, program a strength day, or move/remove/offload a strength exercise. Nothing changes until you tap Accept
-- **Fully offline** after the model download, no API calls, no subscription — aligned with the one-time-payment business model
+- **Fully offline** after the model download, no API calls, no subscription
 - Model weights (~4.3 GB) download from Hugging Face only when you choose to from the coach screen, then stay cached for offline use
 
 See [docs/AI_COACH.md](docs/AI_COACH.md) for the contributor guide.
 
-### Strength Training (Tab 3)
+### Strength → Plan
 - **Kanban-style weekly board** — one lane per weekday, each with an active Plan section and an Offloaded holding section; drag cards to reorder, move between days, or offload
 - **Exercise library** of 100 bundled exercises plus your own custom entries, filterable by muscle group, with optional sets × reps plans
-- **Weight records** per exercise, tagged by recording type (max, average, first/last/min set)
+- **Lift records** owned by the lift, not the card: each lift is tracked by weight, reps, time or distance, a session can be logged as just "done", and weight/reps records say which number they are (max, average, first/last/min set)
+- **Strength → Progress** is a placeholder for now; lift charts and personal bests are coming
 - See [docs/STRENGTH_TRAINING.md](docs/STRENGTH_TRAINING.md)
 
-### History (Tab 4)
+### Cardio → Progress
 - **Summary stats**: all-time, year-to-date, and month-to-date mileage
 - **Monthly calendar** with colored workout indicators and day-tap detail popovers
 - **Paginated workout log** sorted by most recent, with lazy-loading scroll
-- **CSV export/import** and **Apple Health import** in the toolbar menu
+### Settings
+- **Training week** start day and **units**
+- **Data**: CSV export/import and Apple Health import
 - **Google Sheets Sync** — opt-in auto export of the entire workout history to a personal Google Sheet on every add/edit/delete (one-way; the sheet is overwritten on every save). See [docs/CONNECTIONS.md](docs/CONNECTIONS.md) for setup.
 
 ## Tech Stack
@@ -100,7 +105,7 @@ The AI coach model (~4.3 GB, Gemma 4 E2B 4-bit) is not bundled. It downloads fro
 
 ### CloudKit Setup
 
-SwiftData syncs to the athlete's private CloudKit database in the container **`iCloud.com.bradlet.train`**, declared in `Train/Train.entitlements`. It was registered by adding the iCloud (CloudKit), Push Notifications and Background Modes → Remote notifications capabilities to the Train target in Xcode (Signing & Capabilities). The production schema is additive only; see the CloudKit note in `CLAUDE.md` before changing a model.
+SwiftData syncs to the athlete's private CloudKit database in the container **`iCloud.com.bradlet.train`**, declared in `Train/Train.entitlements`. It was registered by adding the iCloud (CloudKit), Push Notifications and Background Modes → Remote notifications capabilities to the Train target in Xcode (Signing & Capabilities). Sync currently runs in **Debug builds only** (the development environment); Release and TestFlight builds stay local until the production schema is deployed (#30). Once deployed, the schema is additive only; see the CloudKit note in `CLAUDE.md` before changing a model.
 
 ## Google Sheets Sync Setup
 

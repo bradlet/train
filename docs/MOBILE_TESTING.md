@@ -167,9 +167,9 @@ xcodebuild test -scheme Train \
   -only-testing:"TrainUITests"
 ```
 
-### History Tab Functional Tests
+### Cardio → Progress Functional Tests
 
-To run only the History tab UI tests:
+To run only the Cardio → Progress (former History tab) UI tests:
 
 ```bash
 xcodebuild test -scheme Train \

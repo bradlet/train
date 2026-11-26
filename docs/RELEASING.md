@@ -116,7 +116,7 @@ For your first version (1.0), you'll need:
 
 | Field | What to provide |
 |-------|----------------|
-| **Screenshots** | At least one set for iPhone 6.7" display (iPhone 15/16 Pro Max). Capture from the simulator: **Simulator menu > File > Save Screen**. You need 2-10 screenshots. Show the weekly calendar, history tab, and recording flow. |
+| **Screenshots** | At least one set for iPhone 6.7" display (iPhone 15/16 Pro Max). Capture from the simulator: **Simulator menu > File > Save Screen**. You need 2-10 screenshots. Show Cardio → Plan (weekly calendar), the strength board, Cardio → Progress, and the recording flow. |
 | **App Previews** (optional) | Short video demos. Not required for initial submission. |
 | **Description** | 1-2 paragraphs describing the app. Visible on the App Store listing page. |
 | **Keywords** | Comma-separated, max 100 characters total. E.g. `running,exercise,training,workout,mileage,fitness,tracking` |
