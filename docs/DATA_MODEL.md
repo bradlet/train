@@ -12,7 +12,7 @@ Train uses **SwiftData**, Apple's ORM framework built on top of Core Data. If yo
 
 ## Entity-Relationship Diagram
 
-The persisted `@Model` entities are `Exercise`, `StrengthExercise`, `StrengthLift`, `StrengthRecord`, `UserLibraryExercise`, `FavoriteWorkout`, and `AppConfiguration` (`ModelContainerFactory`'s schema). An aerobic recording does **not** get its own table: `Exercise.workout` is a `Workout` value struct JSON-encoded into a `Data?` column. Strength records do: each `StrengthRecord` is a row owned by a lift (via `liftKey`) rather than by a board card, so history survives removing a card (see [STRENGTH_TRAINING.md](STRENGTH_TRAINING.md)). An exercise with `workout == nil` is planned only; a non-nil `workout` means it was recorded.
+The persisted `@Model` entities are `Exercise`, `StrengthExercise`, `StrengthLift`, `StrengthRecord`, `UserLibraryExercise`, `UserMovementGroup`, `FavoriteWorkout`, and `AppConfiguration` (`ModelContainerFactory`'s schema). An aerobic recording does **not** get its own table: `Exercise.workout` is a `Workout` value struct JSON-encoded into a `Data?` column. Strength records do: each `StrengthRecord` is a row owned by a lift (via `liftKey`) rather than by a board card, so history survives removing a card (see [STRENGTH_TRAINING.md](STRENGTH_TRAINING.md)). An exercise with `workout == nil` is planned only; a non-nil `workout` means it was recorded.
 
 ```mermaid
 erDiagram
@@ -21,6 +21,7 @@ erDiagram
     StrengthLift ||..o{ StrengthRecord : "liftKey (by key, no relationship)"
     StrengthExercise |o..o{ StrengthRecord : "slotID (card may be gone)"
     StrengthExercise }o..o| UserLibraryExercise : "libraryExerciseID (by id, no relationship)"
+    StrengthExercise }o..o| UserMovementGroup : "groupID (by id; built-ins live in JSON)"
 
     Exercise {
         UUID id
@@ -51,6 +52,17 @@ erDiagram
         Int sortOrder
         Int plannedSets "optional"
         Int plannedReps "optional"
+        String groupID "optional movement group (#24)"
+    }
+    UserMovementGroup {
+        String groupID "built-in id (edited copy) or user-group-uuid"
+        String name
+        Data membersData "JSON GroupMember array"
+        Data pausedLiftKeysData "JSON lift keys"
+        String rotationModeRaw "shuffleWithinBlock / onePerBlock"
+        Int blockWeeks "default 4"
+        Date blockAnchor "optional"
+        String heldLiftKey "optional per-block override"
     }
     StrengthLift {
         String liftKey "library id or name:normalised"

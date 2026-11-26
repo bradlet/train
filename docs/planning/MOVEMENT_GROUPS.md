@@ -2,6 +2,13 @@
 
 > Status: **design draft**, iteration 2 (2026-11-24). Realises idea S5 from [STRENGTH_IDEAS.md](STRENGTH_IDEAS.md).
 > Builds on the lift-owned history and card-linked records in [STRENGTH_ROADMAP.md](STRENGTH_ROADMAP.md) (F1).
+>
+> **Built in #24** (2026-11-26), with the board, the record sheet, the editor and the library. As shipped:
+> - **Swap:** made through the record sheet's member picker. The card's menu has Edit Group / Make This a Group.
+> - **Blocks:** only the steady N-week kind exists; programme-phase blocks wait for TRAINING_PLANS. "Hold this one instead" is a toggle in the record sheet during a held block.
+> - **Built-ins:** all default to shuffle (open question 1 is still open).
+> - **Group sizes:** any size is allowed, including 1 (open question 3).
+> - **Deferred to #16:** the Progress group view (member chips, rotation strip). A pattern-level trend stays parked.
 
 ## The idea
 

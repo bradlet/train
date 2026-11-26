@@ -238,6 +238,21 @@ week follows the athlete's week-start setting (`@Environment(\.weekStartDay)`).
   - **Adjust** undoes the tap, then opens `LogStrengthDaySheet` pre-ticked (`LogStrengthDayRequest.startTicked`) with the same values.
 - **Long-press:** "Log with changes…" opens the sheet pre-ticked straight away.
 
+### Movement groups (#24)
+
+A card can plan a **movement** instead of one lift (`StrengthExercise.groupID`).
+
+- **Where groups come from:** ten built-ins ship in `StrengthMovementGroups.json`, keyed by the library's new `pattern` field. The athlete's own groups, and every edit to a built-in (copy-on-write), are `UserMovementGroup` rows. `MovementGroupCatalog.merged` combines them, and `MovementGroupStore` is the only write path.
+- **Rotation** is computed from records and never stored (`GroupRotation.assignments`):
+  - A card recorded this week shows the member that was done.
+  - **Shuffle** picks the least-recently-done member, judged on each lift's global history, and skips members claimed by earlier cards of the group this week.
+  - **One per block** holds the member that was least recently done as of the block's start, unless "hold this one instead" overrides it for that block.
+- **Recording:** every save path records through `StrengthSlotResolver` → `LiftTarget`, never `slot.liftKey`. Each member is its own lift with its own history and metric. The record sheet's member picker is the swap.
+- **UI:**
+  - Cards and Home rows show ⟳ and "Up next: …" or "Block N: …".
+  - The card menu has Edit Group / Make This a Group (`MovementGroupEditorSheet`).
+  - The library has a **Groups** chip.
+
 ## AI Coach Serialization
 
 The strength board is part of the coaching snapshot:
