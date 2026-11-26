@@ -28,6 +28,15 @@ struct StrengthDayLogRow: Identifiable, Equatable {
     var draft: StrengthRecordDraft
     /// Whether this lift is ticked as done.
     var isDone: Bool = false
+    /// The group the card plans (#24), when the row is its up-next member.
+    var groupName: String? = nil
+    /// Library provenance, for creating the lift on save.
+    var libraryExerciseID: String? = nil
+
+    /// The lift this row records.
+    var target: LiftTarget {
+        LiftTarget(liftKey: liftKey, name: name, libraryExerciseID: libraryExerciseID, muscleGroup: muscleGroup, defaultMetric: draft.metric)
+    }
 
     var id: UUID { slotID }
 }
@@ -36,31 +45,38 @@ struct StrengthDayLogRow: Identifiable, Equatable {
 /// and which records Save writes.
 enum StrengthDayLog {
 
-    /// One prefilled, unticked row per card, in the given order.
+    /// One prefilled, unticked row per card, in the given order. A group
+    /// card's row is its up-next member (#24).
     /// - Parameters:
     ///   - slots: The lane's active cards, in board order.
     ///   - context: The context to resolve lifts and records from.
     ///   - useMetricUnits: Whether values show in metric units.
     ///   - date: The day being logged.
+    ///   - firstWeekday: The week start, for group rotation.
     static func rows(
         for slots: [StrengthExercise],
         in context: ModelContext,
         useMetricUnits: Bool,
-        date: Date
+        date: Date,
+        firstWeekday: Int = AppConfiguration.defaultWeekStartDay
     ) -> [StrengthDayLogRow] {
-        slots.map { slot in
-            let resolved = StrengthPrefill.resolve(for: slot, in: context)
+        let targets = StrengthSlotResolver.targets(for: slots, in: context, firstWeekday: firstWeekday)
+        return slots.map { slot in
+            let target = targets[slot.id] ?? LiftTarget(slot: slot)
+            let resolved = StrengthPrefill.resolve(for: target, in: context)
             return StrengthDayLogRow(
                 slotID: slot.id,
-                liftKey: slot.liftKey,
-                name: slot.name,
-                muscleGroup: slot.muscleGroup,
+                liftKey: target.liftKey,
+                name: target.name,
+                muscleGroup: target.muscleGroup,
                 draft: StrengthRecordDraft(
                     metric: resolved.metric,
                     prefill: resolved.prefill,
                     useMetricUnits: useMetricUnits,
                     date: date
-                )
+                ),
+                groupName: slot.isGroup ? slot.name : nil,
+                libraryExerciseID: target.libraryExerciseID
             )
         }
     }
@@ -119,6 +135,7 @@ struct LogStrengthDaySheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.useMetricUnits) private var useMetricUnits
+    @Environment(\.weekStartDay) private var weekStartDay
 
     @State private var date: Date
     @State private var rows: [StrengthDayLogRow] = []
@@ -187,7 +204,9 @@ struct LogStrengthDaySheet: View {
             .onAppear {
                 guard !didLoad else { return }
                 didLoad = true
-                let loaded = StrengthDayLog.rows(for: slots, in: modelContext, useMetricUnits: useMetricUnits, date: date)
+                let loaded = StrengthDayLog.rows(
+                    for: slots, in: modelContext, useMetricUnits: useMetricUnits, date: date, firstWeekday: weekStartDay
+                )
                 rows = startTicked ? StrengthDayLog.allTicked(loaded) : loaded
             }
         }
@@ -203,9 +222,16 @@ struct LogStrengthDaySheet: View {
                     Image(systemName: row.wrappedValue.isDone ? "checkmark.circle.fill" : "circle")
                         .font(.title3)
                         .foregroundStyle(row.wrappedValue.isDone ? Color.green : Color.secondary)
-                    Text(row.wrappedValue.name)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(row.wrappedValue.name)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        if let groupName = row.wrappedValue.groupName {
+                            Label(groupName, systemImage: "arrow.triangle.2.circlepath")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                     Spacer()
                     if row.wrappedValue.draft.metric.usesMeasurement {
                         Text(row.wrappedValue.draft.measurement.shortLabel)
@@ -236,12 +262,12 @@ struct LogStrengthDaySheet: View {
         let records = StrengthDayLog.makeRecords(rows, date: date, useMetricUnits: useMetricUnits)
         var bests: [String] = []
         for record in records {
-            let slot = slots.first(where: { $0.id == record.slotID })
-            if let slot {
-                StrengthLiftRegistry.findOrCreate(for: slot, metric: record.metric, in: modelContext)
+            let row = rows.first(where: { $0.slotID == record.slotID })
+            if let row {
+                StrengthLiftRegistry.findOrCreate(for: row.target, metric: record.metric, in: modelContext)
             }
             let previous = StrengthLiftRegistry.records(forKey: record.liftKey, in: modelContext)
-            if StrengthPersonalBest.isNewBest(record, previous: previous), let name = slot?.name {
+            if StrengthPersonalBest.isNewBest(record, previous: previous), let name = row?.name {
                 bests.append(name)
             }
             modelContext.insert(record)

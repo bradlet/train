@@ -6,7 +6,10 @@
 //  lift's single number in its primary metric (weight, reps, time, distance)
 //  and, for weight and reps, what that number represents. The number is
 //  optional — leaving it blank logs the session as done. The record belongs
-//  to the lift and remembers the card it was logged from.
+//  to the lift and remembers the card it was logged from. A group card
+//  (#24) records its up-next member; picking another member is the swap
+//  (nothing else is stored), and in a held block the athlete can make the
+//  pick the block's held member instead.
 //
 
 import SwiftUI
@@ -22,8 +25,19 @@ struct RecordStrengthSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.useMetricUnits) private var useMetricUnits
+    @Environment(\.weekStartDay) private var weekStartDay
 
     @State private var draft: StrengthRecordDraft
+    /// The lift being recorded: the card's own, or a group member.
+    @State private var target: LiftTarget?
+    /// The card's group, when it plans one.
+    @State private var group: MovementGroup?
+    /// The member rotation offered, so a swap can be told apart.
+    @State private var upNextKey: String?
+    /// Whether "Hold this one instead" is chosen (one-per-block groups).
+    @State private var holdInstead = false
+    /// Last record date per lift key, for the member picker.
+    @State private var lastDone: [String: Date] = [:]
     /// Whether the lift's metric and prefill have been applied (once).
     @State private var didPrefill = false
 
@@ -42,10 +56,20 @@ struct RecordStrengthSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    LabeledContent("Exercise", value: slot.name)
+                    if let group {
+                        memberPicker(group)
+                    } else {
+                        LabeledContent("Exercise", value: slot.name)
+                    }
                     DatePicker("Date", selection: $draft.date, displayedComponents: .date)
                 } header: {
-                    Text("Session")
+                    Text(group.map { "Session · \($0.name)" } ?? "Session")
+                } footer: {
+                    if let group, group.rotationMode == .onePerBlock, target?.liftKey != upNextKey {
+                        Toggle("Hold this one for the rest of the block", isOn: $holdInstead)
+                            .font(.footnote)
+                            .accessibilityIdentifier("recordStrength.holdInstead")
+                    }
                 }
                 Section {
                     StrengthValueEditor(draft: $draft, identifierPrefix: "recordStrength")
@@ -70,13 +94,13 @@ struct RecordStrengthSheet: View {
             .onAppear {
                 guard !didPrefill else { return }
                 didPrefill = true
-                let resolved = StrengthPrefill.resolve(for: slot, in: modelContext)
-                draft = StrengthRecordDraft(
-                    metric: resolved.metric,
-                    prefill: resolved.prefill,
-                    useMetricUnits: useMetricUnits,
-                    date: draft.date
-                )
+                let resolvedTarget = StrengthSlotResolver.target(for: slot, in: modelContext, firstWeekday: weekStartDay)
+                if let groupID = slot.groupID {
+                    group = StrengthSlotResolver.groups(in: modelContext)[groupID]
+                    upNextKey = resolvedTarget.liftKey
+                    lastDone = GroupRotation.lastDone((try? modelContext.fetch(FetchDescriptor<StrengthRecord>())) ?? [])
+                }
+                select(resolvedTarget)
             }
             .navigationTitle("Record Lift")
             .navigationBarTitleDisplayMode(.inline)
@@ -100,10 +124,57 @@ struct RecordStrengthSheet: View {
         return "Choose what the number represents so trends like a top set and an average can be tracked separately. " + done
     }
 
-    /// Resolves the card's lift, inserts the record, reports a new best,
-    /// and dismisses.
+    /// The group's members, each with when it was last done; choosing one
+    /// is the swap.
+    private func memberPicker(_ group: MovementGroup) -> some View {
+        Picker("Exercise", selection: Binding(
+            get: { target?.liftKey ?? "" },
+            set: { key in
+                guard let member = group.member(forLiftKey: key) else { return }
+                holdInstead = false
+                select(LiftTarget(member: member))
+            }
+        )) {
+            ForEach(group.members) { member in
+                Text(memberLabel(member, in: group)).tag(member.liftKey)
+            }
+        }
+        .accessibilityIdentifier("recordStrength.memberPicker")
+    }
+
+    /// "Incline Dumbbell Press · Nov 10", "… · Up next", "… · Paused".
+    private func memberLabel(_ member: GroupMember, in group: MovementGroup) -> String {
+        if member.liftKey == upNextKey { return "\(member.name) · Up next" }
+        if group.pausedLiftKeys.contains(member.liftKey) { return "\(member.name) · Paused" }
+        guard let date = lastDone[member.liftKey] else { return "\(member.name) · Never" }
+        return "\(member.name) · \(Self.lastDoneFormatter.string(from: date))"
+    }
+
+    /// Cached formatter for member last-done dates, e.g. "Nov 10".
+    private static let lastDoneFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return f
+    }()
+
+    /// Switches the lift being recorded and re-prefills from its history,
+    /// keeping the chosen date.
+    private func select(_ newTarget: LiftTarget) {
+        target = newTarget
+        let resolved = StrengthPrefill.resolve(for: newTarget, in: modelContext)
+        draft = StrengthRecordDraft(
+            metric: resolved.metric,
+            prefill: resolved.prefill,
+            useMetricUnits: useMetricUnits,
+            date: draft.date
+        )
+    }
+
+    /// Resolves the lift, inserts the record, reports a new best, stores a
+    /// "hold this one instead", and dismisses.
     private func save() {
-        let lift = StrengthLiftRegistry.findOrCreate(for: slot, metric: draft.metric, in: modelContext)
+        let recordTarget = target ?? LiftTarget(slot: slot)
+        let lift = StrengthLiftRegistry.findOrCreate(for: recordTarget, metric: draft.metric, in: modelContext)
         guard let record = draft.makeRecord(
             liftKey: lift.liftKey,
             slotID: slot.id,
@@ -111,7 +182,12 @@ struct RecordStrengthSheet: View {
         ) else { return }
         let previous = StrengthLiftRegistry.records(forKey: lift.liftKey, in: modelContext)
         if StrengthPersonalBest.isNewBest(record, previous: previous) {
-            onNewBest([slot.name])
+            onNewBest([recordTarget.name])
+        }
+        if holdInstead, var held = group {
+            held.heldLiftKey = recordTarget.liftKey
+            held.heldBlockIndex = GroupRotation.blockIndex(for: held, now: Date(), firstWeekday: weekStartDay)
+            MovementGroupStore.save(held, in: modelContext)
         }
         modelContext.insert(record)
         StrengthLiftRegistry.rememberDefaults(after: record, in: modelContext)

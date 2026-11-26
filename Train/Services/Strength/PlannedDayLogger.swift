@@ -8,8 +8,8 @@
 //  lift's default measurement and last value, else "done"). The rules are
 //  pure and unit-tested; `log` and `undo` are the context entry points.
 //
-//  Plan targets (TRAINING_PLANS) and up-next group members (#24) will feed
-//  the value and lift here once they exist.
+//  A group card logs its up-next member (#24, via `StrengthSlotResolver`).
+//  Plan targets (TRAINING_PLANS) will feed the value once they exist.
 //
 
 import Foundation
@@ -57,22 +57,26 @@ enum PlannedDayLogger {
     /// no lift or no history records "done" — bodyweight and new lifts count.
     /// - Parameters:
     ///   - slots: The cards to log, in order.
+    ///   - targets: The lift each card records (group cards' up-next
+    ///     members); a card missing here records its own lift.
     ///   - date: The day the records are dated.
     ///   - lifts: Candidate lifts.
     ///   - records: All strength records.
     static func records(
         for slots: [StrengthExercise],
+        targets: [UUID: LiftTarget] = [:],
         on date: Date,
         lifts: [StrengthLift],
         records: [StrengthRecord]
     ) -> [StrengthRecord] {
         slots.map { slot in
-            let lift = StrengthLiftRegistry.lift(forKey: slot.liftKey, in: lifts)
-            let metric = lift?.primaryMetric ?? .weight
-            let history = records.filter { $0.liftKey == slot.liftKey }
+            let target = targets[slot.id] ?? LiftTarget(slot: slot)
+            let lift = StrengthLiftRegistry.lift(forKey: target.liftKey, in: lifts)
+            let metric = lift?.primaryMetric ?? target.defaultMetric
+            let history = records.filter { $0.liftKey == target.liftKey }
             let prefill = StrengthPrefill.make(metric: metric, lift: lift, records: history)
             return StrengthRecord(
-                liftKey: slot.liftKey,
+                liftKey: target.liftKey,
                 slotID: slot.id,
                 date: date,
                 value: prefill.value,
@@ -101,22 +105,32 @@ enum PlannedDayLogger {
     ///   - lane: The lane's cards.
     ///   - date: The day the records are dated.
     ///   - context: The context to read from and insert into.
+    ///   - firstWeekday: The week start, for group rotation.
     /// - Returns: What was written, or `nil` when nothing was pending.
     @discardableResult
-    static func log(_ lane: [StrengthExercise], on date: Date, in context: ModelContext) -> PlannedDayLogResult? {
+    static func log(
+        _ lane: [StrengthExercise],
+        on date: Date,
+        in context: ModelContext,
+        firstWeekday: Int = AppConfiguration.defaultWeekStartDay
+    ) -> PlannedDayLogResult? {
         let allRecords = (try? context.fetch(FetchDescriptor<StrengthRecord>())) ?? []
         let todo = pending(lane, on: date, records: allRecords)
         guard !todo.isEmpty else { return nil }
+        let targets = StrengthSlotResolver.targets(for: todo, in: context, now: date, firstWeekday: firstWeekday)
         for slot in todo {
-            StrengthLiftRegistry.findOrCreate(for: slot, metric: .weight, in: context)
+            let target = targets[slot.id] ?? LiftTarget(slot: slot)
+            StrengthLiftRegistry.findOrCreate(for: target, metric: target.defaultMetric, in: context)
         }
         let lifts = (try? context.fetch(FetchDescriptor<StrengthLift>())) ?? []
-        let made = records(for: todo, on: date, lifts: lifts, records: allRecords)
+        let made = records(for: todo, targets: targets, on: date, lifts: lifts, records: allRecords)
         var bests: [String] = []
         for (slot, record) in zip(todo, made) {
             let previous = allRecords.filter { $0.liftKey == record.liftKey }
                 + made.prefix { $0.id != record.id }.filter { $0.liftKey == record.liftKey }
-            if StrengthPersonalBest.isNewBest(record, previous: previous) { bests.append(slot.name) }
+            if StrengthPersonalBest.isNewBest(record, previous: previous) {
+                bests.append(targets[slot.id]?.name ?? slot.name)
+            }
             context.insert(record)
             StrengthLiftRegistry.rememberDefaults(after: record, in: context)
         }

@@ -51,11 +51,21 @@ struct StrengthPrefill: Equatable {
     ///   - context: The context to fetch from.
     /// - Returns: The lift's metric and the prefill for a new record.
     static func resolve(for slot: StrengthExercise, in context: ModelContext) -> (metric: LiftMetric, prefill: StrengthPrefill) {
-        let key = slot.liftKey
+        resolve(for: LiftTarget(slot: slot), in: context)
+    }
+
+    /// Resolves a target lift's metric and prefill from a context. A lift
+    /// that doesn't exist yet uses the target's default metric (a group
+    /// member's library metric).
+    /// - Parameters:
+    ///   - target: The lift being recorded.
+    ///   - context: The context to fetch from.
+    static func resolve(for target: LiftTarget, in context: ModelContext) -> (metric: LiftMetric, prefill: StrengthPrefill) {
+        let key = target.liftKey
         let lifts = (try? context.fetch(FetchDescriptor<StrengthLift>(predicate: #Predicate { $0.liftKey == key }))) ?? []
         let records = (try? context.fetch(FetchDescriptor<StrengthRecord>(predicate: #Predicate { $0.liftKey == key }))) ?? []
         let lift = StrengthLiftRegistry.lift(forKey: key, in: lifts)
-        let metric = lift?.primaryMetric ?? .weight
+        let metric = lift?.primaryMetric ?? target.defaultMetric
         return (metric, make(metric: metric, lift: lift, records: records))
     }
 }

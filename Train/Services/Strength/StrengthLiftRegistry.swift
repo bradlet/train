@@ -54,16 +54,31 @@ enum StrengthLiftRegistry {
         metric: LiftMetric,
         in context: ModelContext
     ) -> StrengthLift {
-        let key = slot.liftKey
+        findOrCreate(for: LiftTarget(slot: slot), metric: metric, in: context)
+    }
+
+    /// Returns a target's lift — a card's own or a group member (#24) —
+    /// inserting one when none exists. An existing lift keeps its metric.
+    /// - Parameters:
+    ///   - target: The lift to resolve.
+    ///   - metric: Primary metric for a newly created lift.
+    ///   - context: The context to search and insert into.
+    @discardableResult
+    static func findOrCreate(
+        for target: LiftTarget,
+        metric: LiftMetric,
+        in context: ModelContext
+    ) -> StrengthLift {
+        let key = target.liftKey
         let descriptor = FetchDescriptor<StrengthLift>(predicate: #Predicate { $0.liftKey == key })
         if let existing = lift(forKey: key, in: (try? context.fetch(descriptor)) ?? []) {
             return existing
         }
         let lift = StrengthLift(
             liftKey: key,
-            name: slot.name,
-            libraryExerciseID: slot.libraryExerciseID,
-            muscleGroup: slot.muscleGroup,
+            name: target.name,
+            libraryExerciseID: target.libraryExerciseID,
+            muscleGroup: target.muscleGroup,
             primaryMetric: metric
         )
         context.insert(lift)
