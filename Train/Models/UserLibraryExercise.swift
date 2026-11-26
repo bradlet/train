@@ -40,6 +40,9 @@ final class UserLibraryExercise {
     var equipment: String = ""
     /// Difficulty label matching the bundled catalog's values.
     var difficulty: String = "Beginner"
+    /// Raw value of the lift's primary metric. Stored as String (see
+    /// `muscleGroupRaw`); access through `primaryMetric`, never this.
+    private var primaryMetricRaw: String = LiftMetric.weight.rawValue
     /// Creation timestamp, used for stable load ordering.
     var createdAt: Date = Date()
 
@@ -48,6 +51,13 @@ final class UserLibraryExercise {
     var muscleGroup: MuscleGroup {
         get { MuscleGroup(rawValue: muscleGroupRaw) ?? .other }
         set { muscleGroupRaw = newValue.rawValue }
+    }
+
+    /// The one number this lift is tracked by. Unknown stored raw values
+    /// read as weight.
+    var primaryMetric: LiftMetric {
+        get { LiftMetric(rawValue: primaryMetricRaw) ?? .weight }
+        set { primaryMetricRaw = newValue.rawValue }
     }
 
     /// Secondary muscle groups also worked, encoded to/from
@@ -75,7 +85,8 @@ final class UserLibraryExercise {
             muscleGroup: muscleGroup,
             secondaryMuscleGroups: secondaryMuscleGroups,
             equipment: equipment,
-            difficulty: difficulty
+            difficulty: difficulty,
+            primaryMetric: primaryMetric
         )
     }
 
@@ -88,13 +99,15 @@ final class UserLibraryExercise {
     ///   - secondaryMuscleGroups: Secondary muscle groups also worked.
     ///   - equipment: Equipment needed.
     ///   - difficulty: Difficulty label.
+    ///   - primaryMetric: The one number this lift is tracked by.
     init(
         name: String,
         details: String = "",
         muscleGroup: MuscleGroup = .other,
         secondaryMuscleGroups: [MuscleGroup] = [],
         equipment: String = "",
-        difficulty: String = "Beginner"
+        difficulty: String = "Beginner",
+        primaryMetric: LiftMetric = .weight
     ) {
         self.id = UserLibraryExercise.idPrefix + UUID().uuidString
         self.name = name
@@ -103,6 +116,7 @@ final class UserLibraryExercise {
         self.secondaryMuscleGroups = secondaryMuscleGroups
         self.equipment = equipment
         self.difficulty = difficulty
+        self.primaryMetric = primaryMetric
         self.createdAt = Date()
     }
 }

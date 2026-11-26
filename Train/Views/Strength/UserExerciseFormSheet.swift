@@ -4,7 +4,8 @@
 //
 //  Form for creating a user's own exercise library entry, with the same
 //  fields bundled catalog entries carry: name, description, primary and
-//  secondary muscle groups, equipment, and difficulty. Saved entries persist
+//  secondary muscle groups, equipment, difficulty, and the metric the lift
+//  is tracked by (weight, reps, time, or distance). Saved entries persist
 //  as `UserLibraryExercise` models and surface in the library through
 //  `UserLocalExerciseLibraryProvider`.
 //
@@ -23,6 +24,7 @@ struct UserExerciseFormSheet: View {
     @State private var secondaryMuscleGroups: Set<MuscleGroup> = []
     @State private var equipment: String = ""
     @State private var difficulty: String = "Beginner"
+    @State private var primaryMetric: LiftMetric = .weight
 
     /// Difficulty labels matching the bundled catalog's values.
     private static let difficulties = ["Beginner", "Intermediate", "Advanced"]
@@ -82,6 +84,18 @@ struct UserExerciseFormSheet: View {
                     }
                     .accessibilityIdentifier("userExerciseForm.difficulty")
                 }
+                Section {
+                    Picker("Track By", selection: $primaryMetric) {
+                        ForEach(LiftMetric.allCases) { metric in
+                            Label(metric.displayName, systemImage: metric.systemImage).tag(metric)
+                        }
+                    }
+                    .accessibilityIdentifier("userExerciseForm.metric")
+                } header: {
+                    Text("Recording")
+                } footer: {
+                    Text("The one number you log each session: the weight lifted, the reps done, how long you held it, or how far you went.")
+                }
             }
             .navigationTitle("New Exercise")
             .navigationBarTitleDisplayMode(.inline)
@@ -116,7 +130,8 @@ struct UserExerciseFormSheet: View {
             muscleGroup: muscleGroup,
             secondaryMuscleGroups: MuscleGroup.allCases.filter { secondaryMuscleGroups.contains($0) && $0 != muscleGroup },
             equipment: equipment,
-            difficulty: difficulty
+            difficulty: difficulty,
+            primaryMetric: primaryMetric
         ) else { return }
         modelContext.insert(exercise)
         try? modelContext.save()
@@ -137,7 +152,8 @@ enum UserLibraryEditor {
         muscleGroup: MuscleGroup,
         secondaryMuscleGroups: [MuscleGroup],
         equipment: String,
-        difficulty: String
+        difficulty: String,
+        primaryMetric: LiftMetric = .weight
     ) -> UserLibraryExercise? {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return nil }
@@ -147,7 +163,8 @@ enum UserLibraryEditor {
             muscleGroup: muscleGroup,
             secondaryMuscleGroups: secondaryMuscleGroups,
             equipment: equipment.trimmingCharacters(in: .whitespacesAndNewlines),
-            difficulty: difficulty
+            difficulty: difficulty,
+            primaryMetric: primaryMetric
         )
     }
 

@@ -4939,6 +4939,44 @@ struct LibraryExerciseTests {
         let entry = try JSONDecoder().decode(LibraryExercise.self, from: Data(json.utf8))
         #expect(entry.muscleGroup == .other)
     }
+
+    @Test func primaryMetricDefaultsToWeightWhenOmitted() throws {
+        let json = """
+        {"id": "a", "name": "A", "description": "", "muscleGroup": "Chest", "equipment": "Barbell", "difficulty": "Beginner"}
+        """
+        let entry = try JSONDecoder().decode(LibraryExercise.self, from: Data(json.utf8))
+        #expect(entry.primaryMetric == .weight)
+    }
+
+    @Test func primaryMetricDecodesExplicitValues() throws {
+        for metric in LiftMetric.allCases {
+            let json = """
+            {"id": "a", "name": "A", "description": "", "muscleGroup": "Core", "equipment": "Bodyweight", "difficulty": "Beginner", "primaryMetric": "\(metric.rawValue)"}
+            """
+            let entry = try JSONDecoder().decode(LibraryExercise.self, from: Data(json.utf8))
+            #expect(entry.primaryMetric == metric)
+        }
+    }
+
+    @Test func unknownPrimaryMetricDecodesAsWeight() throws {
+        let json = """
+        {"id": "a", "name": "A", "description": "", "muscleGroup": "Core", "equipment": "Bodyweight", "difficulty": "Beginner", "primaryMetric": "calories"}
+        """
+        let entry = try JSONDecoder().decode(LibraryExercise.self, from: Data(json.utf8))
+        #expect(entry.primaryMetric == .weight)
+    }
+
+    @Test func bundledCatalogDeclaresNonWeightMetrics() async throws {
+        let entries = try await BundledExerciseLibraryProvider().loadExercises()
+        let byName = Dictionary(entries.map { ($0.name, $0.primaryMetric) }, uniquingKeysWith: { first, _ in first })
+        #expect(byName["Barbell Bench Press"] == .weight)
+        #expect(byName["Weighted Dip"] == .weight)
+        #expect(byName["Push-Up"] == .reps)
+        #expect(byName["Pull-Up"] == .reps)
+        #expect(byName["Plank"] == .time)
+        #expect(byName["Side Plank"] == .time)
+        #expect(byName["Sled Push"] == .distance)
+    }
 }
 
 // MARK: - UserLibraryExercise Tests
@@ -4954,6 +4992,24 @@ struct UserLibraryExerciseTests {
         #expect(exercise.secondaryMuscleGroups.isEmpty)
         #expect(exercise.equipment == "")
         #expect(exercise.difficulty == "Beginner")
+        #expect(exercise.primaryMetric == .weight)
+    }
+
+    @Test func primaryMetricIsSetAndMappedToTheLibraryEntry() {
+        let exercise = UserLibraryExercise(name: "Farmer Carry", primaryMetric: .distance)
+        #expect(exercise.primaryMetric == .distance)
+        #expect(exercise.libraryEntry.primaryMetric == .distance)
+        exercise.primaryMetric = .time
+        #expect(exercise.libraryEntry.primaryMetric == .time)
+    }
+
+    @Test func primaryMetricPersists() throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        context.insert(UserLibraryExercise(name: "L-Sit", primaryMetric: .time))
+        try context.save()
+        let fetched = try ModelContext(container).fetch(FetchDescriptor<UserLibraryExercise>())
+        #expect(fetched.first?.primaryMetric == .time)
     }
 
     @Test func generatedIDsAreUnique() {
@@ -5160,8 +5216,10 @@ struct UserLibraryEditorTests {
             muscleGroup: .shoulders,
             secondaryMuscleGroups: [.triceps, .core],
             equipment: " Barbell ",
-            difficulty: "Intermediate"
+            difficulty: "Intermediate",
+            primaryMetric: .reps
         ))
+        #expect(exercise.primaryMetric == .reps)
         #expect(exercise.name == "Landmine Press")
         #expect(exercise.details == "Press the barbell end.")
         #expect(exercise.muscleGroup == .shoulders)
