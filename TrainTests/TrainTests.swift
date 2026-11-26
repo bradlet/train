@@ -5082,6 +5082,89 @@ struct StrengthStepperTests {
     }
 }
 
+// MARK: - StrengthDayLog Tests
+
+struct StrengthDayLogTests {
+
+    private func row(_ name: String, metric: LiftMetric = .weight, value: String = "", done: Bool) -> StrengthDayLogRow {
+        var draft = StrengthRecordDraft(metric: metric)
+        draft.valueText = value
+        return StrengthDayLogRow(
+            slotID: UUID(), liftKey: "name:\(name.lowercased())", name: name,
+            muscleGroup: .other, draft: draft, isDone: done
+        )
+    }
+
+    @Test func saveNeedsATickedRow() {
+        #expect(!StrengthDayLog.canSave([], useMetricUnits: false))
+        #expect(!StrengthDayLog.canSave([row("A", value: "100", done: false)], useMetricUnits: false))
+        #expect(StrengthDayLog.canSave([row("A", value: "100", done: true)], useMetricUnits: false))
+    }
+
+    @Test func anInvalidTickedRowBlocksSaveButAnUntickedOneDoesNot() {
+        #expect(!StrengthDayLog.canSave([row("A", value: "abc", done: true)], useMetricUnits: false))
+        #expect(StrengthDayLog.canSave([
+            row("A", value: "100", done: true),
+            row("B", value: "abc", done: false),
+        ], useMetricUnits: false))
+    }
+
+    @Test func recordsOnlyTickedRowsWithTheirSlotAndDate() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let ticked = row("Squat", value: "225", done: true)
+        let blank = row("Plank", metric: .time, done: true)
+        let skipped = row("Curl", value: "30", done: false)
+        let records = StrengthDayLog.makeRecords([ticked, blank, skipped], date: date, useMetricUnits: false)
+        #expect(records.count == 2)
+        #expect(records[0].slotID == ticked.slotID)
+        #expect(records[0].liftKey == "name:squat")
+        #expect(records[0].value == 225)
+        #expect(records[0].date == date)
+        #expect(records[1].value == nil, "a blank ticked row logs done")
+        #expect(records[1].metric == .time)
+    }
+
+    @Test func rowsArePrefilledAndUnticked() {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let squat = StrengthExercise(name: "Squat", libraryExerciseID: "back-squat")
+        let plank = StrengthExercise(name: "Plank", libraryExerciseID: "plank")
+        context.insert(squat)
+        context.insert(plank)
+        StrengthLiftRegistry.findOrCreate(for: plank, metric: .time, in: context)
+        context.insert(StrengthRecord(liftKey: "back-squat", value: 225, metric: .weight, measurement: .max))
+
+        let rows = StrengthDayLog.rows(for: [squat, plank], in: context, useMetricUnits: false, date: Date())
+        #expect(rows.map(\.name) == ["Squat", "Plank"])
+        #expect(rows.allSatisfy { !$0.isDone })
+        #expect(rows[0].draft.valueText == "225")
+        #expect(rows[0].draft.measurement == .max)
+        #expect(rows[1].draft.metric == .time)
+        #expect(rows[1].slotID == plank.id)
+    }
+}
+
+// MARK: - Date mostRecent Tests
+
+struct DateMostRecentWeekdayTests {
+
+    /// Thursday 2026-11-26.
+    private let thursday = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 15))!
+
+    @Test func todayWhenTheWeekdayMatches() {
+        #expect(thursday.mostRecent(weekdayIndex: 4) == thursday.startOfDay)
+    }
+
+    @Test func earlierThisWeek() {
+        let tuesday = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 24))!
+        #expect(thursday.mostRecent(weekdayIndex: 2) == tuesday)
+    }
+
+    @Test func wrapsBackToLastWeek() {
+        let lastFriday = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 20))!
+        #expect(thursday.mostRecent(weekdayIndex: 5) == lastFriday)
+    }
+}
+
 // MARK: - StrengthLiftKey Tests
 
 struct StrengthLiftKeyTests {

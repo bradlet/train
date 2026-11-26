@@ -144,4 +144,13 @@ extension Date {
         // Calendar weekday: 1=Sun, 2=Mon, ..., 7=Sat
         Calendar.current.component(.weekday, from: self) - 1
     }
+
+    /// The most recent day on or before this date that falls on the given
+    /// weekday, at midnight — e.g. "last Tuesday" when logging the board's
+    /// Tuesday lane on a Thursday. Today when it matches.
+    /// - Parameter weekdayIndex: Sunday=0 ... Saturday=6.
+    func mostRecent(weekdayIndex target: Int) -> Date {
+        let back = (weekdayIndex - target + 7) % 7
+        return Calendar.current.date(byAdding: .day, value: -back, to: startOfDay) ?? startOfDay
+    }
 }

@@ -24,6 +24,8 @@ struct StrengthDayColumn: View {
     let onRecord: (StrengthExercise) -> Void
     /// Called when the user taps the add button to open the exercise library.
     let onAddExercise: () -> Void
+    /// Called to log the lane's active lifts in one sheet.
+    let onLogDay: () -> Void
     /// Called when a card is dropped: move `id` to this day's section
     /// (`offloaded`), inserting before `target` (nil = append at end).
     let onDrop: (_ id: UUID, _ offloaded: Bool, _ target: StrengthExercise?) -> Void
@@ -80,6 +82,14 @@ struct StrengthDayColumn: View {
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
                 Spacer()
+                if !offloaded && !exercises.isEmpty {
+                    Button(action: onLogDay) {
+                        Image(systemName: "checklist")
+                            .foregroundStyle(.green)
+                    }
+                    .accessibilityLabel("Log day")
+                    .accessibilityIdentifier("strengthDayColumn.logDay.\(dayIndex)")
+                }
                 if !offloaded {
                     Button(action: onAddExercise) {
                         Image(systemName: "plus.circle.fill")
@@ -140,6 +150,7 @@ struct StrengthDayColumn: View {
         latestRecords: [:],
         onRecord: { _ in },
         onAddExercise: {},
+        onLogDay: {},
         onDrop: { _, _, _ in },
         onMoveToDay: { _, _ in },
         onDelete: { _ in }

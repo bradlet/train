@@ -43,7 +43,7 @@ struct RecordStrengthSheet: View {
                     Text("Session")
                 }
                 Section {
-                    valueFields
+                    StrengthValueEditor(draft: $draft, identifierPrefix: "recordStrength")
                     if draft.metric.usesMeasurement {
                         Picker("Measurement", selection: $draft.measurement) {
                             ForEach(LiftMeasurement.allCases) { measurement in
@@ -84,54 +84,6 @@ struct RecordStrengthSheet: View {
                         .disabled(!draft.canSave(useMetricUnits: useMetricUnits))
                         .accessibilityIdentifier("recordStrength.save")
                 }
-            }
-        }
-    }
-
-    /// The value entry for the lift's metric — minutes and seconds for time,
-    /// one field with a unit suffix otherwise — between − / + nudges.
-    private var valueFields: some View {
-        HStack(spacing: 12) {
-            nudgeButton(by: -1, systemImage: "minus.circle.fill", identifier: "recordStrength.decrement")
-            valueEntry
-            nudgeButton(by: 1, systemImage: "plus.circle.fill", identifier: "recordStrength.increment")
-        }
-    }
-
-    /// One stepper button; borderless so both work inside a form row.
-    private func nudgeButton(by steps: Int, systemImage: String, identifier: String) -> some View {
-        Button {
-            draft.nudge(by: steps, useMetricUnits: useMetricUnits)
-        } label: {
-            Image(systemName: systemImage)
-                .font(.title2)
-        }
-        .buttonStyle(.borderless)
-        .accessibilityLabel(steps > 0 ? "Increase" : "Decrease")
-        .accessibilityIdentifier(identifier)
-    }
-
-    /// The text field(s) for the value.
-    @ViewBuilder
-    private var valueEntry: some View {
-        if draft.metric == .time {
-            HStack {
-                TextField("Min", text: $draft.minutesText)
-                    .keyboardType(.numberPad)
-                    .accessibilityIdentifier("recordStrength.minutesField")
-                Text("min").foregroundStyle(.secondary)
-                TextField("Sec", text: $draft.secondsText)
-                    .keyboardType(.numberPad)
-                    .accessibilityIdentifier("recordStrength.secondsField")
-                Text("sec").foregroundStyle(.secondary)
-            }
-        } else {
-            HStack {
-                TextField(draft.metric.displayName, text: $draft.valueText)
-                    .keyboardType(draft.metric == .reps ? .numberPad : .decimalPad)
-                    .accessibilityIdentifier("recordStrength.valueField")
-                Text(draft.metric.unitLabel(metric: useMetricUnits))
-                    .foregroundStyle(.secondary)
             }
         }
     }

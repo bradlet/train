@@ -24,6 +24,8 @@ struct StrengthTrainingView: View {
     @State private var selectedDay: Int = Date().weekdayIndex
     /// Whether the exercise library sheet is presented.
     @State private var showLibrary = false
+    /// The weekday lane being logged in the whole-day sheet (nil = hidden).
+    @State private var loggingDay: LogDayRequest?
     /// The card a session is being recorded from (nil = sheet hidden).
     @State private var recordingExercise: StrengthExercise?
 
@@ -39,6 +41,7 @@ struct StrengthTrainingView: View {
                         latestRecords: StrengthLiftRegistry.latestByLiftKey(allRecords),
                         onRecord: { recordingExercise = $0 },
                         onAddExercise: { showLibrary = true },
+                        onLogDay: { loggingDay = LogDayRequest(dayIndex: dayIndex) },
                         onDrop: { id, offloaded, target in
                             handleDrop(id: id, day: dayIndex, offloaded: offloaded, target: target)
                         },
@@ -71,6 +74,12 @@ struct StrengthTrainingView: View {
         }
         .sheet(item: $recordingExercise) { exercise in
             RecordStrengthSheet(slot: exercise)
+        }
+        .sheet(item: $loggingDay) { request in
+            LogStrengthDaySheet(
+                slots: StrengthBoardPlanner.lane(allExercises, day: request.dayIndex, offloaded: false),
+                date: Date().mostRecent(weekdayIndex: request.dayIndex)
+            )
         }
     
     }
@@ -166,4 +175,13 @@ struct StrengthTrainingView: View {
 #Preview {
     NavigationStack { StrengthTrainingView() }
         .modelContainer(ModelContainerFactory.makePreviewContainer())
+}
+
+/// A request to log one weekday lane in the whole-day sheet. The date
+/// defaults to that weekday's most recent occurrence, so earlier days this
+/// week can be backfilled.
+struct LogDayRequest: Identifiable {
+    let id = UUID()
+    /// The lane (Sunday=0 ... Saturday=6).
+    let dayIndex: Int
 }
