@@ -28,6 +28,9 @@ final class StrengthLift {
     private var muscleGroupRaw: String = MuscleGroup.other.rawValue
     /// Raw primary metric. Access through `primaryMetric`, never this.
     private var primaryMetricRaw: String = LiftMetric.weight.rawValue
+    /// Raw default measurement for weight and reps lifts, remembered from
+    /// the last valued record. Access through `defaultMeasurement`.
+    private var defaultMeasurementRaw: String? = nil
     /// Creation timestamp; the oldest lift wins when duplicates sync in.
     var createdAt: Date = Date()
 
@@ -42,6 +45,15 @@ final class StrengthLift {
     var primaryMetric: LiftMetric {
         get { LiftMetric(rawValue: primaryMetricRaw) ?? .weight }
         set { primaryMetricRaw = newValue.rawValue }
+    }
+
+    /// The measurement this lift is usually recorded as (e.g. Average),
+    /// remembered from its last valued weight or reps record so it never has
+    /// to be picked again. `nil` until one exists; unknown raw values read
+    /// as `nil`.
+    var defaultMeasurement: LiftMeasurement? {
+        get { defaultMeasurementRaw.flatMap(LiftMeasurement.init(rawValue:)) }
+        set { defaultMeasurementRaw = newValue?.rawValue }
     }
 
     /// Creates a lift.

@@ -167,7 +167,7 @@ struct StrengthExerciseCard: View {
     )
     return StrengthExerciseCard(
         exercise: exercise,
-        latestRecord: StrengthRecord(liftKey: exercise.liftKey, value: 185, metric: .weight, measurement: .max),
+        latestRecord: StrengthRecord(liftKey: exercise.liftKey, value: 185, metric: .weight, measurement: .average),
         onRecord: {},
         onMoveToDay: { _ in },
         onToggleOffloaded: {},

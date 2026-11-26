@@ -4882,6 +4882,62 @@ struct StrengthLiftTests {
     }
 }
 
+// MARK: - Lift Default Measurement Tests
+
+struct LiftDefaultMeasurementTests {
+
+    @Test func averageIsTheStartingMeasurement() {
+        #expect(LiftMeasurement.starting == .average)
+        #expect(StrengthRecordDraft(metric: .weight).measurement == .average)
+    }
+
+    @Test func defaultIsNilUntilRememberedAndPersists() throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        let lift = StrengthLift(liftKey: "k", name: "Bench")
+        #expect(lift.defaultMeasurement == nil)
+        lift.defaultMeasurement = .lastSet
+        context.insert(lift)
+        try context.save()
+        let fetched = try #require(try ModelContext(container).fetch(FetchDescriptor<StrengthLift>()).first)
+        #expect(fetched.defaultMeasurement == .lastSet)
+    }
+
+    @Test func savingAValuedRecordRemembersItsMeasurement() {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let lift = StrengthLift(liftKey: "k", name: "Bench")
+        context.insert(lift)
+        StrengthLiftRegistry.rememberDefaults(
+            after: StrengthRecord(liftKey: "k", value: 185, metric: .weight, measurement: .firstSet), in: context
+        )
+        #expect(lift.defaultMeasurement == .firstSet)
+    }
+
+    @Test func doneAndTimeRecordsLeaveTheDefaultAlone() {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let lift = StrengthLift(liftKey: "k", name: "Bench")
+        lift.defaultMeasurement = .max
+        context.insert(lift)
+        StrengthLiftRegistry.rememberDefaults(
+            after: StrengthRecord(liftKey: "k", metric: .weight, measurement: .min), in: context
+        )
+        StrengthLiftRegistry.rememberDefaults(
+            after: StrengthRecord(liftKey: "k", value: 60, metric: .time), in: context
+        )
+        #expect(lift.defaultMeasurement == .max)
+    }
+
+    @Test func recordsForAnotherLiftDontTouchThisOne() {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let lift = StrengthLift(liftKey: "k", name: "Bench")
+        context.insert(lift)
+        StrengthLiftRegistry.rememberDefaults(
+            after: StrengthRecord(liftKey: "other", value: 5, metric: .reps, measurement: .max), in: context
+        )
+        #expect(lift.defaultMeasurement == nil)
+    }
+}
+
 // MARK: - StrengthLiftKey Tests
 
 struct StrengthLiftKeyTests {

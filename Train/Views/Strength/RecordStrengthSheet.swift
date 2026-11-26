@@ -119,6 +119,7 @@ struct RecordStrengthSheet: View {
             useMetricUnits: useMetricUnits
         ) else { return }
         modelContext.insert(record)
+        StrengthLiftRegistry.rememberDefaults(after: record, in: modelContext)
         dismiss()
     }
 }
@@ -149,7 +150,7 @@ struct StrengthRecordDraft: Equatable {
     /// Seconds text, for time.
     var secondsText: String = ""
     /// What the value represents (weight and reps only).
-    var measurement: LiftMeasurement = .max
+    var measurement: LiftMeasurement = .starting
     /// Optional notes.
     var notes: String = ""
 

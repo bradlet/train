@@ -100,7 +100,7 @@ extension CoachStrengthWorkout {
         self.init(
             date: record.date,
             weightPounds: pounds,
-            recordingType: (record.measurement ?? .max).displayName,
+            recordingType: (record.measurement ?? .starting).displayName,
             notes: record.notes.isEmpty ? nil : record.notes
         )
     }

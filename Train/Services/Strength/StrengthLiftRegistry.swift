@@ -70,6 +70,19 @@ enum StrengthLiftRegistry {
         return lift
     }
 
+    /// Remembers a just-saved record's measurement as its lift's default,
+    /// so the next session prefills it. Only a weight or reps record with a
+    /// value counts: a "done" record says nothing about the measurement.
+    /// - Parameters:
+    ///   - record: The record that was saved.
+    ///   - context: The context to fetch the lift from.
+    static func rememberDefaults(after record: StrengthRecord, in context: ModelContext) {
+        guard record.value != nil, record.metric.usesMeasurement, let measurement = record.measurement else { return }
+        let key = record.liftKey
+        let descriptor = FetchDescriptor<StrengthLift>(predicate: #Predicate { $0.liftKey == key })
+        lift(forKey: key, in: (try? context.fetch(descriptor)) ?? [])?.defaultMeasurement = measurement
+    }
+
     /// A lift's records, oldest first.
     /// - Parameters:
     ///   - key: The lift key.

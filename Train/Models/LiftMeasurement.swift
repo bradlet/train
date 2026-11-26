@@ -22,6 +22,10 @@ enum LiftMeasurement: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
+    /// The measurement a lift starts with before it has a remembered default:
+    /// Average, the honest picture of a session's working sets.
+    static let starting: LiftMeasurement = .average
+
     /// Full label for pickers, e.g. "First Set". Neutral wording so it reads
     /// correctly for both weight and reps.
     var displayName: String {
