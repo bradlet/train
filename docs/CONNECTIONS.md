@@ -22,7 +22,7 @@ The app requests only the **`auth/drive.file`** scope. It gives access to just t
 | Client ID (`GIDClientID`) | `81188376099-3srh0cv25oblvnoukf7n6tvfqemosggn.apps.googleusercontent.com` |
 | Reversed scheme (`CFBundleURLSchemes`) | `com.googleusercontent.apps.81188376099-3srh0cv25oblvnoukf7n6tvfqemosggn` |
 
-> The app uses this client from the Train rename (#11) onward; `Train/Info.plist` holds `GIDClientID` and the reversed scheme. The old client in the `thompson-projects` GCP project (Testing mode, registered for `bradlet.Hybrid-AIthletics`) gets deleted once Train is verified on TestFlight (#11 Phase 5). Leave the `thompson-projects` project itself alone, because other things use it.
+> `Train/Info.plist` holds this client's `GIDClientID` and reversed scheme. It replaced an earlier Testing-mode client in another GCP project, which was deleted when the old app was retired (#11).
 
 ### Setup
 
