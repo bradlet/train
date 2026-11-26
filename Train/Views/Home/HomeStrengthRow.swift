@@ -22,6 +22,8 @@ struct HomeStrengthRow: View {
     /// The lane's short weekday name when the row is carried over from an
     /// earlier day this week ("Mon"); `nil` for today's lane.
     var carryoverDay: String? = nil
+    /// For a group card (#24): the member it offers or recorded this week.
+    var memberName: String? = nil
     /// Called when the row is tapped to record a session.
     let onRecord: () -> Void
 
@@ -36,9 +38,22 @@ struct HomeStrengthRow: View {
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(exercise.name)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
+                    HStack(spacing: 4) {
+                        Text(exercise.name)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                        if exercise.isGroup {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if let memberName {
+                        Text(memberName)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.primary)
+                            .accessibilityIdentifier("home.strengthMember.\(exercise.name)")
+                    }
                     HStack(spacing: 6) {
                         if let carryoverDay {
                             Text(carryoverDay)

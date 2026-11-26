@@ -20,6 +20,7 @@ struct StrengthTrainingView: View {
     @Environment(\.weekStartDay) private var weekStartDay
     @Query private var allExercises: [StrengthExercise]
     @Query private var allRecords: [StrengthRecord]
+    @Query(sort: \UserMovementGroup.createdAt) private var userGroups: [UserMovementGroup]
 
     /// The day column currently shown (Sunday=0 ... Saturday=6).
     @State private var selectedDay: Int = Date().weekdayIndex
@@ -31,12 +32,18 @@ struct StrengthTrainingView: View {
     @State private var plannedLog: PlannedDayLogResult?
     /// The card a session is being recorded from (nil = sheet hidden).
     @State private var recordingExercise: StrengthExercise?
+    /// The group editor, for "Edit Group" / "Make This a Group" (#24).
+    @State private var groupEdit: SlotGroupEdit?
     /// The "New best" banner after a save beats a lift's best.
     @State private var newBest: NewBestAnnouncement?
 
     var body: some View {
         let latestRecords = StrengthLiftRegistry.latestByLiftKey(allRecords)
         let weekRecords = StrengthWeek.recordsBySlot(allRecords, now: Date(), firstWeekday: weekStartDay)
+        let groups = movementGroups
+        let assignments = GroupRotation.assignments(
+            slots: allExercises, groups: groups, records: allRecords, now: Date(), firstWeekday: weekStartDay
+        )
         VStack(spacing: 0) {
             dayStrip
             Divider()
@@ -47,6 +54,8 @@ struct StrengthTrainingView: View {
                         allExercises: allExercises,
                         latestRecords: latestRecords,
                         weekRecords: weekRecords,
+                        assignments: assignments,
+                        onGroup: { slot in groupEdit = SlotGroupEdit(slot: slot, groups: groups) },
                         onRecord: { recordingExercise = $0 },
                         onAddExercise: { showLibrary = true },
                         onLogDay: {
@@ -84,8 +93,23 @@ struct StrengthTrainingView: View {
             }
         }
         .sheet(isPresented: $showLibrary) {
-            ExerciseLibrarySheet(provider: .withUserLibrary(container: modelContext.container)) { entry, plan in
-                addFromLibrary(entry, plan: plan)
+            ExerciseLibrarySheet(
+                provider: .withUserLibrary(container: modelContext.container),
+                onSelect: { entry, plan in addFromLibrary(entry, plan: plan) },
+                onSelectGroup: { group, plan in addGroup(group, plan: plan) }
+            )
+        }
+        .sheet(item: $groupEdit) { edit in
+            MovementGroupEditorSheet(
+                group: edit.group,
+                title: edit.slot.isGroup ? "Edit Group" : "Make a Group",
+                provider: .withUserLibrary(container: modelContext.container)
+            ) { group in
+                if edit.slot.isGroup {
+                    MovementGroupStore.save(group, in: modelContext)
+                } else {
+                    MovementGroupStore.assign(group, to: edit.slot, in: modelContext)
+                }
             }
         }
         .sheet(item: $recordingExercise) { exercise in
@@ -117,7 +141,7 @@ struct StrengthTrainingView: View {
         return StrengthDayColumn.AsPlannedAction(
             title: isToday ? "Done as planned" : "Done as planned · \(Calendar.current.shortWeekdaySymbols[dayIndex])",
             log: {
-                guard let result = PlannedDayLogger.log(lane, on: date, in: modelContext) else { return }
+                guard let result = PlannedDayLogger.log(lane, on: date, in: modelContext, firstWeekday: weekStartDay) else { return }
                 plannedLog = result
                 if !result.newBests.isEmpty { newBest = NewBestAnnouncement(liftNames: result.newBests) }
             },
@@ -217,6 +241,28 @@ struct StrengthTrainingView: View {
         }
     }
 
+    /// Every movement group, built-in and the athlete's, by id.
+    private var movementGroups: [String: MovementGroup] {
+        StrengthSlotResolver.byID(MovementGroupCatalog.merged(
+            builtIns: MovementGroupCatalog.bundled, user: userGroups.map(\.group)
+        ))
+    }
+
+    /// Adds a movement group to the end of the selected day's active plan.
+    /// Member lifts are created when first recorded.
+    private func addGroup(_ group: MovementGroup, plan: StrengthPlanDraft) {
+        let exercise = StrengthExercise(
+            name: group.name,
+            muscleGroup: group.muscleGroup,
+            weekdayIndex: selectedDay,
+            sortOrder: StrengthBoardPlanner.nextSortOrder(allExercises, day: selectedDay, offloaded: false),
+            plannedSets: plan.plannedSets,
+            plannedReps: plan.plannedReps,
+            groupID: group.id
+        )
+        withAnimation { modelContext.insert(exercise) }
+    }
+
     /// Resolves a dropped card ID and moves it via the board planner.
     private func handleDrop(id: UUID, day: Int, offloaded: Bool, target: StrengthExercise?) {
         guard let moving = allExercises.first(where: { $0.id == id }) else { return }
@@ -240,3 +286,22 @@ struct StrengthTrainingView: View {
         .modelContainer(ModelContainerFactory.makePreviewContainer())
 }
 
+
+/// A request to edit a card's group: its group, or a new one seeded from a
+/// single-lift card ("Make This a Group").
+struct SlotGroupEdit: Identifiable {
+    let id = UUID()
+    let slot: StrengthExercise
+    let group: MovementGroup
+
+    /// Builds the request from the card and the known groups.
+    init(slot: StrengthExercise, groups: [String: MovementGroup]) {
+        self.slot = slot
+        if let groupID = slot.groupID, let existing = groups[groupID] {
+            self.group = existing
+        } else {
+            let entry = MovementGroupCatalog.bundledLibrary.first { $0.id == slot.libraryExerciseID }
+            self.group = MovementGroupDraft.seed(from: slot, entry: entry)
+        }
+    }
+}

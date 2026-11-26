@@ -73,6 +73,9 @@ struct ExerciseLibrarySheet: View {
     /// Called with the chosen entry and its drafted plan; the caller creates
     /// the board exercise.
     let onSelect: (LibraryExercise, StrengthPlanDraft) -> Void
+    /// Called with a chosen movement group (#24) and its plan; `nil` hides
+    /// the Groups chip.
+    var onSelectGroup: ((MovementGroup, StrengthPlanDraft) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -81,6 +84,12 @@ struct ExerciseLibrarySheet: View {
     @State private var selectedGroup: MuscleGroup?
     @State private var loadFailed = false
     @State private var showCreateForm = false
+    /// Whether the Groups chip is selected (the list shows groups).
+    @State private var showingGroups = false
+    /// Built-in and athlete groups, loaded from the context.
+    @State private var groups: [MovementGroup] = []
+    /// The group being created or edited in the editor sheet.
+    @State private var editingGroup: GroupEditRequest?
 
     /// Entries matching the current search and group filter, grouped by
     /// primary muscle group.
@@ -108,7 +117,11 @@ struct ExerciseLibrarySheet: View {
                     VStack(spacing: 0) {
                         filterChips
                         Divider()
-                        libraryList
+                        if showingGroups {
+                            groupList
+                        } else {
+                            libraryList
+                        }
                     }
                 }
             }
@@ -119,16 +132,34 @@ struct ExerciseLibrarySheet: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showCreateForm = true
-                    } label: {
-                        Label("New Exercise", systemImage: "plus")
+                    if showingGroups {
+                        Button {
+                            editingGroup = GroupEditRequest(
+                                group: MovementGroup(id: MovementGroup.userPrefix + UUID().uuidString, name: "", members: []),
+                                title: "New Group"
+                            )
+                        } label: {
+                            Label("New Group", systemImage: "plus")
+                        }
+                        .accessibilityIdentifier("exerciseLibrary.newGroup")
+                    } else {
+                        Button {
+                            showCreateForm = true
+                        } label: {
+                            Label("New Exercise", systemImage: "plus")
+                        }
+                        .accessibilityIdentifier("exerciseLibrary.create")
                     }
-                    .accessibilityIdentifier("exerciseLibrary.create")
                 }
             }
             .sheet(isPresented: $showCreateForm, onDismiss: { Task { await load() } }) {
                 UserExerciseFormSheet()
+            }
+            .sheet(item: $editingGroup) { request in
+                MovementGroupEditorSheet(group: request.group, title: request.title, provider: provider) { edited in
+                    MovementGroupStore.save(edited, in: modelContext)
+                    loadGroups()
+                }
             }
         }
         .task { await load() }
@@ -136,12 +167,22 @@ struct ExerciseLibrarySheet: View {
 
     /// Loads (or reloads) the library entries from the provider.
     private func load() async {
+        loadGroups()
         do {
             exercises = try await provider.loadExercises()
             loadFailed = exercises.isEmpty
         } catch {
             loadFailed = true
         }
+    }
+
+    /// Reloads the groups from the context (after an edit).
+    private func loadGroups() {
+        groups = Array(StrengthSlotResolver.groups(in: modelContext).values)
+            .sorted { lhs, rhs in
+                if lhs.isBuiltIn != rhs.isBuiltIn { return lhs.isBuiltIn }
+                return lhs.name < rhs.name
+            }
     }
 
     // MARK: - Muscle Group Filter
@@ -152,6 +193,9 @@ struct ExerciseLibrarySheet: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 filterChip(nil, label: "All")
+                if onSelectGroup != nil {
+                    groupsChip
+                }
                 ForEach(availableGroups) { group in
                     filterChip(group, label: group.rawValue)
                 }
@@ -167,10 +211,11 @@ struct ExerciseLibrarySheet: View {
     ///   - group: The group the chip selects, or `nil` for the "All" chip.
     ///   - label: Chip text.
     private func filterChip(_ group: MuscleGroup?, label: String) -> some View {
-        let isSelected = selectedGroup == group
+        let isSelected = !showingGroups && selectedGroup == group
         let accent = group?.color ?? .blue
         return Button {
             withAnimation(.easeInOut(duration: 0.15)) {
+                showingGroups = false
                 selectedGroup = isSelected ? nil : group
             }
         } label: {
@@ -186,6 +231,60 @@ struct ExerciseLibrarySheet: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("exerciseLibrary.filter.\(group?.rawValue ?? "All")")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// The "Groups" chip: switches the list to movement groups.
+    private var groupsChip: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) { showingGroups.toggle() }
+        } label: {
+            Label("Groups", systemImage: "arrow.triangle.2.circlepath")
+                .font(.caption.bold())
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(showingGroups ? Color.indigo : Color.indigo.opacity(0.12)))
+                .foregroundStyle(showingGroups ? .white : .indigo)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("exerciseLibrary.filter.Groups")
+        .accessibilityAddTraits(showingGroups ? .isSelected : [])
+    }
+
+    // MARK: - Groups
+
+    /// Movement groups, searchable by name or member.
+    private var groupList: some View {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        let shown = groups.filter { group in
+            query.isEmpty || group.name.localizedCaseInsensitiveContains(query)
+                || group.members.contains { $0.name.localizedCaseInsensitiveContains(query) }
+        }
+        return List(shown) { group in
+            NavigationLink {
+                MovementGroupDetailView(group: group) { plan in
+                    onSelectGroup?(group, plan)
+                    dismiss()
+                } onEdit: {
+                    editingGroup = GroupEditRequest(group: group, title: "Edit Group")
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(group.name).font(.subheadline.bold())
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(group.members.map(\.name).joined(separator: ", "))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            .accessibilityIdentifier("exerciseLibrary.group.\(group.name)")
+        }
+        .searchable(text: $searchText, prompt: "Search groups")
+        .accessibilityIdentifier("exerciseLibrary.groupList")
     }
 
     // MARK: - List
@@ -265,6 +364,74 @@ struct ExerciseLibrarySheet: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - Group detail
+
+/// A request to open the group editor.
+struct GroupEditRequest: Identifiable {
+    let id = UUID()
+    let group: MovementGroup
+    let title: String
+}
+
+/// One movement group: its members and rotation, a sets × reps plan, and
+/// Add — a group lands on a day exactly like a single lift.
+struct MovementGroupDetailView: View {
+    let group: MovementGroup
+    /// Called with the drafted plan when the user adds the group.
+    let onAdd: (StrengthPlanDraft) -> Void
+    /// Opens the editor.
+    let onEdit: () -> Void
+
+    @State private var plan = StrengthPlanDraft()
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(group.members) { member in
+                    HStack {
+                        Text(member.name)
+                        Spacer()
+                        if group.pausedLiftKeys.contains(member.liftKey) {
+                            Text("Paused").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Text("Members")
+            } footer: {
+                Text("The board offers the least-recently-done member each session. Tap a card's member to swap on the day.")
+            }
+            Section("Rotation") {
+                LabeledContent("Mode", value: group.rotationMode.displayName)
+                if group.rotationMode == .onePerBlock {
+                    LabeledContent("Block length", value: "\(group.blockWeeks) weeks")
+                }
+                if let pattern = group.pattern {
+                    LabeledContent("Pattern", value: pattern.displayName)
+                }
+            }
+            StrengthPlanFields(draft: $plan)
+            Section {
+                Button {
+                    onAdd(plan)
+                } label: {
+                    Label("Add to This Day", systemImage: "plus.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .accessibilityIdentifier("exerciseLibrary.addGroup")
+            }
+        }
+        .navigationTitle(group.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Edit", action: onEdit)
+                    .accessibilityIdentifier("exerciseLibrary.editGroup")
+            }
         }
     }
 }

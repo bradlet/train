@@ -38,6 +38,11 @@ struct StrengthExerciseCard: View {
     /// This card's latest record in the current week, if any (see
     /// `StrengthWeek.recordsBySlot`). Shown as a ✓ in place of `latestRecord`.
     var weekRecord: StrengthRecord? = nil
+    /// For a group card (#24): the member it offers (or recorded this week).
+    var assignment: GroupAssignment? = nil
+    /// Opens the group editor ("Edit Group" on a group card, "Make This a
+    /// Group" on a single-lift card); `nil` hides the item.
+    var onGroup: (() -> Void)? = nil
     /// Called when the user taps the card to record a session.
     let onRecord: () -> Void
     /// Called when the user picks a destination day from the context menu.
@@ -70,6 +75,12 @@ struct StrengthExerciseCard: View {
                         .foregroundStyle(.primary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
+                    if exercise.isGroup {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.caption.bold())
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Movement group")
+                    }
                     Spacer(minLength: 0)
                     if weekRecord != nil {
                         Image(systemName: "checkmark.circle.fill")
@@ -78,6 +89,13 @@ struct StrengthExerciseCard: View {
                             .accessibilityLabel("Done this week")
                             .accessibilityIdentifier("strengthCard.weekCheck.\(exercise.name)")
                     }
+                }
+                if let assignment {
+                    Text(memberLine(assignment))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(assignment.isRecorded ? Color.green : Color.primary)
+                        .lineLimit(1)
+                        .accessibilityIdentifier("strengthCard.member.\(exercise.name)")
                 }
                 HStack(spacing: 6) {
                     Text(exercise.muscleGroup.rawValue)
@@ -132,6 +150,14 @@ struct StrengthExerciseCard: View {
             Button { showPlanEditor = true } label: {
                 Label("Edit Plan", systemImage: "list.number")
             }
+            if let onGroup {
+                Button(action: onGroup) {
+                    Label(
+                        exercise.isGroup ? "Edit Group" : "Make This a Group",
+                        systemImage: "arrow.triangle.2.circlepath"
+                    )
+                }
+            }
             Menu {
                 ForEach(0..<7, id: \.self) { dayIndex in
                     Button(Calendar.current.weekdaySymbols[dayIndex]) {
@@ -164,6 +190,14 @@ struct StrengthExerciseCard: View {
         } message: {
             Text("The card is removed from the board. Its recorded history stays with the lift.")
         }
+    }
+
+    /// The group card's member line: "Up next: Incline Dumbbell Press",
+    /// "Block 2: Dumbbell Bench", or the member done this week.
+    private func memberLine(_ assignment: GroupAssignment) -> String {
+        if assignment.isRecorded { return assignment.member.name }
+        if let block = assignment.heldBlock { return "Block \(block): \(assignment.member.name)" }
+        return "Up next: \(assignment.member.name)"
     }
 
     /// One-line summary of the latest record, e.g. "185 lb · Max · Jun 12"

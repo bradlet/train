@@ -189,6 +189,16 @@ enum UITestFixtures {
             sortOrder: 0
         ))
 
+        // A movement-group card (#24) on tomorrow's lane, planning the
+        // built-in Chest Press group.
+        context.insert(StrengthExercise(
+            name: "Chest Press",
+            muscleGroup: .chest,
+            weekdayIndex: otherDay,
+            sortOrder: 1,
+            groupID: "group-chest-press"
+        ))
+
         context.insert(StrengthExercise(
             name: "Test Missed Lift",
             muscleGroup: .hamstrings,

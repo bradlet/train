@@ -23,6 +23,10 @@ struct StrengthDayColumn: View {
     /// This week's latest record per card (see `StrengthWeek.recordsBySlot`),
     /// for each card's ✓.
     var weekRecords: [UUID: StrengthRecord] = [:]
+    /// Each group card's member (#24, `GroupRotation.assignments`).
+    var assignments: [UUID: GroupAssignment] = [:]
+    /// Opens the group editor for a card.
+    var onGroup: ((StrengthExercise) -> Void)? = nil
     /// Called when the user taps a card to record a weight entry.
     let onRecord: (StrengthExercise) -> Void
     /// Called when the user taps the add button to open the exercise library.
@@ -146,8 +150,10 @@ struct StrengthDayColumn: View {
                 ForEach(exercises) { exercise in
                     StrengthExerciseCard(
                         exercise: exercise,
-                        latestRecord: latestRecords[exercise.liftKey],
+                        latestRecord: latestRecords[assignments[exercise.id]?.member.liftKey ?? exercise.liftKey],
                         weekRecord: weekRecords[exercise.id],
+                        assignment: assignments[exercise.id],
+                        onGroup: onGroup.map { handler in { handler(exercise) } },
                         onRecord: { onRecord(exercise) },
                         onMoveToDay: { day in onMoveToDay(exercise, day) },
                         onToggleOffloaded: {

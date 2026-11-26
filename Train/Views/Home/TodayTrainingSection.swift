@@ -23,6 +23,8 @@ struct TodayTrainingSection: View {
     /// Active cards from earlier days this week with no record yet
     /// (`StrengthWeek.carryover`).
     var carryover: [StrengthExercise] = []
+    /// Each group card's member (#24).
+    var groupAssignments: [UUID: GroupAssignment] = [:]
     /// Called to record (or re-open) an aerobic exercise.
     let onRecordAerobic: (Exercise) -> Void
     /// Called to edit an aerobic exercise's plan or recorded data.
@@ -70,8 +72,9 @@ struct TodayTrainingSection: View {
                         ForEach(strength) { exercise in
                             HomeStrengthRow(
                                 exercise: exercise,
-                                latestRecord: latestStrengthRecords[exercise.liftKey],
-                                weekRecord: weekStrengthRecords[exercise.id]
+                                latestRecord: latestStrengthRecords[liftKey(for: exercise)],
+                                weekRecord: weekStrengthRecords[exercise.id],
+                                memberName: groupAssignments[exercise.id]?.member.name
                             ) {
                                 onRecordStrength(exercise)
                             }
@@ -87,6 +90,12 @@ struct TodayTrainingSection: View {
     }
 
     // MARK: - Subviews
+
+    /// The lift a row's value comes from: a group card's member, else the
+    /// card's own lift.
+    private func liftKey(for exercise: StrengthExercise) -> String {
+        groupAssignments[exercise.id]?.member.liftKey ?? exercise.liftKey
+    }
 
     /// "Strength", plus the one-tap "Log lifts as planned" button.
     private var strengthHeader: some View {
@@ -129,8 +138,9 @@ struct TodayTrainingSection: View {
             ForEach(carryover) { exercise in
                 HomeStrengthRow(
                     exercise: exercise,
-                    latestRecord: latestStrengthRecords[exercise.liftKey],
-                    carryoverDay: Calendar.current.shortWeekdaySymbols[exercise.weekdayIndex]
+                    latestRecord: latestStrengthRecords[liftKey(for: exercise)],
+                    carryoverDay: Calendar.current.shortWeekdaySymbols[exercise.weekdayIndex],
+                    memberName: groupAssignments[exercise.id]?.member.name
                 ) {
                     onRecordStrength(exercise)
                 }

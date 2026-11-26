@@ -357,7 +357,7 @@ struct ModelContainerFactoryTests {
         let names = Set(ModelContainerFactory.modelTypes.map { String(describing: $0) })
         #expect(names == [
             "Exercise", "StrengthExercise", "StrengthLift", "StrengthRecord",
-            "UserLibraryExercise", "FavoriteWorkout", "AppConfiguration",
+            "UserLibraryExercise", "UserMovementGroup", "FavoriteWorkout", "AppConfiguration",
         ])
     }
 
@@ -5471,6 +5471,414 @@ struct PlannedDayLoggerTests {
     @Test func messageIsSingularForOneLift() {
         let one = PlannedDayLogResult(recordIDs: [UUID()], slotIDs: [], date: thursday, newBests: [])
         #expect(one.message == "Logged 1 lift")
+    }
+}
+
+// MARK: - MovementGroup Tests
+
+struct MovementGroupTests {
+
+    private func entry(_ id: String, _ pattern: MovementPattern? = .horizontalPush, metric: LiftMetric = .weight) -> LibraryExercise {
+        LibraryExercise(id: id, name: id.capitalized, details: "", muscleGroup: .chest, equipment: "", difficulty: "Beginner", primaryMetric: metric, pattern: pattern)
+    }
+
+    @Test func libraryPatternDecodesTolerantly() throws {
+        let json = #"[{"id":"a","name":"A","description":"","muscleGroup":"Chest","equipment":"","difficulty":"Beginner","pattern":"hinge"},"#
+            + #"{"id":"b","name":"B","description":"","muscleGroup":"Chest","equipment":"","difficulty":"Beginner","pattern":"teleport"},"#
+            + #"{"id":"c","name":"C","description":"","muscleGroup":"Chest","equipment":"","difficulty":"Beginner"}]"#
+        let decoded = try JSONDecoder().decode([LibraryExercise].self, from: Data(json.utf8))
+        #expect(decoded.map(\.pattern) == [.hinge, nil, nil])
+    }
+
+    @Test func catalogResolvesMembersAndDropsUnknownOnes() {
+        let definitions = [
+            BundledMovementGroup(id: "group-press", name: "Press", pattern: "horizontal push", memberIDs: ["bench", "ghost", "push-up"]),
+            BundledMovementGroup(id: "group-empty", name: "Empty", pattern: "hinge", memberIDs: ["ghost"]),
+        ]
+        let groups = MovementGroupCatalog.groups(from: definitions, library: [entry("bench"), entry("push-up", metric: .reps)])
+        #expect(groups.map(\.id) == ["group-press"], "a group with no known members is dropped")
+        #expect(groups[0].members.map(\.libraryID) == ["bench", "push-up"])
+        #expect(groups[0].members[1].primaryMetric == .reps)
+        #expect(groups[0].pattern == .horizontalPush)
+        #expect(groups[0].isBuiltIn)
+    }
+
+    @Test func bundledCatalogShipsTheDesignedGroups() {
+        let groups = MovementGroupCatalog.bundled
+        #expect(groups.count == 10)
+        let chest = groups.first { $0.id == "group-chest-press" }
+        #expect(chest?.members.count == 6, "every built-in member exists in the library")
+        #expect(groups.allSatisfy { group in group.members.allSatisfy { _ in group.pattern != nil } })
+        #expect(groups.first { $0.id == "group-power" }?.members.contains { $0.libraryID == "box-jump" } == true)
+    }
+
+    @Test func userRowsOverrideBuiltInsAndAddTheirOwn() {
+        let builtIn = MovementGroup(id: "group-row", name: "Row", members: [GroupMember(entry("row"))])
+        var edited = builtIn
+        edited.name = "My Row"
+        let own = MovementGroup(id: "user-group-1", name: "Arms", members: [GroupMember(entry("curl"))])
+        let merged = MovementGroupCatalog.merged(builtIns: [builtIn], user: [own, edited])
+        #expect(merged.map(\.name) == ["My Row", "Arms"])
+    }
+
+    @Test func activeMembersSkipPausedButNeverEmpty() {
+        var group = MovementGroup(id: "g", name: "G", members: [GroupMember(entry("a")), GroupMember(entry("b"))])
+        group.pausedLiftKeys = ["a"]
+        #expect(group.activeMembers.map(\.libraryID) == ["b"])
+        group.pausedLiftKeys = ["a", "b"]
+        #expect(group.activeMembers.count == 2)
+    }
+
+    @Test func userRowRoundTripsAndPersists() throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        var group = MovementGroup(id: "user-group-x", name: "Press", pattern: .verticalPush,
+                                  members: [GroupMember(entry("ohp")), GroupMember(entry("push-press"))])
+        group.pausedLiftKeys = ["ohp"]
+        group.rotationMode = .onePerBlock
+        group.blockWeeks = 3
+        group.heldLiftKey = "push-press"
+        group.heldBlockIndex = 2
+        context.insert(UserMovementGroup(group))
+        try context.save()
+        let fetched = try ModelContext(container).fetch(FetchDescriptor<UserMovementGroup>())
+        #expect(fetched.count == 1)
+        #expect(fetched[0].group == group)
+    }
+
+    @Test func userRowDefaults() {
+        let row = UserMovementGroup(MovementGroup(id: "user-group-y", name: "", members: []))
+        #expect(row.group.rotationMode == .shuffleWithinBlock)
+        #expect(row.group.blockWeeks == 4)
+        #expect(row.group.members.isEmpty)
+        #expect(row.group.pausedLiftKeys.isEmpty)
+    }
+
+    @Test func slotGroupIDDefaultsToNil() {
+        #expect(StrengthExercise(name: "Bench").groupID == nil)
+        #expect(!StrengthExercise(name: "Bench").isGroup)
+        #expect(StrengthExercise(name: "Press", groupID: "group-chest-press").isGroup)
+    }
+}
+
+// MARK: - GroupRotation Tests
+
+struct GroupRotationTests {
+
+    /// Thursday 2026-11-26, mid-afternoon; Monday-start week Nov 23–29.
+    private let thursday = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 15))!
+
+    private func day(_ dayOfMonth: Int, month: Int = 11) -> Date {
+        Calendar.current.date(from: DateComponents(year: 2026, month: month, day: dayOfMonth, hour: 9))!
+    }
+
+    private func member(_ id: String) -> GroupMember {
+        GroupMember(libraryID: id, name: id.capitalized, muscleGroup: .chest, primaryMetric: .weight)
+    }
+
+    private var press: MovementGroup {
+        MovementGroup(id: "group-press", name: "Press", members: ["bench", "incline", "machine"].map(member))
+    }
+
+    private func card(lane: Int, order: Int = 0, offloaded: Bool = false, group: String = "group-press") -> StrengthExercise {
+        StrengthExercise(name: "Press", weekdayIndex: lane, isOffloaded: offloaded, sortOrder: order, groupID: group)
+    }
+
+    private func done(_ key: String, on date: Date, slot: StrengthExercise? = nil) -> StrengthRecord {
+        StrengthRecord(liftKey: key, slotID: slot?.id, date: date, value: 100, metric: .weight, measurement: .average)
+    }
+
+    private func assign(_ slots: [StrengthExercise], _ groups: [MovementGroup], _ records: [StrengthRecord]) -> [UUID: GroupAssignment] {
+        GroupRotation.assignments(
+            slots: slots,
+            groups: Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) }),
+            records: records,
+            now: thursday,
+            firstWeekday: 2
+        )
+    }
+
+    @Test func neverDoneMembersComeFirstInOrder() {
+        let monday = card(lane: 1)
+        #expect(assign([monday], [press], [])[monday.id]?.member.libraryID == "bench")
+    }
+
+    @Test func theLeastRecentlyDoneMemberIsUpNext() {
+        let monday = card(lane: 5)
+        let records = [done("bench", on: day(10)), done("incline", on: day(3)), done("machine", on: day(17))]
+        #expect(assign([monday], [press], records)[monday.id]?.member.libraryID == "incline")
+    }
+
+    @Test func historyOutsideTheGroupCounts() {
+        // A standalone bench last week (no slot) still makes bench recent.
+        let friday = card(lane: 5)
+        let records = [done("bench", on: day(20)), done("incline", on: day(10)), done("machine", on: day(12))]
+        #expect(assign([friday], [press], records)[friday.id]?.member.libraryID == "incline")
+    }
+
+    @Test func eachDayOfTheWeekGetsADifferentMember() {
+        let monday = card(lane: 1)
+        let thursdayCard = card(lane: 4)
+        let saturday = card(lane: 6)
+        let result = assign([saturday, thursdayCard, monday], [press], [])
+        #expect(result[monday.id]?.member.libraryID == "bench")
+        #expect(result[thursdayCard.id]?.member.libraryID == "incline")
+        #expect(result[saturday.id]?.member.libraryID == "machine")
+    }
+
+    @Test func aRecordedCardShowsWhatWasDoneAndClaimsIt() {
+        // Monday's card recorded machine this week: Thursday's skips machine.
+        let monday = card(lane: 1)
+        let thursdayCard = card(lane: 4)
+        let records = [done("machine", on: day(23), slot: monday)]
+        let result = assign([monday, thursdayCard], [press], records)
+        #expect(result[monday.id] == GroupAssignment(member: member("machine"), isRecorded: true, heldBlock: nil))
+        #expect(result[thursdayCard.id]?.member.libraryID == "bench")
+        #expect(result[thursdayCard.id]?.isRecorded == false)
+    }
+
+    @Test func pausedMembersDropOut() {
+        var group = press
+        group.pausedLiftKeys = ["bench"]
+        let monday = card(lane: 1)
+        #expect(assign([monday], [group], [])[monday.id]?.member.libraryID == "incline")
+    }
+
+    @Test func moreCardsThanMembersWrapAround() {
+        let one = MovementGroup(id: "group-press", name: "Press", members: [member("bench")])
+        let monday = card(lane: 1)
+        let friday = card(lane: 5)
+        let result = assign([monday, friday], [one], [])
+        #expect(result[monday.id]?.member.libraryID == "bench")
+        #expect(result[friday.id]?.member.libraryID == "bench", "a group of one behaves like a normal card")
+    }
+
+    @Test func offloadedCardsDoNotClaimMembers() {
+        let parked = card(lane: 1, offloaded: true)
+        let friday = card(lane: 5)
+        let result = assign([parked, friday], [press], [])
+        #expect(result[parked.id]?.member.libraryID == "bench")
+        #expect(result[friday.id]?.member.libraryID == "bench")
+    }
+
+    @Test func singleLiftCardsAndUnknownGroupsAreSkipped() {
+        let single = StrengthExercise(name: "Curl", weekdayIndex: 1)
+        let orphan = card(lane: 2, group: "group-gone")
+        #expect(assign([single, orphan], [press], []).isEmpty)
+    }
+
+    // MARK: One member per block
+
+    private func blockGroup(anchor: Date, weeks: Int = 4) -> MovementGroup {
+        var group = press
+        group.rotationMode = .onePerBlock
+        group.blockWeeks = weeks
+        group.blockAnchor = anchor
+        return group
+    }
+
+    @Test func blockIndexCountsWholeBlocksFromTheAnchorWeek() {
+        // Anchored the week of Oct 26 (Mon); Nov 26 is 4 weeks + 3 days later.
+        let group = blockGroup(anchor: day(29, month: 10))
+        #expect(GroupRotation.blockIndex(for: group, now: thursday, firstWeekday: 2) == 1)
+        #expect(GroupRotation.blockIndex(for: blockGroup(anchor: day(29, month: 10), weeks: 2), now: thursday, firstWeekday: 2) == 2)
+        #expect(GroupRotation.blockIndex(for: press, now: thursday, firstWeekday: 2) == 0, "no anchor is block 0")
+        #expect(GroupRotation.blockStart(1, for: group, now: thursday, firstWeekday: 2) == Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 23))!)
+    }
+
+    @Test func theBlockHoldsOneMemberOnEveryCard() {
+        let group = blockGroup(anchor: day(23))
+        let monday = card(lane: 1)
+        let friday = card(lane: 5)
+        let result = assign([monday, friday], [group], [])
+        #expect(result[monday.id]?.member.libraryID == "bench")
+        #expect(result[friday.id]?.member.libraryID == "bench", "within-week variety is off")
+        #expect(result[friday.id]?.heldBlock == 1)
+    }
+
+    @Test func recordsInsideTheBlockDoNotMoveTheHold() {
+        // Bench was done Monday of this block; it stays held all block.
+        let group = blockGroup(anchor: day(23))
+        let friday = card(lane: 5)
+        let records = [done("incline", on: day(10)), done("machine", on: day(12)), done("bench", on: day(23))]
+        #expect(assign([friday], [group], records)[friday.id]?.member.libraryID == "bench")
+    }
+
+    @Test func theNextBlockRotatesToTheLeastRecentlyDone() {
+        // Block 2 starts Nov 23; before it, bench was most recent.
+        let group = blockGroup(anchor: day(26, month: 10))
+        let friday = card(lane: 5)
+        let records = [done("bench", on: day(20)), done("incline", on: day(5)), done("machine", on: day(12))]
+        #expect(assign([friday], [group], records)[friday.id]?.member.libraryID == "incline")
+    }
+
+    @Test func holdThisOneInsteadAppliesToItsBlockOnly() {
+        var group = blockGroup(anchor: day(23))
+        group.heldLiftKey = "machine"
+        group.heldBlockIndex = 0
+        let friday = card(lane: 5)
+        #expect(assign([friday], [group], [])[friday.id]?.member.libraryID == "machine")
+        group.heldBlockIndex = 1
+        #expect(assign([friday], [group], [])[friday.id]?.member.libraryID == "bench", "a stale override is ignored")
+    }
+}
+
+// MARK: - MovementGroupDraft Tests
+
+struct MovementGroupDraftTests {
+
+    private func entry(_ id: String, _ pattern: MovementPattern?) -> LibraryExercise {
+        LibraryExercise(id: id, name: id.capitalized, details: "", muscleGroup: .chest, equipment: "", difficulty: "Beginner", pattern: pattern)
+    }
+
+    @Test func saveNeedsANameAndAMember() {
+        var group = MovementGroup(id: "g", name: " ", members: [])
+        #expect(!MovementGroupDraft.canSave(group))
+        group.name = "Press"
+        #expect(!MovementGroupDraft.canSave(group))
+        group.members = [GroupMember(entry("bench", .horizontalPush))]
+        #expect(MovementGroupDraft.canSave(group))
+    }
+
+    @Test func candidatesPutTheSamePatternFirstAndSkipMembers() {
+        let library = [entry("zebra-press", .horizontalPush), entry("curl", nil), entry("bench", .horizontalPush), entry("apple-row", .horizontalPull)]
+        let group = MovementGroup(id: "g", name: "Press", pattern: .horizontalPush, members: [GroupMember(entry("bench", .horizontalPush))])
+        #expect(MovementGroupDraft.candidates(library, for: group).map(\.id) == ["zebra-press", "apple-row", "curl"])
+        #expect(MovementGroupDraft.candidates(library, for: group, searchText: "ROW").map(\.id) == ["apple-row"])
+    }
+
+    @Test func switchingToOnePerBlockAnchorsAndClearsTheOverride() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        var group = MovementGroup(id: "g", name: "G", members: [])
+        group.heldLiftKey = "bench"
+        group.heldBlockIndex = 3
+        MovementGroupDraft.setRotation(.onePerBlock, on: &group, now: now)
+        #expect(group.rotationMode == .onePerBlock)
+        #expect(group.blockAnchor == now)
+        #expect(group.heldLiftKey == nil)
+        MovementGroupDraft.setRotation(.onePerBlock, on: &group, now: now.addingTimeInterval(99))
+        #expect(group.blockAnchor == now, "re-choosing the same mode keeps the anchor")
+        MovementGroupDraft.setRotation(.shuffleWithinBlock, on: &group)
+        #expect(group.rotationMode == .shuffleWithinBlock)
+    }
+
+    @Test func togglePausedPausesAndResumes() {
+        var group = MovementGroup(id: "g", name: "G", members: [])
+        MovementGroupDraft.togglePaused("bench", in: &group)
+        #expect(group.pausedLiftKeys == ["bench"])
+        MovementGroupDraft.togglePaused("bench", in: &group)
+        #expect(group.pausedLiftKeys.isEmpty)
+    }
+
+    @Test func seedUsesTheCardsLiftAndTheBuiltInNameForItsPattern() {
+        let bench = MovementGroupCatalog.bundledLibrary.first { $0.id == "barbell-bench-press" }
+        let slot = StrengthExercise(name: "Barbell Bench Press", libraryExerciseID: "barbell-bench-press", muscleGroup: .chest)
+        let group = MovementGroupDraft.seed(from: slot, entry: bench)
+        #expect(group.name == "Chest Press")
+        #expect(group.pattern == .horizontalPush)
+        #expect(group.members.map(\.liftKey) == [slot.liftKey], "the card's history carries into the group")
+        #expect(group.id.hasPrefix(MovementGroup.userPrefix))
+
+        let custom = StrengthExercise(name: "Landmine Press", muscleGroup: .shoulders)
+        let seeded = MovementGroupDraft.seed(from: custom, entry: nil)
+        #expect(seeded.name == "Landmine Press")
+        #expect(seeded.members.first?.liftKey == custom.liftKey)
+    }
+}
+
+// MARK: - StrengthSlotResolver Tests
+
+struct StrengthSlotResolverTests {
+
+    @Test func singleCardsTargetTheirOwnLift() {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let bench = StrengthExercise(name: "Bench", libraryExerciseID: "barbell-bench-press")
+        context.insert(bench)
+        let target = StrengthSlotResolver.target(for: bench, in: context, firstWeekday: 2)
+        #expect(target == LiftTarget(slot: bench))
+        #expect(target.liftKey == "barbell-bench-press")
+    }
+
+    @Test func groupCardsTargetTheirUpNextMember() {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let card = StrengthExercise(name: "Chest Press", weekdayIndex: 1, groupID: "group-chest-press")
+        context.insert(card)
+        // Bench was done, so the next never-done member comes up.
+        context.insert(StrengthRecord(liftKey: "barbell-bench-press", date: Date(), value: 185))
+        let target = StrengthSlotResolver.target(for: card, in: context, firstWeekday: 2)
+        #expect(target.liftKey == "incline-barbell-bench-press")
+        #expect(target.name == "Incline Barbell Bench Press")
+    }
+
+    @Test func anEditedBuiltInWins() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        var edited = try #require(MovementGroupCatalog.bundled.first { $0.id == "group-chest-press" })
+        edited.pausedLiftKeys = ["barbell-bench-press"]
+        MovementGroupStore.save(edited, in: context)
+        let card = StrengthExercise(name: "Chest Press", weekdayIndex: 1, groupID: "group-chest-press")
+        context.insert(card)
+        #expect(StrengthSlotResolver.target(for: card, in: context, firstWeekday: 2).liftKey == "incline-barbell-bench-press")
+    }
+
+    @Test func groupMembersGetTheirLibraryMetricWhenCreated() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let member = try #require(MovementGroupCatalog.bundled.first { $0.id == "group-core" }?.members.first)
+        #expect(member.libraryID == "plank")
+        let lift = StrengthLiftRegistry.findOrCreate(for: LiftTarget(member: member), metric: member.primaryMetric, in: context)
+        #expect(lift.primaryMetric == .time)
+        #expect(StrengthPrefill.resolve(for: LiftTarget(member: member), in: context).metric == .time)
+    }
+}
+
+// MARK: - MovementGroupStore Tests
+
+struct MovementGroupStoreTests {
+
+    @Test func savingABuiltInCopiesItOnceAndUpdatesInPlace() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        var group = try #require(MovementGroupCatalog.bundled.first { $0.id == "group-row" })
+        group.name = "Rows"
+        MovementGroupStore.save(group, in: context)
+        group.name = "My Rows"
+        MovementGroupStore.save(group, in: context)
+        let rows = try context.fetch(FetchDescriptor<UserMovementGroup>())
+        #expect(rows.count == 1)
+        #expect(rows[0].group.name == "My Rows")
+        #expect(StrengthSlotResolver.groups(in: context)["group-row"]?.name == "My Rows")
+    }
+
+    @Test func savingRenamesTheGroupsCards() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let card = StrengthExercise(name: "Row", groupID: "group-row")
+        context.insert(card)
+        var group = try #require(MovementGroupCatalog.bundled.first { $0.id == "group-row" })
+        group.name = "Pulls"
+        MovementGroupStore.save(group, in: context)
+        #expect(card.name == "Pulls")
+    }
+
+    @Test func assignTurnsACardIntoAGroupCard() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let card = StrengthExercise(name: "Barbell Bench Press", libraryExerciseID: "barbell-bench-press", muscleGroup: .chest)
+        context.insert(card)
+        let group = MovementGroupDraft.seed(from: card, entry: MovementGroupCatalog.bundledLibrary.first { $0.id == "barbell-bench-press" })
+        MovementGroupStore.assign(group, to: card, in: context)
+        #expect(card.groupID == group.id)
+        #expect(card.name == "Chest Press")
+        #expect(card.libraryExerciseID == nil)
+        #expect(try context.fetch(FetchDescriptor<UserMovementGroup>()).count == 1)
+    }
+
+    @Test func revertDeletesOnlyBuiltInCopies() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let builtIn = try #require(MovementGroupCatalog.bundled.first)
+        MovementGroupStore.save(builtIn, in: context)
+        let own = MovementGroup(id: MovementGroup.userPrefix + "x", name: "Mine", members: builtIn.members)
+        MovementGroupStore.save(own, in: context)
+        MovementGroupStore.revert(builtIn.id, in: context)
+        MovementGroupStore.revert(own.id, in: context)
+        let left = try context.fetch(FetchDescriptor<UserMovementGroup>()).map(\.groupID)
+        #expect(left == [own.id])
     }
 }
 

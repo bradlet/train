@@ -25,6 +25,7 @@ struct HomeView: View {
     @Query private var allExercises: [Exercise]
     @Query private var allStrengthExercises: [StrengthExercise]
     @Query private var allStrengthRecords: [StrengthRecord]
+    @Query(sort: \UserMovementGroup.createdAt) private var userGroups: [UserMovementGroup]
     @Query(sort: [SortDescriptor(\FavoriteWorkout.sortOrder), SortDescriptor(\FavoriteWorkout.createdAt)])
     private var favorites: [FavoriteWorkout]
 
@@ -114,6 +115,15 @@ struct HomeView: View {
                         ),
                         carryover: StrengthWeek.carryover(
                             allStrengthExercises, records: allStrengthRecords, now: Date(), firstWeekday: weekStartDay
+                        ),
+                        groupAssignments: GroupRotation.assignments(
+                            slots: allStrengthExercises,
+                            groups: StrengthSlotResolver.byID(MovementGroupCatalog.merged(
+                                builtIns: MovementGroupCatalog.bundled, user: userGroups.map(\.group)
+                            )),
+                            records: allStrengthRecords,
+                            now: Date(),
+                            firstWeekday: weekStartDay
                         ),
                         onRecordAerobic: { recordingExercise = $0 },
                         onEditAerobic: { exercise in
@@ -453,7 +463,7 @@ struct HomeView: View {
 
     /// One tap: logs today's unrecorded lifts as planned (strength only).
     private func logTodayAsPlanned() {
-        guard let result = PlannedDayLogger.log(todayStrength, on: Date(), in: modelContext) else { return }
+        guard let result = PlannedDayLogger.log(todayStrength, on: Date(), in: modelContext, firstWeekday: weekStartDay) else { return }
         plannedLog = result
         if !result.newBests.isEmpty { newBest = NewBestAnnouncement(liftNames: result.newBests) }
     }
