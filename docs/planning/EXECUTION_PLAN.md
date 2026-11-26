@@ -15,7 +15,7 @@ One ordered path through everything planned on 2026-11-24. Do one step at a time
    4. publish to App Store Connect and TestFlight
    5. decommission the old app and repo
 
-   CloudKit is now on (development only). Deploying the *production* schema and checking two-device sync is **#30**. Production schemas can only be added to, so the model changes in #13 should land before #30.
+   CloudKit syncs in Debug builds only (development environment); Release and TestFlight builds are local-only. Deploying the *production* schema is **#30**, deliberately held to the end of the plan (step 19).
 
 ### B. Foundation
 3. **#12** App structure: Home · Cardio (Plan | Progress) · Strength (Plan | Progress). History becomes Cardio → Progress. Docs: [README](README.md), [PROGRESS_VIEWS](PROGRESS_VIEWS.md)
@@ -46,8 +46,11 @@ This is an independent track. It can run in parallel with any step after step 4,
 16. **#23** Connections dashboard, sync status, CSV auto-export. Doc: [CONNECTIONS](CONNECTIONS.md)
 17. **#22** Garmin import: FIT files first, the API later. Doc: [CONNECTIONS](CONNECTIONS.md)
 
-### H. Next brainstorm
-18. **Pick the next ideas** from [STRENGTH_IDEAS](STRENGTH_IDEAS.md): S8 self-maintaining board, S2 priority trim, S6 longevity check-ins, S7 power, S3 hybrid load. Design each one, then file an issue for it.
+### H. Release readiness
+19. **#30** Deploy the CloudKit production schema and verify two-device sync. **Held on purpose (2026-11-26):** a deployed production schema is additive-only forever, and the backlog still plans a rename (#17's `countsTowardMileage` → `countsTowardTraining`) and model redesigns (#20 plans, #24 groups). Sync isn't needed until then: Release/TestFlight builds are local-only (`ModelContainerFactory.isCloudKitSyncEnabled`). When it's time: reset the development environment, launch a Debug build with `-initializeCloudKitSchema`, check the record types, deploy, flip sync on for Release, and re-check the privacy policy's iCloud wording.
+
+### I. Next brainstorm
+20. **Pick the next ideas** from [STRENGTH_IDEAS](STRENGTH_IDEAS.md): S8 self-maintaining board, S2 priority trim, S6 longevity check-ins, S7 power, S3 hybrid load. Design each one, then file an issue for it.
 
 ## Dependencies
 
@@ -64,4 +67,5 @@ flowchart LR
     I15 --> I19
     I19 --> I20["#20 plans"]
     I13 --> I21["#21 connections"] --> I23["#23"] & I22["#22"]
+    I17 & I20 & I24 --> I30["#30 CloudKit prod"]
 ```

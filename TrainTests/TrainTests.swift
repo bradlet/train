@@ -345,6 +345,14 @@ struct DoubleDistanceTests {
 
 struct ModelContainerFactoryTests {
 
+    /// Sync is Debug-only until #30 deploys the production schema; tests
+    /// run a Debug build, so this pins that Debug keeps syncing.
+    @Test func cloudKitSyncIsOnInDebugBuilds() {
+        #if DEBUG
+        #expect(ModelContainerFactory.isCloudKitSyncEnabled)
+        #endif
+    }
+
     @Test func schemaCoversEveryModel() {
         let names = Set(ModelContainerFactory.modelTypes.map { String(describing: $0) })
         #expect(names == [

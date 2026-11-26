@@ -36,13 +36,30 @@ enum ModelContainerFactory {
     /// CloudKit's *development* environment before opening the store (#30).
     static let initializeSchemaArgument = "-initializeCloudKitSchema"
 
-    /// Creates the production ModelContainer with CloudKit sync enabled.
+    /// Whether the on-disk container mirrors to CloudKit.
+    ///
+    /// Debug builds only, for now: they use CloudKit's *development*
+    /// environment. The *production* schema is not deployed yet — deploying
+    /// it makes the schema additive-only for good, and the backlog still
+    /// plans renames (#17) and model redesigns (#20, #24) — so Release and
+    /// TestFlight builds stay local-only rather than syncing against a
+    /// schema that doesn't exist. #30 deploys it and flips this to `true`.
+    static let isCloudKitSyncEnabled: Bool = {
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }()
+
+    /// Creates the app's on-disk ModelContainer, mirrored to CloudKit when
+    /// `isCloudKitSyncEnabled`.
     /// - Returns: A configured ModelContainer.
     static func makeContainer() -> ModelContainer {
         let config = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,
-            cloudKitDatabase: .automatic
+            cloudKitDatabase: isCloudKitSyncEnabled ? .automatic : .none
         )
         do {
             return try ModelContainer(for: schema, configurations: [config])
