@@ -213,7 +213,7 @@ struct WeekMileageTests {
             durationSeconds: 1800,
             distanceMiles: miles,
             date: Date(),
-            countsTowardMileage: counts
+            countsTowardTraining: counts
         )
     }
 
@@ -225,7 +225,7 @@ struct WeekMileageTests {
             durationSeconds: 1800,
             distanceMiles: plannedMiles,
             date: Date(),
-            countsTowardMileage: counts,
+            countsTowardTraining: counts,
             workout: Workout(durationSeconds: 1800, distanceMiles: recordedMiles)
         )
     }
@@ -439,7 +439,7 @@ struct ExerciseModelTests {
         // toward mileage totals.
         #expect(exercise.workout == nil)
         #expect(exercise.isCompleted == false)
-        #expect(exercise.countsTowardMileage == true)
+        #expect(exercise.countsTowardTraining == true)
     }
 
     @Test func settingWorkoutMarksExerciseCompleted() {
@@ -541,7 +541,7 @@ struct ExerciseMileageCountingTests {
         return ModelContext(container)
     }
 
-    @Test func countsTowardMileageDefaultsTrue() {
+    @Test func countsTowardTrainingDefaultsTrue() {
         let exercise = Exercise(
             name: "Morning Run",
             type: .run,
@@ -549,22 +549,22 @@ struct ExerciseMileageCountingTests {
             distanceMiles: 3.0,
             date: Date()
         )
-        #expect(exercise.countsTowardMileage == true)
+        #expect(exercise.countsTowardTraining == true)
     }
 
-    @Test func countsTowardMileageCanBeSetFalse() {
+    @Test func countsTowardTrainingCanBeSetFalse() {
         let exercise = Exercise(
             name: "Lunch Walk",
             type: .other,
             durationSeconds: 1200,
             distanceMiles: 1.0,
             date: Date(),
-            countsTowardMileage: false
+            countsTowardTraining: false
         )
-        #expect(exercise.countsTowardMileage == false)
+        #expect(exercise.countsTowardTraining == false)
     }
 
-    @Test func countsTowardMileagePersistsThroughSwiftData() throws {
+    @Test func countsTowardTrainingPersistsThroughSwiftData() throws {
         let context = try makeContext()
         let walk = Exercise(
             name: "Evening Walk",
@@ -572,7 +572,7 @@ struct ExerciseMileageCountingTests {
             durationSeconds: 1800,
             distanceMiles: 1.5,
             date: Date(),
-            countsTowardMileage: false,
+            countsTowardTraining: false,
             workout: Workout(durationSeconds: 1800, distanceMiles: 1.5)
         )
         let run = Exercise(
@@ -589,8 +589,8 @@ struct ExerciseMileageCountingTests {
 
         let fetched = try context.fetch(FetchDescriptor<Exercise>())
         #expect(fetched.count == 2)
-        #expect(fetched.first { $0.name == "Evening Walk" }?.countsTowardMileage == false)
-        #expect(fetched.first { $0.name == "Tempo Run" }?.countsTowardMileage == true)
+        #expect(fetched.first { $0.name == "Evening Walk" }?.countsTowardTraining == false)
+        #expect(fetched.first { $0.name == "Tempo Run" }?.countsTowardTraining == true)
     }
 }
 
@@ -2776,7 +2776,7 @@ struct WorkoutDetailEditTests {
             workout: Workout(durationSeconds: 1800, distanceMiles: 1.5)
         )
         context.insert(exercise)
-        #expect(exercise.countsTowardMileage == true)
+        #expect(exercise.countsTowardTraining == true)
 
         var edits = WorkoutEditor.EditedValues(
             name: exercise.name,
@@ -2788,15 +2788,15 @@ struct WorkoutDetailEditTests {
             date: exercise.date,
             notes: "",
             perceivedExertion: nil,
-            countsTowardMileage: false
+            countsTowardTraining: false
         )
         WorkoutEditor.apply(edits, to: exercise)
-        #expect(exercise.countsTowardMileage == false)
+        #expect(exercise.countsTowardTraining == false)
 
         // Toggling back on through another edit restores counting.
-        edits.countsTowardMileage = true
+        edits.countsTowardTraining = true
         WorkoutEditor.apply(edits, to: exercise)
-        #expect(exercise.countsTowardMileage == true)
+        #expect(exercise.countsTowardTraining == true)
     }
 
     @Test func applyWritesBothRatings() throws {
@@ -3473,7 +3473,7 @@ struct CalendarDayDotTests {
         )
         let skipped = Exercise(
             name: "Walk", type: .walk, durationSeconds: 1800, distanceMiles: 1.0,
-            date: Date(), countsTowardMileage: false
+            date: Date(), countsTowardTraining: false
         )
         #expect(counted.countsTowardTraining)
         #expect(skipped.countsTowardTraining == false)
@@ -3586,7 +3586,7 @@ struct WorkoutAggregationsTests {
             durationSeconds: 1800,
             distanceMiles: miles,
             date: date,
-            countsTowardMileage: counts,
+            countsTowardTraining: counts,
             workout: Workout(
                 durationSeconds: 1800,
                 distanceMiles: miles,
@@ -4191,8 +4191,10 @@ struct WorkoutCSVRowsTests {
         let rows = WorkoutCSV.rows(exercises: [exercise], unit: .miles)
         #expect(rows.count == 2)
         #expect(rows[0] == WorkoutCSV.headerColumns)
-        // date, name, type, duration, distance, notes, feeling, perceived_exertion
-        #expect(rows[1].count == 8)
+        // date, name, type, duration, distance, notes, feeling,
+        // perceived_exertion, counts_toward_training
+        #expect(rows[1].count == 9)
+        #expect(rows[1][8] == "true")
         #expect(rows[1][1] == "Easy Run")
         #expect(rows[1][2] == ExerciseType.easyRun.rawValue)
         #expect(rows[1][4] == "3.00")
@@ -4200,8 +4202,8 @@ struct WorkoutCSVRowsTests {
         #expect(rows[1][7] == "7")
     }
 
-    @Test func headerEndsWithFeelingThenPerceivedExertion() {
-        #expect(WorkoutCSV.headerColumns.suffix(2) == ["feeling", "perceived_exertion"])
+    @Test func headerEndsWithRatingsThenTrainingFlag() {
+        #expect(WorkoutCSV.headerColumns.suffix(3) == ["feeling", "perceived_exertion", "counts_toward_training"])
     }
 
     @Test func unratedWorkoutEmitsBlankRatingColumns() {
@@ -6286,6 +6288,179 @@ struct StrengthRecordEditorTests {
         context.insert(record)
         StrengthRecordEditor.delete(record, in: context)
         #expect(try context.fetch(FetchDescriptor<StrengthRecord>()).isEmpty)
+    }
+}
+
+// MARK: - TrainingInclusion Tests
+
+struct TrainingInclusionTests {
+
+    private func exercise(_ type: ExerciseType, counts: Bool = true) -> Exercise {
+        Exercise(name: type.rawValue, type: type, durationSeconds: 1800, distanceMiles: 3, date: Date(), countsTowardTraining: counts)
+    }
+
+    @Test func walksAndHikesStartExcluded() {
+        #expect(TrainingInclusion.defaultExcluded == [.walk, .hike])
+        #expect(!TrainingInclusion.counts(.walk, excluded: TrainingInclusion.defaultExcluded))
+        #expect(TrainingInclusion.counts(.tempoRun, excluded: TrainingInclusion.defaultExcluded))
+        #expect(TrainingInclusion.counts(.walk, excluded: []))
+    }
+
+    @Test func storageRoundTripsAndIgnoresUnknownValues() {
+        let raw = TrainingInclusion.encode([.hike, .bike])
+        #expect(raw == "Bike,Hike", "allCases order")
+        #expect(TrainingInclusion.decode(raw) == [.bike, .hike])
+        #expect(TrainingInclusion.decode("Walk,Teleport,") == [.walk])
+        #expect(TrainingInclusion.decode("").isEmpty)
+    }
+
+    @Test func theToggleFollowsTheTypeUnlessOverridden() {
+        let excluded = TrainingInclusion.defaultExcluded
+        #expect(!TrainingInclusion.toggle(true, afterChangingFrom: .run, to: .walk, excluded: excluded), "the run default followed to walk's")
+        #expect(TrainingInclusion.toggle(false, afterChangingFrom: .walk, to: .bike, excluded: excluded))
+        #expect(!TrainingInclusion.toggle(false, afterChangingFrom: .run, to: .bike, excluded: excluded), "an override sticks")
+    }
+
+    @Test func applyToPastRewritesOnlyThatType() {
+        let walks = [exercise(.walk), exercise(.walk, counts: false)]
+        let run = exercise(.run)
+        let changed = TrainingInclusion.applyToPast(.walk, counts: false, exercises: walks + [run])
+        #expect(changed == 1)
+        #expect(walks.allSatisfy { !$0.countsTowardTraining })
+        #expect(run.countsTowardTraining)
+    }
+
+    @Test func configurationDefaultsAndPersists() throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        #expect(TrainingInclusion.excludedTypes(in: context) == TrainingInclusion.defaultExcluded, "no configuration yet")
+        let config = AppConfiguration()
+        #expect(config.trainingExcludedTypes == TrainingInclusion.defaultExcluded)
+        config.trainingExcludedTypes = [.elliptical]
+        context.insert(config)
+        try context.save()
+        #expect(TrainingInclusion.excludedTypes(in: ModelContext(container)) == [.elliptical])
+    }
+
+    @Test func healthImportsFollowTheTypeDefault() {
+        let walk = HealthKitWorkout(id: "w", activityType: .walking, startDate: Date(), duration: 1800, distanceMiles: 2)
+        #expect(!HealthKitWorkoutMapper.toExercise(walk).countsTowardTraining)
+        #expect(HealthKitWorkoutMapper.toExercise(walk, excludedTypes: []).countsTowardTraining)
+    }
+
+    @Test func renamedFlagStillDefaultsToCounting() {
+        #expect(Exercise(name: "Run", type: .run, durationSeconds: 0, distanceMiles: 0, date: Date()).countsTowardTraining)
+        #expect(FavoriteWorkout(name: "Fav", type: .run).countsTowardTraining)
+    }
+}
+
+// MARK: - TrainingScope Tests
+
+struct TrainingScopeTests {
+
+    private func exercise(_ type: ExerciseType) -> Exercise {
+        Exercise(name: type.rawValue, type: type, durationSeconds: 1800, distanceMiles: 3, date: Date())
+    }
+
+    @Test func familiesGroupEveryRunVariant() {
+        #expect(ExerciseFamily.running.types == [.run, .longRun, .tempoRun, .intervalRun, .easyRun, .recoveryRun, .race])
+        #expect(ExerciseType.allCases.allSatisfy { $0.family.types.contains($0) })
+    }
+
+    @Test func scopesFilterExercises() {
+        let all = [exercise(.tempoRun), exercise(.bike), exercise(.easyRun), exercise(.walk)]
+        #expect(TrainingScope.all.filter(all).count == 4)
+        #expect(TrainingScope.family(.running).filter(all).map(\.type) == [.tempoRun, .easyRun])
+        #expect(TrainingScope.type(.tempoRun).filter(all).map(\.type) == [.tempoRun])
+        #expect(TrainingScope.family(.swim).filter(all).isEmpty)
+    }
+
+    @Test func chipsOfferOnlyWhatIsPresent() {
+        let all = [exercise(.walk), exercise(.tempoRun), exercise(.longRun), exercise(.bike)]
+        #expect(TrainingScope.families(in: all) == [.running, .bike, .walk])
+        #expect(TrainingScope.types(of: .running, in: all) == [.longRun, .tempoRun])
+        #expect(TrainingScope.families(in: []).isEmpty)
+    }
+
+    @Test func rawValuesRoundTripForStickyStorage() {
+        for scope in [TrainingScope.all, .family(.bike), .type(.tempoRun)] {
+            #expect(TrainingScope(rawValue: scope.rawValue) == scope)
+        }
+        #expect(TrainingScope(rawValue: "family:Teleport") == nil)
+        #expect(TrainingScope(rawValue: "") == nil)
+    }
+
+    @Test func aTypeScopeBelongsToItsFamily() {
+        #expect(TrainingScope.type(.intervalRun).family == .running)
+        #expect(TrainingScope.all.family == nil)
+        #expect(TrainingScope.type(.tempoRun).title == "Tempo Run")
+    }
+}
+
+// MARK: - CSV counts_toward_training Tests
+
+struct WorkoutCSVTrainingColumnTests {
+
+    @Test func exportWritesTheColumn() {
+        let excluded = Exercise(name: "Walk", type: .walk, durationSeconds: 1800, distanceMiles: 2, date: Date(),
+                                countsTowardTraining: false, workout: Workout(durationSeconds: 1800, distanceMiles: 2))
+        #expect(WorkoutCSV.headerColumns.last == "counts_toward_training")
+        #expect(WorkoutCSV.encodeRow(exercise: excluded, unit: .miles).hasSuffix(",false"))
+    }
+
+    @Test func roundTripKeepsTheFlag() throws {
+        let excluded = Exercise(name: "Walk", type: .walk, durationSeconds: 1800, distanceMiles: 2, date: Date(),
+                                countsTowardTraining: false, workout: Workout(durationSeconds: 1800, distanceMiles: 2))
+        let counted = Exercise(name: "Run", type: .run, durationSeconds: 1800, distanceMiles: 3, date: Date(),
+                               workout: Workout(durationSeconds: 1800, distanceMiles: 3))
+        let csv = WorkoutCSV.encode(exercises: [excluded, counted], unit: .miles)
+        let rows = try WorkoutCSV.parse(csv).rows
+        let imported = rows.map { WorkoutCSV.toExercise($0, unit: .miles) }
+        #expect(Set(imported.map(\.countsTowardTraining)) == [true, false])
+        #expect(imported.first { $0.type == .walk }?.countsTowardTraining == false)
+    }
+
+    @Test func aMissingOrBlankColumnCounts() throws {
+        let old = "date,name,type,duration,distance\n1/2/2026,Run,run,30m,3\n"
+        #expect(try WorkoutCSV.parse(old).rows.first?.countsTowardTraining == true)
+        let blank = "h\n1/2/2026,Run,run,30m,3,,,,\n"
+        #expect(try WorkoutCSV.parse(blank).rows.first?.countsTowardTraining == true)
+    }
+
+    @Test func countsParsingIsLenient() {
+        #expect(!WorkoutCSV.parseCounts("false"))
+        #expect(!WorkoutCSV.parseCounts(" No "))
+        #expect(!WorkoutCSV.parseCounts("0"))
+        #expect(WorkoutCSV.parseCounts("TRUE"))
+        #expect(WorkoutCSV.parseCounts("yes"))
+        #expect(WorkoutCSV.parseCounts(""))
+    }
+}
+
+// MARK: - Strength training opt-out Tests
+
+struct StrengthTrainingOptOutTests {
+
+    @Test func liftsCountByDefaultAndPersistTheOptOut() throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        let lift = StrengthLift(liftKey: "mobility", name: "Mobility")
+        #expect(lift.countsTowardTraining)
+        lift.countsTowardTraining = false
+        context.insert(lift)
+        try context.save()
+        #expect(try ModelContext(container).fetch(FetchDescriptor<StrengthLift>()).first?.countsTowardTraining == false)
+    }
+
+    @Test func optedOutLiftsLeaveTheWeekAndShowInSummaries() {
+        let now = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 12))!
+        let records = [StrengthRecord(liftKey: "squat", date: now), StrengthRecord(liftKey: "mobility", date: now)]
+        let week = StrengthProgress.thisWeek(records, now: now, firstWeekday: 2, excludedLiftKeys: ["mobility"])
+        #expect(week.lifts == 1)
+        let lift = StrengthLift(liftKey: "mobility", name: "Mobility")
+        lift.countsTowardTraining = false
+        let summary = StrengthProgress.summaries(lifts: [lift], records: records).first { $0.liftKey == "mobility" }
+        #expect(summary?.countsTowardTraining == false)
     }
 }
 
@@ -8968,7 +9143,7 @@ struct FavoriteWorkoutTests {
         #expect(favorite.type == .run)
         #expect(favorite.distanceMiles == 0)
         #expect(favorite.durationSeconds == 0)
-        #expect(favorite.countsTowardMileage)
+        #expect(favorite.countsTowardTraining)
         #expect(favorite.sortOrder == 0)
     }
 
@@ -8982,14 +9157,14 @@ struct FavoriteWorkoutTests {
             type: .hike,
             distanceMiles: 6.5,
             durationSeconds: 7200,
-            countsTowardMileage: false,
+            countsTowardTraining: false,
             sortOrder: 3
         )
         #expect(favorite.name == "Trail Hike")
         #expect(favorite.type == .hike)
         #expect(favorite.distanceMiles == 6.5)
         #expect(favorite.durationSeconds == 7200)
-        #expect(!favorite.countsTowardMileage)
+        #expect(!favorite.countsTowardTraining)
         #expect(favorite.sortOrder == 3)
     }
 
@@ -9001,7 +9176,7 @@ struct FavoriteWorkoutTests {
             type: .tempoRun,
             distanceMiles: 5,
             durationSeconds: 2400,
-            countsTowardMileage: true,
+            countsTowardTraining: true,
             sortOrder: 1
         ))
         try context.save()
@@ -9051,14 +9226,14 @@ struct FavoriteFormValuesTests {
 
     @Test func readsFavoriteInImperialUnits() {
         let favorite = FavoriteWorkout(
-            name: "Loop", type: .easyRun, distanceMiles: 5, durationSeconds: 2700, countsTowardMileage: false
+            name: "Loop", type: .easyRun, distanceMiles: 5, durationSeconds: 2700, countsTowardTraining: false
         )
         let values = FavoriteFormValues(favorite, metric: false)
         #expect(values.name == "Loop")
         #expect(values.type == .easyRun)
         #expect(values.displayDistance == 5)
         #expect(values.durationSeconds == 2700)
-        #expect(!values.countsTowardMileage)
+        #expect(!values.countsTowardTraining)
     }
 
     @Test func readsFavoriteInMetricUnitsAndRoundTrips() throws {
@@ -9079,7 +9254,7 @@ struct FavoriteFormValuesTests {
             name: "Tempo", type: .tempoRun,
             plannedDurationSeconds: 2400, plannedDisplayDistance: 5,
             actualDurationSeconds: 2500, actualDisplayDistance: 5.2,
-            countsTowardMileage: true
+            countsTowardTraining: true
         )
         #expect(values.durationSeconds == 2400)
         #expect(values.displayDistance == 5)
@@ -9092,17 +9267,17 @@ struct FavoriteFormValuesTests {
             name: "Ride", type: .bike,
             plannedDurationSeconds: 0, plannedDisplayDistance: 20,
             actualDurationSeconds: 3600, actualDisplayDistance: 21,
-            countsTowardMileage: false
+            countsTowardTraining: false
         )
         #expect(values.durationSeconds == 3600)
         #expect(values.displayDistance == 20)
-        #expect(!values.countsTowardMileage)
+        #expect(!values.countsTowardTraining)
 
         let noPlannedDistance = FavoriteFormValues.plannedFirst(
             name: "Ride", type: .bike,
             plannedDurationSeconds: 3000, plannedDisplayDistance: nil,
             actualDurationSeconds: 3600, actualDisplayDistance: 21,
-            countsTowardMileage: true
+            countsTowardTraining: true
         )
         #expect(noPlannedDistance.durationSeconds == 3000)
         #expect(noPlannedDistance.displayDistance == 21)
@@ -9118,7 +9293,7 @@ struct FavoriteWorkoutEditorTests {
         let context = ModelContext(container)
         let values = FavoriteFormValues(
             name: "  Track 6x800  ", type: .intervalRun, durationSeconds: 3000,
-            displayDistance: 8.0467, countsTowardMileage: true
+            displayDistance: 8.0467, countsTowardTraining: true
         )
         let favorite = try #require(try FavoriteWorkoutEditor.make(from: values, metric: true, in: context))
         #expect(favorite.name == "Track 6x800")
@@ -9160,7 +9335,7 @@ struct FavoriteWorkoutEditorTests {
             favorite,
             with: FavoriteFormValues(
                 name: " New ", type: .hike, durationSeconds: 5400,
-                displayDistance: nil, countsTowardMileage: false
+                displayDistance: nil, countsTowardTraining: false
             ),
             metric: false
         )
@@ -9169,7 +9344,7 @@ struct FavoriteWorkoutEditorTests {
         #expect(favorite.type == .hike)
         #expect(favorite.distanceMiles == 0)
         #expect(favorite.durationSeconds == 5400)
-        #expect(!favorite.countsTowardMileage)
+        #expect(!favorite.countsTowardTraining)
     }
 
     @Test func updateRejectsBlankNameAndLeavesFavoriteUntouched() {

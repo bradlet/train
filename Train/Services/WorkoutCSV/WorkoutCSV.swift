@@ -57,6 +57,9 @@ struct WorkoutCSVRow: Equatable {
     var feeling: Int?
     /// Subjective 1-10 perceived exertion; `nil` when the column is blank.
     var perceivedExertion: Int?
+    /// Whether the workout counts toward training (#29); `true` when the
+    /// column is missing or blank, so older files import as before.
+    var countsTowardTraining: Bool = true
 }
 
 /// Errors raised only for whole-file failures. Per-row problems are
@@ -88,7 +91,7 @@ enum WorkoutCSV {
     /// are written on export but ignored on import (the schema is fixed).
     static let headerColumns = [
         "date", "name", "type", "duration", "distance", "notes",
-        "feeling", "perceived_exertion"
+        "feeling", "perceived_exertion", "counts_toward_training"
     ]
 
     /// CSV header line (joined `headerColumns`).
@@ -144,7 +147,8 @@ enum WorkoutCSV {
             formatDistance(distance),
             workout?.notes ?? exercise.notes,
             workout?.feeling.map(String.init) ?? "",
-            workout?.perceivedExertion.map(String.init) ?? ""
+            workout?.perceivedExertion.map(String.init) ?? "",
+            exercise.countsTowardTraining ? "true" : "false"
         ]
     }
 
@@ -199,6 +203,7 @@ enum WorkoutCSV {
             distanceMiles: miles,
             notes: row.notes,
             date: row.date,
+            countsTowardTraining: row.countsTowardTraining,
             workout: Workout(
                 durationSeconds: row.durationSeconds,
                 distanceMiles: miles,
@@ -412,8 +417,8 @@ enum WorkoutCSV {
     /// Decodes a tokenized row's fields into a `WorkoutCSVRow`.
     /// Returns `.skip` with a short human-readable reason on failure.
     /// Minimum 5 fields required (date, name, type, duration, distance).
-    /// Notes (field 6) defaults to "", and both rating columns (fields 7 and
-    /// 8) default to `nil`.
+    /// Notes (field 6) defaults to "", both rating columns (fields 7 and
+    /// 8) default to `nil`, and counts-toward-training (field 9) to `true`.
     private static func decodeRow(_ fields: [String]) -> DecodeOutcome {
         guard fields.count >= 5 else {
             return .skip("expected at least 5 fields, got \(fields.count)")
@@ -427,6 +432,7 @@ enum WorkoutCSV {
         let notes = fields.count > 5 ? fields[5] : ""
         let feelingString = fields.count > 6 ? fields[6] : ""
         let exertionString = fields.count > 7 ? fields[7] : ""
+        let countsString = fields.count > 8 ? fields[8] : ""
 
         guard let date = parseDate(dateString) else {
             return .skip("invalid date '\(dateString)'")
@@ -462,8 +468,16 @@ enum WorkoutCSV {
             distance: distance,
             notes: notes,
             feeling: feeling,
-            perceivedExertion: exertion
+            perceivedExertion: exertion,
+            countsTowardTraining: parseCounts(countsString)
         ))
+    }
+
+    /// Parses the counts-toward-training column leniently: "false", "no"
+    /// and "0" (any case) mean excluded; anything else — including blank or
+    /// a missing column — counts, so older files import unchanged.
+    static func parseCounts(_ raw: String) -> Bool {
+        !["false", "no", "0"].contains(raw.trimmingCharacters(in: .whitespaces).lowercased())
     }
 
     /// Parses an optional rating column.
