@@ -22,7 +22,7 @@ One ordered path through everything planned on 2026-11-24. Do one step at a time
 4. ✅ **#13** Lift-owned history, a metric per lift, and records linked to the card they were logged from (`slotID`). Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §1. Shipped as `StrengthLift` + `StrengthRecord` rows; its schema is ready for #30.
 
 ### C. Daily strength loop
-5. **#14** Fast recording: prefill, per-lift default measurement, the whole-day sheet (a "done" record with no number already exists, from #13). Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §2
+5. ✅ **#14** Fast recording: prefill, per-lift default measurement, the whole-day sheet (a "done" record with no number already exists, from #13). Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §2
 6. **#15** Current-week checkmarks, missed-lift carryover, PR badge. Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §3
 7. **#26** "Log lifts as planned" in one tap, strength only. Doc: [DONE_AS_PLANNED](DONE_AS_PLANNED.md)
 8. **#24** Movement groups: smart rotation, with a toggle for one member per block. Doc: [MOVEMENT_GROUPS](MOVEMENT_GROUPS.md)

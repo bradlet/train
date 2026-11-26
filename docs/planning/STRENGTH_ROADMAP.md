@@ -85,6 +85,8 @@ classDiagram
 
 ## 2. Recording speed
 
+> **R1–R3 built in #14** (2026-11-26). As shipped: the starting measurement is **Average** (not Max); the default measurement is remembered from the last valued record and changed by picking another; the whole-day sheet also opens from a *Log day* button on every board lane, and its rows start unticked. R4 is #15.
+
 - **R1 — Prefill last session.** The value and measurement prefill from the lift's latest record. A ± stepper nudges the value by a sensible increment (5 lb / 2.5 kg, 1 rep, 15 s, 10 m), so typing is the exception.
 - **R2 — Per-lift default measurement.** Remembered from the last record and editable on the lift. Never pick "Max" again for a lift you track as Avg.
 - **R3 — Log the whole day.** One sheet lists the day's active lane. Each row has a done tick and a prefilled stepper; **Save all** records everything. Home's "Log Lift" opens this when there's more than one lift, instead of the current picker.

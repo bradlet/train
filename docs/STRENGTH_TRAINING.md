@@ -144,7 +144,8 @@ flowchart TD
     OFF["Offloaded section<br/>ordered cards, drop targets"]
     CARD["StrengthExerciseCard<br/>draggable · tap to record ·<br/>context menu (move/offload/delete)"]
     LIB["ExerciseLibrarySheet<br/>search + muscle-group sections"]
-    REC["RecordStrengthSheet<br/>date · value in the lift's metric (optional) ·<br/>measurement · notes"]
+    REC["RecordStrengthSheet<br/>prefilled value ± stepper (optional) ·<br/>measurement · notes"]
+    DAY["LogStrengthDaySheet<br/>tick + nudge each lane lift, Save all"]
     PLANNER["StrengthBoardPlanner<br/>lane / move / nextSortOrder<br/>(pure, unit-tested)"]
 
     STV --> STRIP
@@ -153,6 +154,7 @@ flowchart TD
     COL --> OFF --> CARD
     STV -->|sheet| LIB
     STV -->|sheet| REC
+    STV -->|sheet| DAY
     STV -->|mutations| PLANNER
 ```
 
@@ -187,6 +189,21 @@ sequenceDiagram
     Sheet->>Store: insert StrengthRecord(liftKey, slotID: slot.id, …)
     Note over Store: one row per record,<br/>persisted by SwiftData + CloudKit
 ```
+
+### Fast recording (#14)
+
+- **Prefill.** `StrengthPrefill` starts every record on the lift's usual measurement —
+  its remembered `StrengthLift.defaultMeasurement`, else the latest record's, else
+  **Average** (`LiftMeasurement.starting`) — and on the last value logged for it in that
+  metric and measurement. Saving a weight or reps record with a value remembers its
+  measurement as the lift's default (`StrengthLiftRegistry.rememberDefaults`).
+- **Stepper.** `StrengthValueEditor` puts − / + around the value: 5 lb / 2.5 kg, 1 rep,
+  15 s, 10 yd / 10 m (`LiftMetric.stepIncrement`). It never steps below one increment;
+  blank is how "done" is logged.
+- **Log the whole day.** `LogStrengthDaySheet` lists a lane's active cards, prefilled and
+  unticked; Save records each ticked row against its card (`StrengthDayLog`). It opens
+  from each lane's *Log day* button (dated to that weekday's most recent occurrence,
+  `Date.mostRecent(weekdayIndex:)`) and from Home's Log Lift when today has several lifts.
 
 ## AI Coach Serialization
 
