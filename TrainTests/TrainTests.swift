@@ -5364,6 +5364,105 @@ struct NewBestAnnouncementTests {
     }
 }
 
+// MARK: - PlannedDayLogger Tests
+
+struct PlannedDayLoggerTests {
+
+    /// Thursday 2026-11-26, mid-afternoon.
+    private let thursday = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 15))!
+
+    private func day(_ dayOfMonth: Int, hour: Int = 9) -> Date {
+        Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: dayOfMonth, hour: hour))!
+    }
+
+    private func slot(_ name: String, order: Int = 0, offloaded: Bool = false) -> StrengthExercise {
+        StrengthExercise(name: name, muscleGroup: .chest, weekdayIndex: 4, isOffloaded: offloaded, sortOrder: order)
+    }
+
+    @Test func pendingSkipsOffloadedAndAlreadyRecordedCardsInBoardOrder() {
+        let second = slot("Row", order: 1)
+        let first = slot("Squat", order: 0)
+        let done = slot("Press", order: 2)
+        let parked = slot("Curl", order: 3, offloaded: true)
+        let recorded = StrengthRecord(liftKey: done.liftKey, slotID: done.id, date: day(26, hour: 7))
+        let result = PlannedDayLogger.pending([second, done, parked, first], on: thursday, records: [recorded])
+        #expect(result.map(\.name) == ["Squat", "Row"])
+    }
+
+    @Test func aRecordOnAnotherDayDoesNotCount() {
+        let squat = slot("Squat")
+        let yesterday = StrengthRecord(liftKey: squat.liftKey, slotID: squat.id, date: day(25))
+        #expect(PlannedDayLogger.pending([squat], on: thursday, records: [yesterday]).count == 1)
+    }
+
+    @Test func recordsUseTheLastValueAndDefaultMeasurement() {
+        let squat = slot("Squat")
+        let lift = StrengthLift(liftKey: squat.liftKey, name: "Squat")
+        lift.defaultMeasurement = .max
+        let history = [
+            StrengthRecord(liftKey: squat.liftKey, date: day(20), value: 225, metric: .weight, measurement: .max),
+            StrengthRecord(liftKey: squat.liftKey, date: day(22), value: 185, metric: .weight, measurement: .average),
+        ]
+        let made = PlannedDayLogger.records(for: [squat], on: thursday, lifts: [lift], records: history)
+        #expect(made.count == 1)
+        #expect(made[0].value == 225)
+        #expect(made[0].measurement == .max)
+        #expect(made[0].slotID == squat.id)
+        #expect(made[0].date == thursday)
+    }
+
+    @Test func aCardWithNoHistoryRecordsDone() {
+        let plank = slot("Plank")
+        let lift = StrengthLift(liftKey: plank.liftKey, name: "Plank", primaryMetric: .time)
+        let made = PlannedDayLogger.records(for: [plank], on: thursday, lifts: [lift], records: [])
+        #expect(made[0].value == nil)
+        #expect(made[0].measurement == nil)
+        #expect(made[0].metric == .time)
+    }
+
+    @Test func logDateIsNowTodayTheLaneDayEarlierAndHiddenLater() {
+        // Monday week start: Thursday's lane is today, Tuesday's earlier,
+        // Sunday's (end of the week) still to come.
+        #expect(PlannedDayLogger.logDate(forLane: 4, now: thursday, firstWeekday: 2) == thursday)
+        #expect(PlannedDayLogger.logDate(forLane: 2, now: thursday, firstWeekday: 2) == day(24, hour: 0))
+        #expect(PlannedDayLogger.logDate(forLane: 0, now: thursday, firstWeekday: 2) == nil)
+        #expect(PlannedDayLogger.logDate(forLane: 5, now: thursday, firstWeekday: 2) == nil)
+        // A Sunday start puts Sunday's lane earlier in the week.
+        #expect(PlannedDayLogger.logDate(forLane: 0, now: thursday, firstWeekday: 1) == day(22, hour: 0))
+    }
+
+    @Test func logInsertsPendingRecordsAndUndoRemovesExactlyThem() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let squat = slot("Squat", order: 0)
+        let row = slot("Row", order: 1)
+        context.insert(squat)
+        context.insert(row)
+        let earlier = StrengthRecord(liftKey: squat.liftKey, slotID: squat.id, date: day(19), value: 200, metric: .weight, measurement: .average)
+        context.insert(earlier)
+
+        let result = try #require(PlannedDayLogger.log([squat, row], on: thursday, in: context))
+        #expect(result.count == 2)
+        #expect(result.slotIDs == [squat.id, row.id])
+        #expect(result.message == "Logged 2 lifts")
+        #expect(result.newBests.isEmpty, "logging the last value ties it, never beats it")
+        let afterLog = try context.fetch(FetchDescriptor<StrengthRecord>())
+        #expect(afterLog.count == 3)
+        #expect(afterLog.first { $0.slotID == squat.id && $0.date == thursday }?.value == 200)
+        #expect(afterLog.first { $0.slotID == row.id }?.value == nil, "no history records done")
+
+        #expect(PlannedDayLogger.log([squat, row], on: thursday, in: context) == nil, "a second tap has nothing left to log")
+
+        PlannedDayLogger.undo(result, in: context)
+        let afterUndo = try context.fetch(FetchDescriptor<StrengthRecord>())
+        #expect(afterUndo.map(\.id) == [earlier.id], "undo keeps the earlier history")
+    }
+
+    @Test func messageIsSingularForOneLift() {
+        let one = PlannedDayLogResult(recordIDs: [UUID()], slotIDs: [], date: thursday, newBests: [])
+        #expect(one.message == "Logged 1 lift")
+    }
+}
+
 // MARK: - StrengthLiftKey Tests
 
 struct StrengthLiftKeyTests {
