@@ -200,6 +200,8 @@ Views/
 - `Views/Strength/StrengthProgressView.swift` / `LiftDetailView.swift` / `GroupProgressView.swift` — the lift list, a lift's chart + sessions (+ `EditStrengthRecordSheet`), a group's members + rotation strip
 - `Views/Strength/StrengthBoardCopier.swift` — copy a day / duplicate a card, never doubling a lift or group on the target day; `MuscleBalance` maps cards to the five `BodyRegion`s by pattern, then muscle (unit-tested); `MuscleBalanceStrip.swift` draws it
 - `Services/Strength/PlacementRules.swift` — key/easy/rest cardio days, lane loads, verdicts, conflicts, the stack cue, `WeekArranger` (propose/apply/undo) and `PlacementDismissals` (unit-tested); `Services/KeyWorkoutDefaults.swift` holds the per-type defaults and `KeyDayStrategy`; `Views/Strength/ArrangeWeekSheet.swift` is the sheet
+- `Services/HybridWeek.swift` — Home's hybrid week (#19): the two-track strip (`HybridWeek.days`, progress), `hints` (legs before an athlete-marked key day, the strength floor, a missing recovery day, region gaps), and `HintDismissals` (unit-tested); `Views/Home/HybridWeekSection.swift` draws it
+- `Services/PlanRouter.swift` — `@Environment(\.planRouter)`: owns the selected tab and hands a day to Cardio/Strength Plan (unit-tested)
 - `Views/Strength/MovementGroupEditorSheet.swift` — group editor; `MovementGroupDraft` owns its rules (unit-tested)
 - `Views/Strength/NewBestBanner.swift` — the transient "New best" banner modifier and its message
 - `Views/Strength/StrengthPlanFields.swift` — `StrengthPlanDraft` (plan form state + `apply(to:)`) and the shared sets × reps form section used by both the add-from-library and edit-plan flows

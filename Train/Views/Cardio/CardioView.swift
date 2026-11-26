@@ -15,6 +15,7 @@ import SwiftData
 struct CardioView: View {
     /// The visible segment; Plan by default.
     @State private var segment: TrainingSegment = .plan
+    @Environment(\.planRouter) private var planRouter
 
     var body: some View {
         NavigationStack {
@@ -32,6 +33,10 @@ struct CardioView: View {
                 }
             }
             .settingsToolbarButton()
+            // A day opened from Home's week strip shows on Plan (#19).
+            .onChange(of: planRouter.cardioDay != nil, initial: true) { _, pending in
+                if pending { segment = .plan }
+            }
         }
     }
 }

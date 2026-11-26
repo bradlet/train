@@ -15,9 +15,10 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.coachLauncher) private var coachLauncher
 
-    /// The selected tab. Switches to Home when the widget or Siri opens the
-    /// coach, since Home owns the navigation into the chat.
-    @State private var selectedTab: AppTab = .home
+    /// The selected tab, owned by the plan router so Home's week strip can
+    /// open a day in Cardio or Strength (#19). Switches to Home when the
+    /// widget or Siri opens the coach, since Home owns the chat.
+    @State private var planRouter = PlanRouter()
 
     /// Reactively reads the metric preference without fetching in body.
     private var useMetric: Bool { configurations.first?.useMetricUnits ?? false }
@@ -28,7 +29,7 @@ struct ContentView: View {
     private var weekStartDay: Int { min(max(configurations.first?.weekStartDay ?? AppConfiguration.defaultWeekStartDay, 1), 7) }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $planRouter.tab) {
             HomeView()
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(AppTab.home)
@@ -40,8 +41,9 @@ struct ContentView: View {
                 .tag(AppTab.strength)
         }
         .onChange(of: coachLauncher.pending, initial: true) { _, pending in
-            if pending != nil { selectedTab = .home }
+            if pending != nil { planRouter.tab = .home }
         }
+        .environment(\.planRouter, planRouter)
         .environment(\.useMetricUnits, useMetric)
         .environment(\.weekStartDay, weekStartDay)
         .environment(\.trainingExcludedTypes, configurations.first?.trainingExcludedTypes ?? TrainingInclusion.defaultExcluded)

@@ -46,6 +46,7 @@ struct StrengthTrainingView: View {
     @State private var groupEdit: SlotGroupEdit?
     /// A card's history, pushed from its context menu (#16).
     @State private var historyRoute: StrengthProgressRoute?
+    @Environment(\.planRouter) private var planRouter
     /// A copy confirmation (#18).
     @State private var notice: String?
     /// The "New best" banner after a save beats a lift's best.
@@ -210,6 +211,11 @@ struct StrengthTrainingView: View {
             StrengthProgressDestination(route: route)
         }
         .transientNotice($notice)
+        .onChange(of: planRouter.strengthWeekday, initial: true) { _, weekday in
+            guard let weekday else { return }
+            selectedDay = weekday
+            planRouter.strengthWeekday = nil
+        }
         .newBestBanner($newBest)
         .plannedLogToast($plannedLog, onUndo: undoPlannedLog, onAdjust: adjustPlannedLog)
     }

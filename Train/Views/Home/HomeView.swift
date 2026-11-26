@@ -19,6 +19,10 @@ struct HomeView: View {
     @Environment(\.useMetricUnits) private var useMetricUnits
     @Environment(\.weekStartDay) private var weekStartDay
     @Environment(\.keyDayStrategy) private var keyDayStrategy
+    @Environment(\.planRouter) private var planRouter
+    @Query private var allLifts: [StrengthLift]
+    /// Hybrid hints dismissed this week (#19).
+    @AppStorage("hybridHintsDismissed") private var dismissedHintsRaw = ""
     @Environment(\.coachChat) private var coachChat
     @Environment(\.aiCoach) private var coach
     @Environment(\.coachLauncher) private var coachLauncher
@@ -69,6 +73,30 @@ struct HomeView: View {
     /// Today's active strength lane.
     private var todayStrength: [StrengthExercise] {
         TodayTraining.strength(allStrengthExercises, on: Date())
+    }
+
+    /// The hybrid week strip and its hints (#19).
+    private var hybridWeekSection: some View {
+        let groups = StrengthSlotResolver.byID(MovementGroupCatalog.merged(
+            builtIns: MovementGroupCatalog.bundled, user: userGroups.map(\.group)
+        ))
+        let days = HybridWeek.days(
+            cardio: allExercises, cards: allStrengthExercises, records: allStrengthRecords,
+            groups: groups, now: Date(), firstWeekday: weekStartDay
+        )
+        let hints = HintDismissals.visible(
+            HybridWeek.hints(days, records: allStrengthRecords, lifts: allLifts, now: Date()),
+            in: dismissedHintsRaw, now: Date(), firstWeekday: weekStartDay
+        )
+        return HybridWeekSection(
+            days: days,
+            hints: hints,
+            onOpenCardio: { planRouter.openCardio(on: $0) },
+            onOpenStrength: { planRouter.openStrength(on: $0) },
+            onDismissHint: { hint in
+                dismissedHintsRaw = HintDismissals.dismiss(hint, in: dismissedHintsRaw, now: Date(), firstWeekday: weekStartDay)
+            }
+        )
     }
 
     /// Whether Today shows the "key workout first" cue (#25).
@@ -155,6 +183,8 @@ struct HomeView: View {
                             )
                         }
                     )
+
+                    hybridWeekSection
 
                     QuickRecordSection(
                         onLogWorkout: {

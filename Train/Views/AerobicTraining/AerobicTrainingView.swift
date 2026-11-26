@@ -16,6 +16,7 @@ struct AerobicTrainingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.useMetricUnits) private var useMetricUnits
     @Environment(\.weekStartDay) private var weekStartDay
+    @Environment(\.planRouter) private var planRouter
     @Query private var allExercises: [Exercise]
     @Query(sort: [SortDescriptor(\FavoriteWorkout.sortOrder), SortDescriptor(\FavoriteWorkout.createdAt)])
     private var favorites: [FavoriteWorkout]
@@ -128,6 +129,13 @@ struct AerobicTrainingView: View {
                 .id(selectedWeek)
                 .transition(.push(from: weekSlideEdge))
             }
+        }
+        // A day opened from Home's week strip (#19) shows its week.
+        .onChange(of: planRouter.cardioDay, initial: true) { _, day in
+            guard let day else { return }
+            selectedWeek = day.startOfDay
+            selectedMonth = day
+            planRouter.cardioDay = nil
         }
         .sheet(item: $addExerciseRequest) { request in
             AddExerciseSheet(exercise: nil, defaultDate: request.date, favorites: favorites)

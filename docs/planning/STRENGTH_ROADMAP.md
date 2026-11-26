@@ -124,6 +124,11 @@ classDiagram
 
 ## 6. Hybrid integration
 
+> **H1 and H2 built in #19** (2026-11-26).
+> - **Week strip:** shows miles with ⚡ on run days and L/U on lift days, green once a day is done, plus "N of M done". Tapping a cell opens that day in Cardio or Strength Plan.
+> - **Hints:** share #25's key-day rule. A region gap is only flagged once there's strength history. Each hint can be dismissed for the week.
+> - **Light weeks:** relax every hint, once #20 adds them.
+
 - **H1 — Home two-track week strip** (in the hybrid hub, below Today):
 
   ```

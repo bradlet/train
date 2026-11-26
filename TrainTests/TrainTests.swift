@@ -6788,6 +6788,118 @@ struct PlacementDismissalsTests {
     }
 }
 
+// MARK: - HybridWeek Tests
+
+struct HybridWeekTests {
+
+    /// Thursday 2026-11-26; Monday-start week Nov 23–29.
+    private let thursday = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 12))!
+
+    private func day(_ dayOfMonth: Int) -> Date {
+        Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: dayOfMonth, hour: 7))!
+    }
+
+    private func run(_ dayOfMonth: Int, miles: Double = 5, key: Bool = false, done: Bool = false) -> Exercise {
+        Exercise(name: "Run", type: .run, durationSeconds: 1800, distanceMiles: miles, date: day(dayOfMonth),
+                 isKeyWorkout: key, workout: done ? Workout(durationSeconds: 1800, distanceMiles: miles) : nil)
+    }
+
+    private func card(_ name: String, _ muscle: MuscleGroup, lane: Int) -> StrengthExercise {
+        StrengthExercise(name: name, muscleGroup: muscle, weekdayIndex: lane)
+    }
+
+    private func strip(_ cardio: [Exercise], _ cards: [StrengthExercise], _ records: [StrengthRecord] = []) -> [HybridDay] {
+        HybridWeek.days(cardio: cardio, cards: cards, records: records, groups: [:], now: thursday, firstWeekday: 2)
+    }
+
+    @Test func daysFollowTheWeekOrderAndFillBothTracks() {
+        let squat = card("Squat", .quads, lane: 2)
+        let days = strip([run(24, miles: 6, key: true), run(26, done: true)], [squat, card("Bench", .chest, lane: 4)],
+                         [StrengthRecord(liftKey: squat.liftKey, slotID: squat.id, date: day(24))])
+        #expect(days.map(\.weekday) == [1, 2, 3, 4, 5, 6, 0], "Monday first")
+        let tuesday = days[1]
+        #expect(tuesday.cardioCount == 1 && tuesday.hasKey && tuesday.miles == 6)
+        #expect(tuesday.liftLoad == .lower && tuesday.liftDone == 1)
+        #expect(days[3].cardioDone == 1 && days[3].liftLoad == .upper)
+        #expect(HybridWeek.progress(days).done == 2)
+        #expect(HybridWeek.progress(days).total == 4)
+    }
+
+    @Test func legsBeforeAKeyWorkoutIsHinted() {
+        let days = strip([run(25, key: true)], [card("Squat", .quads, lane: 2), card("Row", .back, lane: 4)])
+        let hint = HybridWeek.hints(days, records: [], lifts: [], now: thursday).first { $0.kind == .legsBeforeKey }
+        #expect(hint?.weekday == 2)
+    }
+
+    @Test func unmarkedHardSessionsAreNeverKey() {
+        let intervals = Exercise(name: "Intervals", type: .intervalRun, durationSeconds: 3000, distanceMiles: 6, date: day(25))
+        let days = strip([intervals], [card("Squat", .quads, lane: 2), card("Row", .back, lane: 4)])
+        #expect(!HybridWeek.hints(days, records: [], lifts: [], now: thursday).contains { $0.kind == .legsBeforeKey })
+    }
+
+    @Test func fewerThanTwoStrengthDaysIsHinted() {
+        let one = strip([], [card("Squat", .quads, lane: 2)])
+        #expect(HybridWeek.hints(one, records: [], lifts: [], now: thursday).contains { $0.kind == .strengthFloor })
+        let two = strip([], [card("Squat", .quads, lane: 2), card("Bench", .chest, lane: 5)])
+        #expect(!HybridWeek.hints(two, records: [], lifts: [], now: thursday).contains { $0.kind == .strengthFloor })
+    }
+
+    @Test func sevenTrainingDaysWithoutRestIsHinted() {
+        let cardio = (23...29).map { run($0) }
+        let days = strip(cardio, [card("Bench", .chest, lane: 1), card("Row", .back, lane: 3)])
+        #expect(HybridWeek.hints(days, records: [], lifts: [], now: thursday).contains { $0.kind == .noRecoveryDay })
+        let restful = strip(Array(cardio.dropLast()), [card("Bench", .chest, lane: 1), card("Row", .back, lane: 3)])
+        #expect(!HybridWeek.hints(restful, records: [], lifts: [], now: thursday).contains { $0.kind == .noRecoveryDay })
+    }
+
+    @Test func regionGapsNeedHistoryAndLookBackTwoWeeks() {
+        #expect(HybridWeek.untouchedRegions(records: [], lifts: [], now: thursday).isEmpty, "no history, no nagging")
+        let recent = [
+            StrengthRecord(liftKey: "barbell-bench-press", date: day(20)),
+            StrengthRecord(liftKey: "barbell-row", date: day(20)),
+            StrengthRecord(liftKey: "back-squat", date: day(20)),
+            StrengthRecord(liftKey: "romanian-deadlift", date: day(20)),
+            StrengthRecord(liftKey: "plank", date: Calendar.current.date(byAdding: .day, value: -20, to: thursday)!),
+        ]
+        #expect(HybridWeek.untouchedRegions(records: recent, lifts: [], now: thursday) == [.core])
+    }
+
+    @Test func aLiftsRegionsFallBackToItsMuscleGroup() {
+        let custom = StrengthLift(liftKey: "name:landmine press", name: "Landmine Press", muscleGroup: .shoulders)
+        #expect(HybridWeek.regions(forLiftKey: custom.liftKey, lifts: [custom]) == [.push])
+    }
+
+    @Test func aLightWeekRelaxesEverything() {
+        let days = strip([], [])
+        #expect(!HybridWeek.hints(days, records: [], lifts: [], now: thursday).isEmpty)
+        #expect(HybridWeek.hints(days, records: [], lifts: [], now: thursday, isLightWeek: true).isEmpty)
+    }
+
+    @Test func hintDismissalsLastTheWeek() {
+        let hint = HybridHint(kind: .strengthFloor, weekday: nil, message: "")
+        let raw = HintDismissals.dismiss(hint, in: "", now: thursday, firstWeekday: 2)
+        #expect(HintDismissals.visible([hint], in: raw, now: thursday, firstWeekday: 2).isEmpty)
+        let nextWeek = Calendar.current.date(byAdding: .day, value: 7, to: thursday)!
+        #expect(HintDismissals.visible([hint], in: raw, now: nextWeek, firstWeekday: 2) == [hint])
+    }
+}
+
+// MARK: - PlanRouter Tests
+
+@MainActor
+struct PlanRouterTests {
+
+    @Test func openingADaySelectsTheTabAndHandsOverTheDay() {
+        let router = PlanRouter()
+        #expect(router.tab == .home)
+        let day = Date(timeIntervalSince1970: 1_000_000)
+        router.openCardio(on: day)
+        #expect(router.tab == .cardio && router.cardioDay == day)
+        router.openStrength(on: 3)
+        #expect(router.tab == .strength && router.strengthWeekday == 3)
+    }
+}
+
 // MARK: - StrengthLiftKey Tests
 
 struct StrengthLiftKeyTests {
