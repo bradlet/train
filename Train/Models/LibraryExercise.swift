@@ -35,11 +35,15 @@ struct LibraryExercise: Codable, Hashable, Sendable, Identifiable {
     /// defaulting to weight; an unknown value (e.g. from a newer server
     /// catalog) also reads as weight.
     let primaryMetric: LiftMetric
+    /// The movement pattern (#24), e.g. horizontal push — what makes two
+    /// lifts interchangeable in a movement group. `nil` for isolation work
+    /// and entries without one; an unknown value also reads as `nil`.
+    let pattern: MovementPattern?
 
     private enum CodingKeys: String, CodingKey {
         case id, name
         case details = "description"
-        case muscleGroup, secondaryMuscleGroups, equipment, difficulty, primaryMetric
+        case muscleGroup, secondaryMuscleGroups, equipment, difficulty, primaryMetric, pattern
     }
 
     /// Creates a library exercise entry.
@@ -51,7 +55,8 @@ struct LibraryExercise: Codable, Hashable, Sendable, Identifiable {
         secondaryMuscleGroups: [MuscleGroup] = [],
         equipment: String,
         difficulty: String,
-        primaryMetric: LiftMetric = .weight
+        primaryMetric: LiftMetric = .weight,
+        pattern: MovementPattern? = nil
     ) {
         self.id = id
         self.name = name
@@ -61,11 +66,13 @@ struct LibraryExercise: Codable, Hashable, Sendable, Identifiable {
         self.equipment = equipment
         self.difficulty = difficulty
         self.primaryMetric = primaryMetric
+        self.pattern = pattern
     }
 
     /// Tolerant decoding: `secondaryMuscleGroups` may be omitted in source
     /// JSON, defaulting to empty, and `primaryMetric` may be omitted or
-    /// unknown, defaulting to weight.
+    /// unknown, defaulting to weight; `pattern` may be omitted or unknown,
+    /// reading as `nil`.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(String.self, forKey: .id)
@@ -77,5 +84,7 @@ struct LibraryExercise: Codable, Hashable, Sendable, Identifiable {
         self.difficulty = try container.decode(String.self, forKey: .difficulty)
         let metricRaw = try container.decodeIfPresent(String.self, forKey: .primaryMetric)
         self.primaryMetric = metricRaw.flatMap(LiftMetric.init(rawValue:)) ?? .weight
+        let patternRaw = try container.decodeIfPresent(String.self, forKey: .pattern)
+        self.pattern = patternRaw.flatMap(MovementPattern.init(rawValue:))
     }
 }

@@ -23,6 +23,7 @@ enum ModelContainerFactory {
         StrengthLift.self,
         StrengthRecord.self,
         UserLibraryExercise.self,
+        UserMovementGroup.self,
         FavoriteWorkout.self,
         AppConfiguration.self,
     ]

@@ -43,6 +43,11 @@ final class StrengthExercise {
     var plannedSets: Int? = nil
     /// Planned reps per set, or `nil` when no plan is set.
     var plannedReps: Int? = nil
+    /// The movement group (#24) this card plans instead of a single lift,
+    /// or `nil` for a single-lift card. A group card's `name` and
+    /// `muscleGroup` mirror the group; the lift it records is the group's
+    /// up-next member (`GroupRotation`), never `liftKey`.
+    var groupID: String? = nil
 
     /// Primary muscle group, denormalized from the library for card display.
     /// Unknown stored raw values (e.g. synced from a newer app version) read
@@ -54,6 +59,7 @@ final class StrengthExercise {
 
     /// The lift this card is a slot for: its history, metric and records
     /// live on the lift under this key, so they outlive the card.
+    /// Meaningless for a group card — resolve its member instead.
     var liftKey: String {
         StrengthLiftKey.make(libraryID: libraryExerciseID, name: name)
     }
@@ -76,6 +82,7 @@ final class StrengthExercise {
     ///   - notes: Optional notes.
     ///   - plannedSets: Planned number of sets, if any.
     ///   - plannedReps: Planned reps per set, if any.
+    ///   - groupID: The movement group this card plans, if any.
     init(
         name: String,
         libraryExerciseID: String? = nil,
@@ -85,7 +92,8 @@ final class StrengthExercise {
         sortOrder: Int = 0,
         notes: String = "",
         plannedSets: Int? = nil,
-        plannedReps: Int? = nil
+        plannedReps: Int? = nil,
+        groupID: String? = nil
     ) {
         self.id = UUID()
         self.name = name
@@ -97,5 +105,9 @@ final class StrengthExercise {
         self.notes = notes
         self.plannedSets = plannedSets
         self.plannedReps = plannedReps
+        self.groupID = groupID
     }
+
+    /// Whether this card plans a movement group rather than one lift.
+    var isGroup: Bool { groupID != nil }
 }
