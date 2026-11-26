@@ -89,23 +89,32 @@ extension MuscleGroup {
 
 extension CoachStrengthWorkout {
 
-    /// Creates a coaching snapshot from a recorded strength workout. Empty
-    /// notes arrive as `nil` so they stay out of prompt output.
-    init(from workout: StrengthWorkout) {
+    /// Creates a coaching snapshot from a recorded strength session, or
+    /// `nil` for one the weight-only coach snapshot can't carry. The coach
+    /// is being reworked separately (out of scope for #13), so for now only
+    /// weight records with a value are passed through; reps, time, distance
+    /// and value-less "done" records are left out. Empty notes arrive as
+    /// `nil` so they stay out of prompt output.
+    init?(from record: StrengthRecord) {
+        guard record.metric == .weight, let pounds = record.value else { return nil }
         self.init(
-            date: workout.date,
-            weightPounds: workout.weightPounds,
-            recordingType: workout.recordingType.rawValue,
-            notes: workout.notes.isEmpty ? nil : workout.notes
+            date: record.date,
+            weightPounds: pounds,
+            recordingType: (record.measurement ?? .max).displayName,
+            notes: record.notes.isEmpty ? nil : record.notes
         )
     }
 }
 
 extension CoachStrengthExercise {
 
-    /// Creates a coaching snapshot from a board exercise, with its recorded
-    /// workouts sorted oldest first. Empty notes arrive as `nil`.
-    init(from exercise: StrengthExercise) {
+    /// Creates a coaching snapshot from a board exercise and its lift's
+    /// recorded history (shared by every card for the same lift), sorted
+    /// oldest first. Empty notes arrive as `nil`.
+    /// - Parameters:
+    ///   - exercise: The board card.
+    ///   - records: All strength records; filtered to the card's lift.
+    init(from exercise: StrengthExercise, records: [StrengthRecord]) {
         self.init(
             name: exercise.name,
             muscleGroup: exercise.muscleGroup.rawValue,
@@ -114,20 +123,25 @@ extension CoachStrengthExercise {
             notes: exercise.notes.isEmpty ? nil : exercise.notes,
             plannedSets: exercise.plannedSets,
             plannedReps: exercise.plannedReps,
-            workouts: exercise.workouts
-                .sorted { $0.date < $1.date }
-                .map { CoachStrengthWorkout(from: $0) }
+            workouts: StrengthLiftRegistry.records(forKey: exercise.liftKey, in: records)
+                .compactMap { CoachStrengthWorkout(from: $0) }
         )
     }
 
     /// Converts board exercises into coach snapshots, in board order (day,
     /// then section, then position).
-    static func snapshots(from exercises: [StrengthExercise]) -> [CoachStrengthExercise] {
+    /// - Parameters:
+    ///   - exercises: The board cards.
+    ///   - records: All strength records.
+    static func snapshots(
+        from exercises: [StrengthExercise],
+        records: [StrengthRecord] = []
+    ) -> [CoachStrengthExercise] {
         exercises
             .sorted {
                 ($0.weekdayIndex, $0.isOffloaded ? 1 : 0, $0.sortOrder)
                     < ($1.weekdayIndex, $1.isOffloaded ? 1 : 0, $1.sortOrder)
             }
-            .map { CoachStrengthExercise(from: $0) }
+            .map { CoachStrengthExercise(from: $0, records: records) }
     }
 }

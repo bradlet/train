@@ -17,6 +17,9 @@ struct StrengthDayColumn: View {
     let dayIndex: Int
     /// All strength exercises (the column filters its own lanes).
     let allExercises: [StrengthExercise]
+    /// The latest record per lift key (see
+    /// `StrengthLiftRegistry.latestByLiftKey`), for each card's summary.
+    let latestRecords: [String: StrengthRecord]
     /// Called when the user taps a card to record a weight entry.
     let onRecord: (StrengthExercise) -> Void
     /// Called when the user taps the add button to open the exercise library.
@@ -97,6 +100,7 @@ struct StrengthDayColumn: View {
                 ForEach(exercises) { exercise in
                     StrengthExerciseCard(
                         exercise: exercise,
+                        latestRecord: latestRecords[exercise.liftKey],
                         onRecord: { onRecord(exercise) },
                         onMoveToDay: { day in onMoveToDay(exercise, day) },
                         onToggleOffloaded: {
@@ -133,6 +137,7 @@ struct StrengthDayColumn: View {
     StrengthDayColumn(
         dayIndex: 1,
         allExercises: [],
+        latestRecords: [:],
         onRecord: { _ in },
         onAddExercise: {},
         onDrop: { _, _, _ in },

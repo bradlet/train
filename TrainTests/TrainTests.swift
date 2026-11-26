@@ -4606,101 +4606,28 @@ struct AppConfigurationSheetsSyncDefaultsTests {
     }
 }
 
-// MARK: - WeightRecordingType Tests
+// MARK: - LiftMeasurement Tests
 
-struct WeightRecordingTypeTests {
+struct LiftMeasurementTests {
 
-    @Test func hasAllFiveRecordingTypes() {
-        #expect(WeightRecordingType.allCases.count == 5)
-        #expect(WeightRecordingType.allCases.contains(.maxWeight))
-        #expect(WeightRecordingType.allCases.contains(.averageWeight))
-        #expect(WeightRecordingType.allCases.contains(.firstSetWeight))
-        #expect(WeightRecordingType.allCases.contains(.lastSetWeight))
-        #expect(WeightRecordingType.allCases.contains(.minWeight))
+    @Test func hasAllFiveMeasurementsWithStableRawValues() {
+        #expect(LiftMeasurement.allCases.map(\.rawValue) == ["max", "average", "firstSet", "lastSet", "min"])
     }
 
-    @Test func allCasesHaveShortLabels() {
-        for type in WeightRecordingType.allCases {
-            #expect(!type.shortLabel.isEmpty, "\(type) should have a shortLabel")
+    @Test func labelsAreNeutralAcrossWeightAndReps() {
+        for measurement in LiftMeasurement.allCases {
+            #expect(!measurement.shortLabel.isEmpty)
+            #expect(!measurement.displayName.lowercased().contains("weight"))
         }
+        #expect(LiftMeasurement.average.shortLabel == "Avg")
+        #expect(LiftMeasurement.firstSet.displayName == "First Set")
     }
 
     @Test func codableRoundTrip() throws {
-        for type in WeightRecordingType.allCases {
-            let data = try JSONEncoder().encode(type)
-            let decoded = try JSONDecoder().decode(WeightRecordingType.self, from: data)
-            #expect(decoded == type)
+        for measurement in LiftMeasurement.allCases {
+            let data = try JSONEncoder().encode(measurement)
+            #expect(try JSONDecoder().decode(LiftMeasurement.self, from: data) == measurement)
         }
-    }
-}
-
-// MARK: - LiftMetric Tests
-
-struct LiftMetricTests {
-
-    @Test func hasFourMetricsWithStableRawValues() {
-        #expect(LiftMetric.allCases.map(\.rawValue) == ["weight", "reps", "time", "distance"])
-    }
-
-    @Test func onlyWeightAndRepsUseAMeasurement() {
-        #expect(LiftMetric.weight.usesMeasurement)
-        #expect(LiftMetric.reps.usesMeasurement)
-        #expect(!LiftMetric.time.usesMeasurement)
-        #expect(!LiftMetric.distance.usesMeasurement)
-    }
-
-    @Test func unitLabelsFollowTheUnitPreference() {
-        #expect(LiftMetric.weight.unitLabel(metric: false) == "lb")
-        #expect(LiftMetric.weight.unitLabel(metric: true) == "kg")
-        #expect(LiftMetric.reps.unitLabel(metric: true) == "reps")
-        #expect(LiftMetric.time.unitLabel(metric: false) == "")
-        #expect(LiftMetric.distance.unitLabel(metric: false) == "yd")
-        #expect(LiftMetric.distance.unitLabel(metric: true) == "m")
-    }
-
-    @Test func displayAndStoredValuesRoundTrip() {
-        for metric in LiftMetric.allCases {
-            for useMetric in [false, true] {
-                let stored = metric.storedValue(fromDisplay: 40, metric: useMetric)
-                let display = metric.displayValue(fromStored: stored, metric: useMetric)
-                #expect(abs(display - 40) < 0.0001, "\(metric) metric=\(useMetric)")
-            }
-        }
-    }
-
-    @Test func distanceIsStoredInMiles() {
-        #expect(LiftMetric.distance.storedValue(fromDisplay: 1760, metric: false) == 1)
-        #expect(abs(LiftMetric.distance.storedValue(fromDisplay: 1609.344, metric: true) - 1) < 0.0001)
-    }
-
-    @Test func weightIsStoredInPounds() {
-        #expect(LiftMetric.weight.storedValue(fromDisplay: 185, metric: false) == 185)
-        #expect(abs(LiftMetric.weight.storedValue(fromDisplay: 100, metric: true) - 220.462) < 0.001)
-    }
-
-    @Test func nilValueFormatsAsDone() {
-        for metric in LiftMetric.allCases {
-            #expect(metric.formatted(nil, metric: false) == "Done")
-        }
-    }
-
-    @Test func formatsEachMetric() {
-        #expect(LiftMetric.weight.formatted(185, metric: false) == "185 lb")
-        #expect(LiftMetric.reps.formatted(12, metric: false) == "12 reps")
-        #expect(LiftMetric.reps.formatted(1, metric: false) == "1 rep")
-        #expect(LiftMetric.time.formatted(90, metric: false) == "1:30")
-        #expect(LiftMetric.distance.formatted(40 / 1760, metric: false) == "40 yd")
-        #expect(LiftMetric.distance.formatted(20 / 1609.344, metric: true) == "20 m")
-    }
-
-    @Test func clockFormattingEdgeCases() {
-        #expect(LiftMetric.formattedClock(seconds: 0) == "0:00")
-        #expect(LiftMetric.formattedClock(seconds: 5) == "0:05")
-        #expect(LiftMetric.formattedClock(seconds: 59) == "0:59")
-        #expect(LiftMetric.formattedClock(seconds: 60) == "1:00")
-        #expect(LiftMetric.formattedClock(seconds: 3600) == "1:00:00")
-        #expect(LiftMetric.formattedClock(seconds: 3725) == "1:02:05")
-        #expect(LiftMetric.formattedClock(seconds: -3) == "0:00")
     }
 }
 
@@ -4723,36 +4650,304 @@ struct MuscleGroupTests {
     }
 }
 
-// MARK: - StrengthWorkout Tests
+// MARK: - StrengthRecord Tests
 
-struct StrengthWorkoutTests {
+struct StrengthRecordTests {
 
     @Test func defaultValues() {
-        let workout = StrengthWorkout()
-        #expect(workout.weightPounds == 0.0)
-        #expect(workout.recordingType == .maxWeight)
-        #expect(workout.notes == "")
+        let record = StrengthRecord(liftKey: "back-squat")
+        #expect(record.liftKey == "back-squat")
+        #expect(record.slotID == nil)
+        #expect(record.value == nil)
+        #expect(record.metric == .weight)
+        #expect(record.measurement == nil)
+        #expect(record.notes == "")
     }
 
     @Test func explicitInitPreservesValues() {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
-        let workout = StrengthWorkout(
-            date: date,
-            weightPounds: 225.0,
-            recordingType: .averageWeight,
-            notes: "Felt strong"
+        let slot = UUID()
+        let record = StrengthRecord(
+            liftKey: "push-up", slotID: slot, date: date, value: 20,
+            metric: .reps, measurement: .lastSet, notes: "slow eccentric"
         )
-        #expect(workout.date == date)
-        #expect(workout.weightPounds == 225.0)
-        #expect(workout.recordingType == .averageWeight)
-        #expect(workout.notes == "Felt strong")
+        #expect(record.slotID == slot)
+        #expect(record.date == date)
+        #expect(record.value == 20)
+        #expect(record.metric == .reps)
+        #expect(record.measurement == .lastSet)
+        #expect(record.notes == "slow eccentric")
     }
 
-    @Test func codableRoundTrip() throws {
-        let workout = StrengthWorkout(weightPounds: 135.5, recordingType: .firstSetWeight, notes: "warmup")
-        let data = try JSONEncoder().encode(workout)
-        let decoded = try JSONDecoder().decode(StrengthWorkout.self, from: data)
-        #expect(decoded == workout)
+    @Test func timeAndDistanceDropTheMeasurement() {
+        #expect(StrengthRecord(liftKey: "plank", value: 60, metric: .time, measurement: .max).measurement == nil)
+        #expect(StrengthRecord(liftKey: "sled-push", value: 0.01, metric: .distance, measurement: .max).measurement == nil)
+    }
+
+    @Test func summaryIncludesTheMeasurementOnlyWithAValue() {
+        #expect(StrengthRecord(liftKey: "k", value: 185, metric: .weight, measurement: .max)
+            .summary(useMetricUnits: false) == "185 lb · Max")
+        #expect(StrengthRecord(liftKey: "k", value: 90, metric: .time).summary(useMetricUnits: false) == "1:30")
+        #expect(StrengthRecord(liftKey: "k", metric: .weight, measurement: .max)
+            .summary(useMetricUnits: false) == "Done")
+    }
+
+    @Test func persistsInModelContainer() throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        let slot = UUID()
+        context.insert(StrengthRecord(liftKey: "barbell-row", slotID: slot, value: 185, metric: .weight, measurement: .average))
+        context.insert(StrengthRecord(liftKey: "plank", metric: .time))
+        try context.save()
+
+        let fetched = try ModelContext(container).fetch(FetchDescriptor<StrengthRecord>())
+        let row = try #require(fetched.first { $0.liftKey == "barbell-row" })
+        #expect(row.slotID == slot)
+        #expect(row.value == 185)
+        #expect(row.measurement == .average)
+        let done = try #require(fetched.first { $0.liftKey == "plank" })
+        #expect(done.value == nil, "a done record persists with no value, never 0")
+        #expect(done.metric == .time)
+    }
+}
+
+// MARK: - StrengthLift Tests
+
+struct StrengthLiftTests {
+
+    @Test func defaultValues() {
+        let lift = StrengthLift(liftKey: "name:l-sit", name: "L-Sit")
+        #expect(lift.libraryExerciseID == nil)
+        #expect(lift.muscleGroup == .other)
+        #expect(lift.primaryMetric == .weight)
+    }
+
+    @Test func explicitInitAndPersistence() throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        context.insert(StrengthLift(
+            liftKey: "plank", name: "Plank", libraryExerciseID: "plank",
+            muscleGroup: .core, primaryMetric: .time
+        ))
+        try context.save()
+        let lift = try #require(try ModelContext(container).fetch(FetchDescriptor<StrengthLift>()).first)
+        #expect(lift.liftKey == "plank")
+        #expect(lift.name == "Plank")
+        #expect(lift.libraryExerciseID == "plank")
+        #expect(lift.muscleGroup == .core)
+        #expect(lift.primaryMetric == .time)
+    }
+}
+
+// MARK: - StrengthLiftKey Tests
+
+struct StrengthLiftKeyTests {
+
+    @Test func libraryIDWins() {
+        #expect(StrengthLiftKey.make(libraryID: "barbell-bench-press", name: "Bench") == "barbell-bench-press")
+    }
+
+    @Test func unlinkedLiftsKeyByNormalisedName() {
+        #expect(StrengthLiftKey.make(libraryID: nil, name: "  Zercher   Squat ") == "name:zercher squat")
+        #expect(StrengthLiftKey.make(libraryID: "", name: "Zercher Squat") == "name:zercher squat")
+        #expect(StrengthLiftKey.make(libraryID: nil, name: "zercher squat")
+            == StrengthLiftKey.make(libraryID: nil, name: "ZERCHER SQUAT"))
+    }
+
+    @Test func boardSlotExposesItsLiftKey() {
+        #expect(StrengthExercise(name: "Bench", libraryExerciseID: "barbell-bench-press").liftKey == "barbell-bench-press")
+        #expect(StrengthExercise(name: "Sled Drag").liftKey == "name:sled drag")
+    }
+}
+
+// MARK: - StrengthLiftRegistry Tests
+
+struct StrengthLiftRegistryTests {
+
+    @Test func liftForKeyResolvesDuplicatesToTheOldest() {
+        let newer = StrengthLift(liftKey: "k", name: "New", createdAt: Date(timeIntervalSince1970: 2_000))
+        let older = StrengthLift(liftKey: "k", name: "Old", createdAt: Date(timeIntervalSince1970: 1_000))
+        let other = StrengthLift(liftKey: "x", name: "Other", createdAt: Date(timeIntervalSince1970: 0))
+        #expect(StrengthLiftRegistry.lift(forKey: "k", in: [newer, other, older])?.name == "Old")
+        #expect(StrengthLiftRegistry.lift(forKey: "missing", in: [newer]) == nil)
+    }
+
+    @Test func metricFallsBackToWeightWithoutALift() {
+        let slot = StrengthExercise(name: "Plank", libraryExerciseID: "plank")
+        #expect(StrengthLiftRegistry.metric(for: slot, in: []) == .weight)
+        let lift = StrengthLift(liftKey: "plank", name: "Plank", primaryMetric: .time)
+        #expect(StrengthLiftRegistry.metric(for: slot, in: [lift]) == .time)
+    }
+
+    @Test func findOrCreateIsIdempotentAndKeepsTheExistingMetric() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let slot = StrengthExercise(name: "Plank", libraryExerciseID: "plank", muscleGroup: .core)
+        context.insert(slot)
+        let first = StrengthLiftRegistry.findOrCreate(for: slot, metric: .time, in: context)
+        let second = StrengthLiftRegistry.findOrCreate(for: slot, metric: .reps, in: context)
+        #expect(first === second)
+        #expect(second.primaryMetric == .time, "metric only seeds a new lift")
+        #expect(first.name == "Plank")
+        #expect(first.muscleGroup == .core)
+        #expect(try context.fetch(FetchDescriptor<StrengthLift>()).count == 1)
+        #expect(StrengthLiftRegistry.metric(for: slot, in: context) == .time)
+    }
+
+    @Test func contextMetricIsWeightWithoutALift() {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        #expect(StrengthLiftRegistry.metric(for: StrengthExercise(name: "Curl"), in: context) == .weight)
+    }
+
+    @Test func recordsAreFilteredByKeyOldestFirst() {
+        let newer = StrengthRecord(liftKey: "k", date: Date(timeIntervalSince1970: 2_000), value: 110)
+        let older = StrengthRecord(liftKey: "k", date: Date(timeIntervalSince1970: 1_000), value: 100)
+        let other = StrengthRecord(liftKey: "x", value: 5)
+        #expect(StrengthLiftRegistry.records(forKey: "k", in: [newer, other, older]).map(\.value) == [100, 110])
+    }
+
+    @Test func latestByLiftKeyPicksTheMostRecentPerLift() {
+        let old = StrengthRecord(liftKey: "k", date: Date(timeIntervalSince1970: 1_000), value: 100)
+        let new = StrengthRecord(liftKey: "k", date: Date(timeIntervalSince1970: 3_000), value: 120)
+        let x = StrengthRecord(liftKey: "x", date: Date(timeIntervalSince1970: 2_000), value: 5)
+        let latest = StrengthLiftRegistry.latestByLiftKey([new, x, old])
+        #expect(latest["k"]?.value == 120)
+        #expect(latest["x"]?.value == 5)
+        #expect(StrengthLiftRegistry.latestByLiftKey([]).isEmpty)
+    }
+
+    @Test func twoCardsForTheSameLiftShareOneHistory() {
+        let monday = StrengthExercise(name: "Bench", libraryExerciseID: "barbell-bench-press", weekdayIndex: 1)
+        let thursday = StrengthExercise(name: "Bench", libraryExerciseID: "barbell-bench-press", weekdayIndex: 4)
+        let record = StrengthRecord(liftKey: monday.liftKey, slotID: monday.id, value: 185)
+        let latest = StrengthLiftRegistry.latestByLiftKey([record])
+        #expect(latest[monday.liftKey] === record)
+        #expect(latest[thursday.liftKey] === record)
+    }
+
+    @Test func deletingACardKeepsItsRecords() throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        let slot = StrengthExercise(name: "Deadlift", libraryExerciseID: "deadlift")
+        context.insert(slot)
+        StrengthLiftRegistry.findOrCreate(for: slot, metric: .weight, in: context)
+        context.insert(StrengthRecord(liftKey: slot.liftKey, slotID: slot.id, value: 315))
+        try context.save()
+
+        context.delete(slot)
+        try context.save()
+
+        let fresh = ModelContext(container)
+        #expect(try fresh.fetch(FetchDescriptor<StrengthExercise>()).isEmpty)
+        #expect(try fresh.fetch(FetchDescriptor<StrengthLift>()).count == 1)
+        let records = try fresh.fetch(FetchDescriptor<StrengthRecord>())
+        #expect(records.map(\.value) == [315])
+
+        // Re-adding the lift finds the same history.
+        let readded = StrengthExercise(name: "Deadlift", libraryExerciseID: "deadlift", weekdayIndex: 3)
+        #expect(StrengthLiftRegistry.records(forKey: readded.liftKey, in: records).count == 1)
+    }
+}
+
+// MARK: - StrengthRecordDraft Tests
+
+struct StrengthRecordDraftTests {
+
+    @Test func blankValueIsDoneAndSavable() {
+        for metric in LiftMetric.allCases {
+            let draft = StrengthRecordDraft(metric: metric)
+            #expect(draft.entry(useMetricUnits: false) == .done)
+            #expect(draft.canSave(useMetricUnits: false))
+        }
+    }
+
+    @Test func doneRecordHasNoValueOrMeasurement() throws {
+        var draft = StrengthRecordDraft(metric: .weight)
+        draft.measurement = .average
+        let record = try #require(draft.makeRecord(liftKey: "k", slotID: nil, useMetricUnits: false))
+        #expect(record.value == nil)
+        #expect(record.measurement == nil)
+    }
+
+    @Test func recordCarriesLiftKeySlotDateMetricAndTrimmedNotes() throws {
+        let slot = UUID()
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        var draft = StrengthRecordDraft(metric: .reps, date: date)
+        draft.valueText = "12"
+        draft.measurement = .firstSet
+        draft.notes = "  strict  "
+        let record = try #require(draft.makeRecord(liftKey: "push-up", slotID: slot, useMetricUnits: false))
+        #expect(record.liftKey == "push-up")
+        #expect(record.slotID == slot)
+        #expect(record.date == date)
+        #expect(record.metric == .reps)
+        #expect(record.value == 12)
+        #expect(record.measurement == .firstSet)
+        #expect(record.notes == "strict")
+    }
+
+    @Test func weightConvertsFromKilogramsAndAcceptsCommaDecimals() {
+        var draft = StrengthRecordDraft(metric: .weight)
+        draft.valueText = "100"
+        guard case .value(let pounds) = draft.entry(useMetricUnits: true) else { Issue.record("expected value"); return }
+        #expect(abs(pounds - 220.462) < 0.001)
+        draft.valueText = "62,5"
+        #expect(draft.entry(useMetricUnits: false) == .value(62.5))
+    }
+
+    @Test func distanceConvertsYardsAndMetresToMiles() {
+        var draft = StrengthRecordDraft(metric: .distance)
+        draft.valueText = "1760"
+        #expect(draft.entry(useMetricUnits: false) == .value(1))
+        draft.valueText = "20"
+        guard case .value(let miles) = draft.entry(useMetricUnits: true) else { Issue.record("expected value"); return }
+        #expect(abs(miles - 20 / 1609.344) < 0.000001)
+    }
+
+    @Test func invalidTextBlocksSaving() {
+        var weight = StrengthRecordDraft(metric: .weight)
+        for text in ["abc", "0", "-5"] {
+            weight.valueText = text
+            #expect(weight.entry(useMetricUnits: false) == .invalid, "\(text)")
+            #expect(!weight.canSave(useMetricUnits: false))
+            #expect(weight.makeRecord(liftKey: "k", slotID: nil, useMetricUnits: false) == nil)
+        }
+        var reps = StrengthRecordDraft(metric: .reps)
+        reps.valueText = "12.5"
+        #expect(reps.entry(useMetricUnits: false) == .invalid, "reps are whole numbers")
+    }
+
+    @Test func timeCombinesMinutesAndSeconds() {
+        var draft = StrengthRecordDraft(metric: .time)
+        draft.minutesText = "1"
+        draft.secondsText = "30"
+        #expect(draft.entry(useMetricUnits: false) == .value(90))
+        draft.minutesText = ""
+        draft.secondsText = "90"
+        #expect(draft.entry(useMetricUnits: false) == .value(90), "seconds alone may exceed 59")
+        draft.minutesText = "2"
+        draft.secondsText = ""
+        #expect(draft.entry(useMetricUnits: false) == .value(120))
+    }
+
+    @Test func timeRejectsOverflowingSecondsZeroAndJunk() {
+        var draft = StrengthRecordDraft(metric: .time)
+        draft.minutesText = "1"
+        draft.secondsText = "75"
+        #expect(draft.entry(useMetricUnits: false) == .invalid)
+        draft.minutesText = "0"
+        draft.secondsText = "0"
+        #expect(draft.entry(useMetricUnits: false) == .invalid)
+        draft.minutesText = "x"
+        draft.secondsText = ""
+        #expect(draft.entry(useMetricUnits: false) == .invalid)
+    }
+
+    @Test func timeRecordsHaveNoMeasurement() throws {
+        var draft = StrengthRecordDraft(metric: .time)
+        draft.secondsText = "45"
+        draft.measurement = .max
+        let record = try #require(draft.makeRecord(liftKey: "plank", slotID: nil, useMetricUnits: false))
+        #expect(record.measurement == nil)
     }
 }
 
@@ -4772,8 +4967,6 @@ struct StrengthExerciseTests {
         #expect(exercise.plannedSets == nil)
         #expect(exercise.plannedReps == nil)
         #expect(exercise.plannedSummary == nil)
-        #expect(exercise.workouts.isEmpty)
-        #expect(exercise.latestWorkout == nil)
     }
 
     @Test func plannedSummaryFormatsSetsByReps() {
@@ -4818,24 +5011,6 @@ struct StrengthExerciseTests {
         #expect(exercise.notes == "pause reps")
     }
 
-    @Test func workoutsRoundTripThroughBackingData() {
-        let exercise = StrengthExercise(name: "Deadlift", muscleGroup: .back)
-        let first = StrengthWorkout(weightPounds: 315, recordingType: .maxWeight)
-        let second = StrengthWorkout(weightPounds: 275, recordingType: .averageWeight)
-        exercise.workouts = [first, second]
-        #expect(exercise.workouts == [first, second])
-        exercise.workouts = []
-        #expect(exercise.workouts.isEmpty)
-    }
-
-    @Test func latestWorkoutReturnsMostRecentByDate() {
-        let exercise = StrengthExercise(name: "Overhead Press", muscleGroup: .shoulders)
-        let older = StrengthWorkout(date: Date(timeIntervalSince1970: 1_000), weightPounds: 95)
-        let newer = StrengthWorkout(date: Date(timeIntervalSince1970: 2_000), weightPounds: 105)
-        exercise.workouts = [newer, older]
-        #expect(exercise.latestWorkout == newer)
-    }
-
     @Test func persistsInModelContainer() throws {
         let container = ModelContainerFactory.makePreviewContainer()
         let context = ModelContext(container)
@@ -4844,8 +5019,7 @@ struct StrengthExerciseTests {
             libraryExerciseID: "barbell-row",
             muscleGroup: .back,
             weekdayIndex: 5,
-            sortOrder: 1,
-            workouts: [StrengthWorkout(weightPounds: 185, recordingType: .lastSetWeight)]
+            sortOrder: 1
         )
         context.insert(exercise)
         try context.save()
@@ -4854,8 +5028,7 @@ struct StrengthExerciseTests {
         #expect(fetched.count == 1)
         #expect(fetched.first?.name == "Barbell Row")
         #expect(fetched.first?.weekdayIndex == 5)
-        #expect(fetched.first?.workouts.first?.weightPounds == 185)
-        #expect(fetched.first?.workouts.first?.recordingType == .lastSetWeight)
+        #expect(fetched.first?.liftKey == "barbell-row")
     }
 }
 
@@ -5372,49 +5545,63 @@ struct StrengthBoardPlannerTests {
 
 struct CoachStrengthConversionTests {
 
-    @Test func snapshotCapturesExerciseFields() {
+    @Test func snapshotCapturesExerciseFieldsAndLiftHistory() {
         let exercise = StrengthExercise(
             name: "Back Squat",
+            libraryExerciseID: "back-squat",
             muscleGroup: .quads,
             weekdayIndex: 2,
             isOffloaded: true,
-            notes: "belt on top sets",
-            workouts: [StrengthWorkout(weightPounds: 315, recordingType: .maxWeight)]
+            notes: "belt on top sets"
         )
-        let snapshot = CoachStrengthExercise(from: exercise)
+        let records = [
+            StrengthRecord(liftKey: "back-squat", value: 315, metric: .weight, measurement: .max),
+            StrengthRecord(liftKey: "deadlift", value: 405, metric: .weight, measurement: .max),
+        ]
+        let snapshot = CoachStrengthExercise(from: exercise, records: records)
         #expect(snapshot.name == "Back Squat")
         #expect(snapshot.muscleGroup == "Quads")
         #expect(snapshot.weekdayIndex == 2)
         #expect(snapshot.isOffloaded == true)
         #expect(snapshot.notes == "belt on top sets")
-        #expect(snapshot.workouts.count == 1)
+        #expect(snapshot.workouts.count == 1, "only this lift's records")
         #expect(snapshot.workouts.first?.weightPounds == 315)
-        #expect(snapshot.workouts.first?.recordingType == "Max Weight")
+        #expect(snapshot.workouts.first?.recordingType == "Max")
     }
 
     @Test func emptyNotesAreOmitted() {
-        let exercise = StrengthExercise(
-            name: "Curl",
-            muscleGroup: .biceps,
-            workouts: [StrengthWorkout(weightPounds: 30)]
-        )
-        let snapshot = CoachStrengthExercise(from: exercise)
+        let exercise = StrengthExercise(name: "Curl", muscleGroup: .biceps)
+        let records = [StrengthRecord(liftKey: exercise.liftKey, value: 30)]
+        let snapshot = CoachStrengthExercise(from: exercise, records: records)
         #expect(snapshot.notes == nil)
         #expect(snapshot.workouts.first?.notes == nil)
     }
 
+    @Test func onlyWeightRecordsWithAValueReachTheCoach() {
+        let exercise = StrengthExercise(name: "Mixed")
+        let key = exercise.liftKey
+        let records = [
+            StrengthRecord(liftKey: key, value: 100, metric: .weight),
+            StrengthRecord(liftKey: key, metric: .weight),
+            StrengthRecord(liftKey: key, value: 12, metric: .reps),
+            StrengthRecord(liftKey: key, value: 60, metric: .time),
+        ]
+        let snapshot = CoachStrengthExercise(from: exercise, records: records)
+        #expect(snapshot.workouts.map(\.weightPounds) == [100])
+    }
+
     @Test func snapshotCapturesPlannedSetsAndReps() {
         let exercise = StrengthExercise(name: "Bench", plannedSets: 3, plannedReps: 8)
-        let snapshot = CoachStrengthExercise(from: exercise)
+        let snapshot = CoachStrengthExercise(from: exercise, records: [])
         #expect(snapshot.plannedSets == 3)
         #expect(snapshot.plannedReps == 8)
     }
 
     @Test func workoutsAreSortedOldestFirst() {
-        let older = StrengthWorkout(date: Date(timeIntervalSince1970: 1_000), weightPounds: 100)
-        let newer = StrengthWorkout(date: Date(timeIntervalSince1970: 2_000), weightPounds: 110)
-        let exercise = StrengthExercise(name: "Press", workouts: [newer, older])
-        let snapshot = CoachStrengthExercise(from: exercise)
+        let exercise = StrengthExercise(name: "Press")
+        let newer = StrengthRecord(liftKey: exercise.liftKey, date: Date(timeIntervalSince1970: 2_000), value: 110)
+        let older = StrengthRecord(liftKey: exercise.liftKey, date: Date(timeIntervalSince1970: 1_000), value: 100)
+        let snapshot = CoachStrengthExercise(from: exercise, records: [newer, older])
         #expect(snapshot.workouts.map(\.weightPounds) == [100, 110])
     }
 
@@ -6114,6 +6301,28 @@ struct CoachProposalApplierTests {
         let inserted = try #require(try fetchStrength(in: context).first)
         #expect(inserted.libraryExerciseID == "barbell-bench-press")
         #expect(inserted.muscleGroup == .chest, "library group wins over the proposal's")
+    }
+
+    @Test func strengthDayCreatesLiftsWithTheLibraryMetric() throws {
+        let context = try makeContext()
+        let library = [
+            LibraryExercise(
+                id: "plank", name: "Plank", details: "", muscleGroup: .core,
+                equipment: "Bodyweight", difficulty: "Beginner", primaryMetric: .time
+            ),
+        ]
+        _ = CoachProposalApplier.apply(
+            strengthProposal(exercises: [
+                PlannedStrengthExercise(name: "Plank", muscleGroup: .core),
+                PlannedStrengthExercise(name: "Made-Up Move", muscleGroup: .other),
+            ]),
+            library: library,
+            in: context
+        )
+        let lifts = try context.fetch(FetchDescriptor<StrengthLift>())
+        #expect(lifts.first { $0.liftKey == "plank" }?.primaryMetric == .time)
+        #expect(lifts.first { $0.liftKey == "name:made-up move" }?.primaryMetric == .weight)
+        #expect(lifts.count == 2)
     }
 
     @Test func strengthDaySkipsNamesAlreadyInTheActiveLane() throws {

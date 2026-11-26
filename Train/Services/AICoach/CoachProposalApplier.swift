@@ -220,6 +220,9 @@ enum CoachProposalApplier {
                 plannedReps: entry.plannedReps
             )
             context.insert(exercise)
+            StrengthLiftRegistry.findOrCreate(
+                for: exercise, metric: match?.primaryMetric ?? .weight, in: context
+            )
             laneNames.insert(key)
             nextOrder += 1
             outcome.inserted.append(exercise.name)

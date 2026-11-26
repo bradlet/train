@@ -15,11 +15,13 @@ struct TodayTrainingSection: View {
     let aerobic: [Exercise]
     /// Today's active strength lane, already ordered by `TodayTraining.strength`.
     let strength: [StrengthExercise]
+    /// The latest record per lift key, for each strength row's value.
+    let latestStrengthRecords: [String: StrengthRecord]
     /// Called to record (or re-open) an aerobic exercise.
     let onRecordAerobic: (Exercise) -> Void
     /// Called to edit an aerobic exercise's plan or recorded data.
     let onEditAerobic: (Exercise) -> Void
-    /// Called to record a weight against a strength exercise.
+    /// Called to record a session against a strength exercise.
     let onRecordStrength: (StrengthExercise) -> Void
 
     /// Shared across the aerobic cards so only one shows its delete button.
@@ -55,7 +57,10 @@ struct TodayTrainingSection: View {
                     }
                     VStack(spacing: 8) {
                         ForEach(strength) { exercise in
-                            HomeStrengthRow(exercise: exercise) {
+                            HomeStrengthRow(
+                                exercise: exercise,
+                                latestRecord: latestStrengthRecords[exercise.liftKey]
+                            ) {
                                 onRecordStrength(exercise)
                             }
                         }

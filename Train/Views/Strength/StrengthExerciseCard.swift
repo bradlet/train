@@ -2,9 +2,9 @@
 //  StrengthExerciseCard.swift
 //  Train
 //
-//  A kanban card for one strength exercise: name, muscle group, and the most
-//  recent recorded weight. Draggable between lanes/days; tap to record a
-//  weight entry; context menu for moving, offloading, and deleting.
+//  A kanban card for one strength exercise: name, muscle group, and its
+//  lift's most recent record. Draggable between lanes/days; tap to record a
+//  session; context menu for moving, offloading, and deleting.
 //
 
 import SwiftUI
@@ -32,7 +32,9 @@ struct StrengthExerciseDragItem: Transferable, Codable {
 /// A compact kanban card for a strength exercise.
 struct StrengthExerciseCard: View {
     let exercise: StrengthExercise
-    /// Called when the user taps the card to record a weight entry.
+    /// The latest record of this card's lift (from any card), if any.
+    let latestRecord: StrengthRecord?
+    /// Called when the user taps the card to record a session.
     let onRecord: () -> Void
     /// Called when the user picks a destination day from the context menu.
     let onMoveToDay: (Int) -> Void
@@ -83,7 +85,7 @@ struct StrengthExerciseCard: View {
                             .foregroundStyle(.secondary)
                             .clipShape(Capsule())
                     }
-                    if let latest = exercise.latestWorkout {
+                    if let latest = latestRecord {
                         Text(latestSummary(latest))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
@@ -144,15 +146,15 @@ struct StrengthExerciseCard: View {
             Button("Delete", role: .destructive) { onDelete() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will permanently delete the exercise and all recorded weights.")
+            Text("The card is removed from the board. Its recorded history stays with the lift.")
         }
     }
 
-    /// One-line summary of the latest record, e.g. "185 lb · Max · Jun 12".
-    private func latestSummary(_ workout: StrengthWorkout) -> String {
-        let weight = workout.weightPounds.formattedWeight(metric: useMetricUnits)
-        let date = Self.workoutDateFormatter.string(from: workout.date)
-        return "\(weight) · \(workout.recordingType.shortLabel) · \(date)"
+    /// One-line summary of the latest record, e.g. "185 lb · Max · Jun 12"
+    /// or "Done · Jun 12".
+    private func latestSummary(_ record: StrengthRecord) -> String {
+        let date = Self.workoutDateFormatter.string(from: record.date)
+        return "\(record.summary(useMetricUnits: useMetricUnits)) · \(date)"
     }
 }
 
@@ -161,11 +163,11 @@ struct StrengthExerciseCard: View {
         name: "Barbell Bench Press",
         muscleGroup: .chest,
         plannedSets: 3,
-        plannedReps: 8,
-        workouts: [StrengthWorkout(weightPounds: 185, recordingType: .maxWeight)]
+        plannedReps: 8
     )
     return StrengthExerciseCard(
         exercise: exercise,
+        latestRecord: StrengthRecord(liftKey: exercise.liftKey, value: 185, metric: .weight, measurement: .max),
         onRecord: {},
         onMoveToDay: { _ in },
         onToggleOffloaded: {},

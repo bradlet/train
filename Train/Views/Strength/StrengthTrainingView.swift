@@ -6,7 +6,8 @@
 //  column per day (Sunday-Saturday), swipeable left/right like a project
 //  management board. Each column has the day's active plan plus a lower
 //  "offloaded" section for exercises kept in mind but out of the week's plan.
-//  Exercises are undated; recorded weights (`StrengthWorkout`) carry dates.
+//  Exercises are undated slots for lifts; recorded sessions
+//  (`StrengthRecord`) belong to the lift and carry dates.
 //
 
 import SwiftUI
@@ -16,12 +17,13 @@ import SwiftData
 struct StrengthTrainingView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var allExercises: [StrengthExercise]
+    @Query private var allRecords: [StrengthRecord]
 
     /// The day column currently shown (Sunday=0 ... Saturday=6).
     @State private var selectedDay: Int = Date().weekdayIndex
     /// Whether the exercise library sheet is presented.
     @State private var showLibrary = false
-    /// The exercise a weight is being recorded against (nil = sheet hidden).
+    /// The card a session is being recorded from (nil = sheet hidden).
     @State private var recordingExercise: StrengthExercise?
 
     var body: some View {
@@ -34,6 +36,7 @@ struct StrengthTrainingView: View {
                         StrengthDayColumn(
                             dayIndex: dayIndex,
                             allExercises: allExercises,
+                            latestRecords: StrengthLiftRegistry.latestByLiftKey(allRecords),
                             onRecord: { recordingExercise = $0 },
                             onAddExercise: { showLibrary = true },
                             onDrop: { id, offloaded, target in
@@ -69,7 +72,7 @@ struct StrengthTrainingView: View {
                 }
             }
             .sheet(item: $recordingExercise) { exercise in
-                RecordStrengthWorkoutSheet(exercise: exercise)
+                RecordStrengthSheet(slot: exercise)
             }
         }
     }
@@ -126,7 +129,8 @@ struct StrengthTrainingView: View {
     // MARK: - Board Mutations
 
     /// Adds a library entry to the end of the selected day's active plan,
-    /// carrying the sets × reps plan drafted in the library sheet.
+    /// carrying the sets × reps plan drafted in the library sheet, and makes
+    /// sure its lift exists with the entry's primary metric.
     private func addFromLibrary(_ entry: LibraryExercise, plan: StrengthPlanDraft) {
         let exercise = StrengthExercise(
             name: entry.name,
@@ -137,7 +141,10 @@ struct StrengthTrainingView: View {
             plannedSets: plan.plannedSets,
             plannedReps: plan.plannedReps
         )
-        withAnimation { modelContext.insert(exercise) }
+        withAnimation {
+            modelContext.insert(exercise)
+            StrengthLiftRegistry.findOrCreate(for: exercise, metric: entry.primaryMetric, in: modelContext)
+        }
     }
 
     /// Resolves a dropped card ID and moves it via the board planner.

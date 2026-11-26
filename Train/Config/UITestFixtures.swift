@@ -46,6 +46,8 @@ enum UITestFixtures {
                 context.delete(exercise)
             }
         }
+        try? context.delete(model: StrengthLift.self)
+        try? context.delete(model: StrengthRecord.self)
 
         let calendar = Calendar.current
         let baseDate = Date()
@@ -141,7 +143,8 @@ enum UITestFixtures {
 
     /// Seeds the strength board: `todayStrengthCount` exercises in today's
     /// lane, one offloaded (so Home's exclusion of offloaded work is
-    /// exercised), and one on another day.
+    /// exercised), and one on another day. The first lift has a lift row and
+    /// one recorded session, so cards render lift-owned history.
     private static func seedStrength(into context: ModelContext) {
         let today = Date().weekdayIndex
         let otherDay = (today + 1) % 7
@@ -156,6 +159,17 @@ enum UITestFixtures {
                 plannedReps: 8 + index
             )
             context.insert(exercise)
+            if index == 0 {
+                let lift = StrengthLiftRegistry.findOrCreate(for: exercise, metric: .weight, in: context)
+                context.insert(StrengthRecord(
+                    liftKey: lift.liftKey,
+                    slotID: exercise.id,
+                    date: Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date(),
+                    value: 135,
+                    metric: .weight,
+                    measurement: .max
+                ))
+            }
         }
 
         context.insert(StrengthExercise(

@@ -14,7 +14,9 @@ import SwiftUI
 /// One of today's strength exercises, tappable to record a weight.
 struct HomeStrengthRow: View {
     let exercise: StrengthExercise
-    /// Called when the row is tapped to record a weight entry.
+    /// The latest record of this exercise's lift, if any.
+    let latestRecord: StrengthRecord?
+    /// Called when the row is tapped to record a session.
     let onRecord: () -> Void
 
     @Environment(\.useMetricUnits) private var useMetricUnits
@@ -44,8 +46,8 @@ struct HomeStrengthRow: View {
 
                 Spacer()
 
-                if let latest = exercise.latestWorkout {
-                    Text(latest.weightPounds.formattedWeight(metric: useMetricUnits))
+                if let latest = latestRecord {
+                    Text(latest.metric.formatted(latest.value, metric: useMetricUnits))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }

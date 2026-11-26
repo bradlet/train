@@ -2,10 +2,11 @@
 //  StrengthExercise.swift
 //  Train
 //
-//  A strength exercise on the weekly kanban board. Unlike aerobic `Exercise`,
-//  a strength exercise has NO date — it lives permanently in a day-of-week
-//  lane (or that lane's "offloaded" section) and accumulates dated
-//  `StrengthWorkout` records over time as the user logs weights against it.
+//  A strength exercise on the weekly kanban board — a *slot* for a lift.
+//  Unlike aerobic `Exercise`, it has NO date: it lives permanently in a
+//  day-of-week lane (or that lane's "offloaded" section). Recorded history
+//  belongs to the lift (`StrengthLift`, via `liftKey`), not the card, so the
+//  same lift on two days shares one history and deleting a card keeps it.
 //
 
 import Foundation
@@ -51,28 +52,10 @@ final class StrengthExercise {
         set { muscleGroupRaw = newValue.rawValue }
     }
 
-    /// JSON-encoded backing store for the recorded workouts. SwiftData
-    /// persists `Data?` reliably and CloudKit mirrors it as a blob (composite
-    /// Codable attributes fatalError on fetch — see `Exercise.workoutData`).
-    /// Access through `workouts`, never this.
-    private var workoutsData: Data? = nil
-
-    /// All recorded weight entries for this exercise, oldest first. Encoded
-    /// to/from `workoutsData` as JSON so records ride along inside this single
-    /// entity (no second table, no CloudKit relationship).
-    var workouts: [StrengthWorkout] {
-        get {
-            guard let workoutsData else { return [] }
-            return (try? JSONDecoder().decode([StrengthWorkout].self, from: workoutsData)) ?? []
-        }
-        set {
-            workoutsData = newValue.isEmpty ? nil : try? JSONEncoder().encode(newValue)
-        }
-    }
-
-    /// The most recently dated workout record, if any. Used for card display.
-    var latestWorkout: StrengthWorkout? {
-        workouts.max(by: { $0.date < $1.date })
+    /// The lift this card is a slot for: its history, metric and records
+    /// live on the lift under this key, so they outlive the card.
+    var liftKey: String {
+        StrengthLiftKey.make(libraryID: libraryExerciseID, name: name)
     }
 
     /// Compact plan badge text, e.g. "3×8". `nil` unless both sets and reps
@@ -93,7 +76,6 @@ final class StrengthExercise {
     ///   - notes: Optional notes.
     ///   - plannedSets: Planned number of sets, if any.
     ///   - plannedReps: Planned reps per set, if any.
-    ///   - workouts: Recorded weight entries, if any.
     init(
         name: String,
         libraryExerciseID: String? = nil,
@@ -103,8 +85,7 @@ final class StrengthExercise {
         sortOrder: Int = 0,
         notes: String = "",
         plannedSets: Int? = nil,
-        plannedReps: Int? = nil,
-        workouts: [StrengthWorkout] = []
+        plannedReps: Int? = nil
     ) {
         self.id = UUID()
         self.name = name
@@ -116,6 +97,5 @@ final class StrengthExercise {
         self.notes = notes
         self.plannedSets = plannedSets
         self.plannedReps = plannedReps
-        self.workouts = workouts
     }
 }

@@ -23,6 +23,7 @@ struct HomeView: View {
 
     @Query private var allExercises: [Exercise]
     @Query private var allStrengthExercises: [StrengthExercise]
+    @Query private var allStrengthRecords: [StrengthRecord]
     @Query(sort: [SortDescriptor(\FavoriteWorkout.sortOrder), SortDescriptor(\FavoriteWorkout.createdAt)])
     private var favorites: [FavoriteWorkout]
 
@@ -96,6 +97,7 @@ struct HomeView: View {
                     TodayTrainingSection(
                         aerobic: todayAerobic,
                         strength: todayStrength,
+                        latestStrengthRecords: StrengthLiftRegistry.latestByLiftKey(allStrengthRecords),
                         onRecordAerobic: { recordingExercise = $0 },
                         onEditAerobic: { exercise in
                             // Matches the Training tab: a recorded exercise opens
@@ -178,7 +180,7 @@ struct HomeView: View {
                 WorkoutDetailSheet(exercise: exercise)
             }
             .sheet(item: $recordingStrength) { exercise in
-                RecordStrengthWorkoutSheet(exercise: exercise)
+                RecordStrengthSheet(slot: exercise)
             }
             .sheet(item: $proposedWorkout) { request in
                 RecordWorkoutSheet(
@@ -325,7 +327,9 @@ struct HomeView: View {
         return CoachingRequest(
             recentWorkouts: recent,
             upcomingExercises: upcoming,
-            strengthExercises: CoachStrengthExercise.snapshots(from: allStrengthExercises),
+            strengthExercises: CoachStrengthExercise.snapshots(
+                from: allStrengthExercises, records: allStrengthRecords
+            ),
             useMetricUnits: useMetricUnits
         )
     }
@@ -434,6 +438,7 @@ struct HomeView: View {
             plannedReps: plan.plannedReps
         )
         modelContext.insert(exercise)
+        StrengthLiftRegistry.findOrCreate(for: exercise, metric: entry.primaryMetric, in: modelContext)
         recordingStrength = exercise
     }
 }
