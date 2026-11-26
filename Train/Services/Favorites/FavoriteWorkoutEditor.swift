@@ -27,7 +27,7 @@ struct FavoriteFormValues: Equatable {
     /// Distance in the display unit (mi or km), or nil when none.
     var displayDistance: Double? = nil
     /// Whether it counts toward training mileage.
-    var countsTowardMileage: Bool = true
+    var countsTowardTraining: Bool = true
 
     /// Whole hours of `durationSeconds`.
     var hours: Int { durationSeconds / 3600 }
@@ -42,19 +42,19 @@ struct FavoriteFormValues: Equatable {
     ///   - type: Exercise type.
     ///   - durationSeconds: Duration in seconds.
     ///   - displayDistance: Distance in the display unit; nil or 0 means none.
-    ///   - countsTowardMileage: Whether it counts toward training mileage.
+    ///   - countsTowardTraining: Whether it counts toward training mileage.
     init(
         name: String = "",
         type: ExerciseType = .run,
         durationSeconds: Int = 0,
         displayDistance: Double? = nil,
-        countsTowardMileage: Bool = true
+        countsTowardTraining: Bool = true
     ) {
         self.name = name
         self.type = type
         self.durationSeconds = max(durationSeconds, 0)
         self.displayDistance = displayDistance.flatMap { $0 > 0 ? $0 : nil }
-        self.countsTowardMileage = countsTowardMileage
+        self.countsTowardTraining = countsTowardTraining
     }
 
     /// Reads a stored favorite into form units. A zero distance becomes nil
@@ -70,7 +70,7 @@ struct FavoriteFormValues: Equatable {
             displayDistance: favorite.distanceMiles > 0
                 ? favorite.distanceMiles.toDisplayDistance(metric: metric)
                 : nil,
-            countsTowardMileage: favorite.countsTowardMileage
+            countsTowardTraining: favorite.countsTowardTraining
         )
     }
 
@@ -84,7 +84,7 @@ struct FavoriteFormValues: Equatable {
     ///   - plannedDisplayDistance: Planned distance in the display unit.
     ///   - actualDurationSeconds: Recorded duration in seconds.
     ///   - actualDisplayDistance: Recorded distance in the display unit.
-    ///   - countsTowardMileage: Whether it counts toward training mileage.
+    ///   - countsTowardTraining: Whether it counts toward training mileage.
     /// - Returns: The seeded form values.
     static func plannedFirst(
         name: String,
@@ -93,7 +93,7 @@ struct FavoriteFormValues: Equatable {
         plannedDisplayDistance: Double?,
         actualDurationSeconds: Int,
         actualDisplayDistance: Double?,
-        countsTowardMileage: Bool
+        countsTowardTraining: Bool
     ) -> FavoriteFormValues {
         let planned = (plannedDisplayDistance ?? 0) > 0 ? plannedDisplayDistance : nil
         return FavoriteFormValues(
@@ -101,7 +101,7 @@ struct FavoriteFormValues: Equatable {
             type: type,
             durationSeconds: plannedDurationSeconds > 0 ? plannedDurationSeconds : actualDurationSeconds,
             displayDistance: planned ?? actualDisplayDistance,
-            countsTowardMileage: countsTowardMileage
+            countsTowardTraining: countsTowardTraining
         )
     }
 
@@ -149,7 +149,7 @@ enum FavoriteWorkoutEditor {
             type: values.type,
             distanceMiles: values.distanceMiles(metric: metric),
             durationSeconds: values.durationSeconds,
-            countsTowardMileage: values.countsTowardMileage,
+            countsTowardTraining: values.countsTowardTraining,
             sortOrder: nextOrder
         )
         context.insert(favorite)
@@ -172,7 +172,7 @@ enum FavoriteWorkoutEditor {
         favorite.type = values.type
         favorite.distanceMiles = values.distanceMiles(metric: metric)
         favorite.durationSeconds = values.durationSeconds
-        favorite.countsTowardMileage = values.countsTowardMileage
+        favorite.countsTowardTraining = values.countsTowardTraining
         return true
     }
 

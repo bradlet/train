@@ -34,7 +34,7 @@ struct SeriesMutations: Equatable {
     var name: String? = nil
     var type: ExerciseType? = nil
     var notes: String? = nil
-    var countsTowardMileage: Bool? = nil
+    var countsTowardTraining: Bool? = nil
     /// Move each occurrence by this many days (negative = earlier).
     var shiftDays: Int? = nil
     /// Set the absolute planned distance in miles.
@@ -66,7 +66,7 @@ enum ExercisePlanner {
                 notes: spec.notes,
                 date: occurrence.date,
                 seriesID: seriesID,
-                countsTowardMileage: spec.countsTowardMileage
+                countsTowardTraining: spec.countsTowardTraining
             )
         }
         for exercise in exercises {
@@ -92,7 +92,7 @@ enum ExercisePlanner {
             if let name = mutations.name { exercise.name = name }
             if let type = mutations.type { exercise.type = type }
             if let notes = mutations.notes { exercise.notes = notes }
-            if let counts = mutations.countsTowardMileage { exercise.countsTowardMileage = counts }
+            if let counts = mutations.countsTowardTraining { exercise.countsTowardTraining = counts }
             if let shiftDays = mutations.shiftDays,
                let shifted = Calendar.current.date(byAdding: .day, value: shiftDays, to: exercise.date) {
                 exercise.date = shifted

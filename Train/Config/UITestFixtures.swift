@@ -33,6 +33,12 @@ enum UITestFixtures {
     static func seed(into container: ModelContainer) {
         let context = container.mainContext
 
+        // Sticky Progress scopes (#17) live in UserDefaults, which outlives
+        // the in-memory store; every UI test starts unscoped.
+        for key in ["cardioProgressScope", "strengthProgressScope"] {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+
         // Wipe existing data so each UI test launch starts clean. This
         // is safe because seeding only runs under `-uiTestSeed`, which also
         // forces an in-memory preview container.
@@ -72,15 +78,15 @@ enum UITestFixtures {
             // History list's dimmed "Not training" row and the calendar's
             // hollow dot are both exercised under UI test. Index 3 is
             // "Test Workout 4".
-            let countsTowardMileage = index % 4 != 3
+            let countsTowardTraining = index % 4 != 3
             let exercise = Exercise(
                 name: "Test Workout \(number)",
-                type: countsTowardMileage ? .run : .walk,
+                type: countsTowardTraining ? .run : .walk,
                 durationSeconds: duration,
                 distanceMiles: miles,
                 notes: "Seeded fixture \(number)",
                 date: day,
-                countsTowardMileage: countsTowardMileage,
+                countsTowardTraining: countsTowardTraining,
                 workout: Workout(
                     durationSeconds: duration,
                     distanceMiles: workoutMiles,

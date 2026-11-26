@@ -54,6 +54,27 @@ final class HistoryUITests: XCTestCase {
         app.buttons["workoutList.nextPage"]
     }
 
+    // MARK: - Scope (#17)
+
+    /// The Running chip narrows the list to runs (the seeded walk drops
+    /// out), a long-press drills into one type, and All brings everything
+    /// back.
+    @MainActor
+    func testScopeChipsNarrowTheList() throws {
+        let app = launchAndOpenHistory()
+        let walk = app.staticTexts["Test Workout 4"]
+        XCTAssertTrue(walk.waitForExistence(timeout: 5), "the seeded walk is listed under All")
+
+        let running = app.buttons["progressScope.family:Running"]
+        XCTAssertTrue(running.waitForExistence(timeout: 5), "families present get a chip")
+        running.tap()
+        XCTAssertTrue(walk.waitForNonExistence(timeout: 5), "Running leaves the walk out")
+        XCTAssertTrue(app.staticTexts["Test Workout 1"].exists, "and keeps the runs")
+
+        app.buttons["progressScope.all"].tap()
+        XCTAssertTrue(walk.waitForExistence(timeout: 5), "All brings it back")
+    }
+
     // MARK: - Chart scales (#31)
 
     /// The mileage chart offers the long scales, and each one renders with

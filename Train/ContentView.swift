@@ -44,6 +44,7 @@ struct ContentView: View {
         }
         .environment(\.useMetricUnits, useMetric)
         .environment(\.weekStartDay, weekStartDay)
+        .environment(\.trainingExcludedTypes, configurations.first?.trainingExcludedTypes ?? TrainingInclusion.defaultExcluded)
         .onAppear { ensureConfigurationExists() }
     }
 

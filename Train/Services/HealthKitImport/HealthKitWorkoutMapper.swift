@@ -46,9 +46,12 @@ enum HealthKitWorkoutMapper {
     /// records the actuals with `source = "Apple Exercise App"` and
     /// `externalID` seeded from the HealthKit UUID so repeat imports can be
     /// deduplicated.
-    /// - Parameter dto: The HealthKit workout DTO to transform.
+    /// - Parameters:
+    ///   - dto: The HealthKit workout DTO to transform.
+    ///   - excludedTypes: Types that don't count toward training (#17), so
+    ///     an imported walk is tracked but not counted by default.
     /// - Returns: A new unsaved completed `Exercise` instance.
-    static func toExercise(_ dto: HealthKitWorkout) -> Exercise {
+    static func toExercise(_ dto: HealthKitWorkout, excludedTypes: Set<ExerciseType> = TrainingInclusion.defaultExcluded) -> Exercise {
         let type = exerciseType(for: dto.activityType)
         let seconds = Int(dto.duration)
         let miles = dto.distanceMiles ?? 0.0
@@ -59,6 +62,7 @@ enum HealthKitWorkoutMapper {
             distanceMiles: miles,
             notes: "",
             date: dto.startDate,
+            countsTowardTraining: TrainingInclusion.counts(type, excluded: excludedTypes),
             workout: Workout(
                 durationSeconds: seconds,
                 distanceMiles: miles,

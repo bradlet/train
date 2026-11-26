@@ -40,6 +40,17 @@ final class AppConfiguration {
     /// clamp so they can't drift apart.
     static let defaultWeekStartDay = 2
 
+    /// Exercise types that don't count toward training by default (#17),
+    /// as comma-joined raw values. Access through `trainingExcludedTypes`.
+    var trainingExcludedTypesRaw: String = TrainingInclusion.encode(TrainingInclusion.defaultExcluded)
+
+    /// Exercise types whose new workouts start out not counting toward
+    /// training (walks and hikes by default).
+    var trainingExcludedTypes: Set<ExerciseType> {
+        get { TrainingInclusion.decode(trainingExcludedTypesRaw) }
+        set { trainingExcludedTypesRaw = TrainingInclusion.encode(newValue) }
+    }
+
     /// Creates a new configuration with default values.
     init(
         useMetricUnits: Bool = false,

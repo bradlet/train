@@ -17,6 +17,10 @@ struct RecordWorkoutSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.useMetricUnits) private var useMetricUnits
+    @Environment(\.trainingExcludedTypes) private var trainingExcludedTypes
+    /// The type the form was filled with, whose `onChange` is not the
+    /// athlete's doing.
+    @State private var populatedType: ExerciseType?
     @Environment(\.googleSheetsSync) private var sheetsSync
 
     /// The exercise template to pre-fill defaults from, or nil for quick add.
@@ -44,7 +48,7 @@ struct RecordWorkoutSheet: View {
     @State private var workoutDate = Date()
     @State private var feeling: Int?
     @State private var perceivedExertion: Int?
-    @State private var countsTowardMileage = true
+    @State private var countsTowardTraining = true
     @State private var previousType: ExerciseType = .run
 
     /// Whether the form has enough data to save.
@@ -71,7 +75,7 @@ struct RecordWorkoutSheet: View {
                     notes: $notes,
                     feeling: $feeling,
                     perceivedExertion: $perceivedExertion,
-                    countsTowardMileage: $countsTowardMileage
+                    countsTowardTraining: $countsTowardTraining
                 )
             }
             .navigationTitle("Record Workout")
@@ -90,6 +94,16 @@ struct RecordWorkoutSheet: View {
                 if name == oldType.rawValue {
                     name = newType.rawValue
                 }
+                // Filling the form from an exercise, favorite or proposal
+                // also changes `type`; only the athlete's own change should
+                // move the toggle to the new type's default.
+                if newType == populatedType {
+                    populatedType = nil
+                } else {
+                    countsTowardTraining = TrainingInclusion.toggle(
+                        countsTowardTraining, afterChangingFrom: oldType, to: newType, excluded: trainingExcludedTypes
+                    )
+                }
             }
         }
     }
@@ -98,6 +112,7 @@ struct RecordWorkoutSheet: View {
 
     /// Pre-fills form fields from the source exercise template or defaults.
     private func populateFields() {
+        defer { populatedType = type == .run ? nil : type }
         if let prefill {
             populate(from: prefill)
             return
@@ -114,12 +129,13 @@ struct RecordWorkoutSheet: View {
             if exercise.distanceMiles > 0 {
                 distance = useMetricUnits ? exercise.distanceMiles.toDisplayDistance(metric: true) : exercise.distanceMiles
             }
-            countsTowardMileage = exercise.countsTowardMileage
+            countsTowardTraining = exercise.countsTowardTraining
             previousType = exercise.type
         } else if let initialFavorite {
             apply(initialFavorite)
         } else {
             name = type.rawValue
+            countsTowardTraining = TrainingInclusion.counts(type, excluded: trainingExcludedTypes)
             previousType = type
         }
         workoutDate = defaultDate
@@ -131,13 +147,14 @@ struct RecordWorkoutSheet: View {
     private func apply(_ favorite: FavoriteWorkout) {
         let values = FavoriteFormValues(favorite, metric: useMetricUnits)
         name = values.name
+        if values.type != type { populatedType = values.type }
         type = values.type
         previousType = values.type
         hours = values.hours
         minutes = values.minutes
         seconds = values.seconds
         distance = values.displayDistance
-        countsTowardMileage = values.countsTowardMileage
+        countsTowardTraining = values.countsTowardTraining
     }
 
     /// Fills the form from a coach proposal.
@@ -149,6 +166,7 @@ struct RecordWorkoutSheet: View {
         name = prefill.name
         type = prefill.type
         previousType = prefill.type
+        countsTowardTraining = TrainingInclusion.counts(prefill.type, excluded: trainingExcludedTypes)
         hours = prefill.durationSeconds / 3600
         minutes = (prefill.durationSeconds % 3600) / 60
         seconds = prefill.durationSeconds % 60
@@ -184,7 +202,7 @@ struct RecordWorkoutSheet: View {
             exercise.name = name
             exercise.type = type
             exercise.date = workoutDate
-            exercise.countsTowardMileage = countsTowardMileage
+            exercise.countsTowardTraining = countsTowardTraining
             exercise.workout = workout
         } else {
             let newExercise = Exercise(
@@ -194,7 +212,7 @@ struct RecordWorkoutSheet: View {
                 distanceMiles: distanceMiles,
                 notes: notes,
                 date: workoutDate,
-                countsTowardMileage: countsTowardMileage,
+                countsTowardTraining: countsTowardTraining,
                 workout: workout
             )
             modelContext.insert(newExercise)

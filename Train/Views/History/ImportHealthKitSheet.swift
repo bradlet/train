@@ -23,6 +23,7 @@ private let importFetchLimit: Int = 60
 struct ImportHealthKitSheet: View {
     @Environment(\.healthKitImport) private var service
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.trainingExcludedTypes) private var trainingExcludedTypes
     @Environment(\.useMetricUnits) private var useMetricUnits
     @Environment(\.dismiss) private var dismiss
     @Environment(\.googleSheetsSync) private var sheetsSync
@@ -157,7 +158,7 @@ struct ImportHealthKitSheet: View {
         let skippedCount = selected.count - deduped.count
 
         for dto in deduped {
-            let exercise = HealthKitWorkoutMapper.toExercise(dto)
+            let exercise = HealthKitWorkoutMapper.toExercise(dto, excludedTypes: trainingExcludedTypes)
             modelContext.insert(exercise)
         }
         do {

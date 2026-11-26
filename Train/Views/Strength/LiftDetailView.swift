@@ -58,6 +58,17 @@ struct LiftDetailView: View {
                     .accessibilityIdentifier("liftDetail.scale")
                 }
             }
+            if let lift = StrengthLiftRegistry.lift(forKey: liftKey, in: lifts) {
+                Section {
+                    Toggle("Counts toward training", isOn: Binding(
+                        get: { lift.countsTowardTraining },
+                        set: { lift.countsTowardTraining = $0 }
+                    ))
+                    .accessibilityIdentifier("liftDetail.countsTowardTraining")
+                } footer: {
+                    Text("Turn off for mobility or rehab work: it's still tracked, but left out of your weekly strength totals.")
+                }
+            }
             Section("Sessions") {
                 ForEach(records) { record in
                     Button { editing = record } label: { recordRow(record, isBest: bests.contains(record.id)) }

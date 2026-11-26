@@ -56,7 +56,7 @@ struct ExerciseSeriesSpec: Codable, Equatable {
     /// Planned duration of the first occurrence, in seconds.
     var baseDurationSeconds: Int
     var notes: String = ""
-    var countsTowardMileage: Bool = true
+    var countsTowardTraining: Bool = true
     /// Optional linear progression; nil keeps every occurrence at the base values.
     var progression: SeriesProgression? = nil
 }

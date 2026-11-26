@@ -33,11 +33,21 @@ final class Exercise {
     /// Groups exercises that were bulk-created as one recurring series.
     /// `nil` means a standalone one-off exercise.
     var seriesID: UUID? = nil
-    /// Whether this exercise's recorded distance counts toward mileage
-    /// aggregates (weekly totals, stat cards, charts). Defaults to `true` so
-    /// every pre-existing record keeps counting; turn off for casual activity
-    /// (e.g. walks) that should be tracked but not treated as training volume.
-    var countsTowardMileage: Bool = true
+    /// Whether this exercise counts toward "my training" (#17): mileage
+    /// totals, stat cards and charts. A new exercise copies its type's
+    /// default (`TrainingInclusion`, edited in Settings → Training); turn it
+    /// off for casual activity (e.g. walks) that should be tracked but not
+    /// treated as training volume.
+    var countsTowardTraining: Bool {
+        get { countsTowardMileage }
+        set { countsTowardMileage = newValue }
+    }
+
+    /// Stored backing for `countsTowardTraining`. Keeps its original name on
+    /// purpose: a CloudKit-backed store refuses to migrate a renamed
+    /// property, even with `@Attribute(originalName:)` (it fails to load).
+    /// Access through `countsTowardTraining`, never this.
+    private var countsTowardMileage: Bool = true
 
     /// JSON-encoded backing store for the nested recorded workout. SwiftData
     /// persists `Data?` reliably and CloudKit mirrors it as a blob. We do NOT
@@ -76,7 +86,7 @@ final class Exercise {
     ///   - notes: Optional notes.
     ///   - date: The day this activity is planned and/or performed.
     ///   - seriesID: Identifier shared by exercises bulk-created as one series.
-    ///   - countsTowardMileage: Whether the distance counts toward mileage aggregates.
+    ///   - countsTowardTraining: Whether the distance counts toward mileage aggregates.
     ///   - workout: Recorded data, if the activity has been performed.
     init(
         name: String,
@@ -86,7 +96,7 @@ final class Exercise {
         notes: String = "",
         date: Date,
         seriesID: UUID? = nil,
-        countsTowardMileage: Bool = true,
+        countsTowardTraining: Bool = true,
         workout: Workout? = nil
     ) {
         self.id = UUID()
@@ -97,7 +107,7 @@ final class Exercise {
         self.notes = notes
         self.date = date
         self.seriesID = seriesID
-        self.countsTowardMileage = countsTowardMileage
+        self.countsTowardMileage = countsTowardTraining
         self.workout = workout
     }
 }

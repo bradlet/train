@@ -37,7 +37,13 @@ struct StrengthProgressView: View {
     @Environment(\.weekStartDay) private var weekStartDay
     @Environment(\.useMetricUnits) private var useMetricUnits
     @State private var searchText = ""
-    @State private var muscleFilter: MuscleGroup?
+    /// The muscle-group scope, sticky between visits (#17); "" is All.
+    @AppStorage("strengthProgressScope") private var muscleFilterRaw = ""
+
+    private var muscleFilter: MuscleGroup? {
+        get { MuscleGroup(rawValue: muscleFilterRaw) }
+        nonmutating set { muscleFilterRaw = newValue?.rawValue ?? "" }
+    }
 
     var body: some View {
         let summaries = StrengthProgress.summaries(lifts: lifts, records: records)
@@ -94,7 +100,8 @@ struct StrengthProgressView: View {
 
     /// "This week: 6 lifts · 2 days".
     private var weekHeadline: some View {
-        let week = StrengthProgress.thisWeek(records, now: Date(), firstWeekday: weekStartDay)
+        let excluded = Set(lifts.filter { !$0.countsTowardTraining }.map(\.liftKey))
+        let week = StrengthProgress.thisWeek(records, now: Date(), firstWeekday: weekStartDay, excludedLiftKeys: excluded)
         return HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("This week").font(.caption).foregroundStyle(.secondary)
@@ -176,7 +183,17 @@ struct LiftSummaryRow: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(summary.name).font(.subheadline.weight(.semibold))
+                HStack(spacing: 6) {
+                    Text(summary.name).font(.subheadline.weight(.semibold))
+                    if !summary.countsTowardTraining {
+                        Text("Not training")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Capsule().strokeBorder(.secondary))
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Text("Last done \(Self.dateFormatter.string(from: summary.lastDone))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -199,6 +216,7 @@ struct LiftSummaryRow: View {
             }
         }
         .padding(.vertical, 2)
+        .opacity(summary.countsTowardTraining ? 1 : 0.55)
     }
 }
 

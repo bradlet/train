@@ -25,8 +25,14 @@ final class FavoriteWorkout {
     /// Target duration in seconds; 0 means no duration.
     var durationSeconds: Int = 0
     /// Whether workouts started from this favorite count toward training
-    /// mileage (see `Exercise.countsTowardMileage`).
-    var countsTowardMileage: Bool = true
+    /// mileage (see `Exercise.countsTowardTraining`).
+    var countsTowardTraining: Bool {
+        get { countsTowardMileage }
+        set { countsTowardMileage = newValue }
+    }
+    /// Stored backing for `countsTowardTraining`, under its original name
+    /// because CloudKit-backed stores can't rename properties.
+    private var countsTowardMileage: Bool = true
     /// Position in the athlete's manual ordering, ascending.
     var sortOrder: Int = 0
     /// Creation timestamp, a tie-breaker for equal `sortOrder`s (e.g. two
@@ -40,14 +46,14 @@ final class FavoriteWorkout {
     ///   - type: Exercise type.
     ///   - distanceMiles: Target distance in miles, 0 for none.
     ///   - durationSeconds: Target duration in seconds, 0 for none.
-    ///   - countsTowardMileage: Whether it counts toward training mileage.
+    ///   - countsTowardTraining: Whether it counts toward training mileage.
     ///   - sortOrder: Position in the manual ordering.
     init(
         name: String,
         type: ExerciseType = .run,
         distanceMiles: Double = 0,
         durationSeconds: Int = 0,
-        countsTowardMileage: Bool = true,
+        countsTowardTraining: Bool = true,
         sortOrder: Int = 0
     ) {
         self.id = UUID()
@@ -55,7 +61,7 @@ final class FavoriteWorkout {
         self.type = type
         self.distanceMiles = distanceMiles
         self.durationSeconds = durationSeconds
-        self.countsTowardMileage = countsTowardMileage
+        self.countsTowardMileage = countsTowardTraining
         self.sortOrder = sortOrder
         self.createdAt = Date()
     }

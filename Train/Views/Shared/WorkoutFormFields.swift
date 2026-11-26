@@ -35,7 +35,7 @@ struct WorkoutFormFields<PlannedSection: View>: View {
     @Binding var notes: String
     @Binding var feeling: Int?
     @Binding var perceivedExertion: Int?
-    @Binding var countsTowardMileage: Bool
+    @Binding var countsTowardTraining: Bool
     /// Retitles the duration/distance headers as "Completed …" when a
     /// planned section is shown alongside them.
     var usesCompletedHeaders: Bool = false
@@ -88,12 +88,12 @@ struct WorkoutFormFields<PlannedSection: View>: View {
                 Text(useMetricUnits ? "km" : "mi")
                     .foregroundStyle(.secondary)
             }
-            Toggle("Counts Toward Mileage", isOn: $countsTowardMileage)
-                .accessibilityIdentifier("workoutForm.countsTowardMileageToggle")
+            Toggle("Counts Toward Training", isOn: $countsTowardTraining)
+                .accessibilityIdentifier("workoutForm.countsTowardTrainingToggle")
         } header: {
             Text(usesCompletedHeaders ? "Completed Distance" : "Distance")
         } footer: {
-            if !countsTowardMileage {
+            if !countsTowardTraining {
                 Text("Distance is tracked but excluded from mileage totals.")
             }
         }
@@ -144,7 +144,7 @@ extension WorkoutFormFields where PlannedSection == EmptyView {
         notes: Binding<String>,
         feeling: Binding<Int?>,
         perceivedExertion: Binding<Int?>,
-        countsTowardMileage: Binding<Bool>
+        countsTowardTraining: Binding<Bool>
     ) {
         self.init(
             name: name,
@@ -157,7 +157,7 @@ extension WorkoutFormFields where PlannedSection == EmptyView {
             notes: notes,
             feeling: feeling,
             perceivedExertion: perceivedExertion,
-            countsTowardMileage: countsTowardMileage,
+            countsTowardTraining: countsTowardTraining,
             usesCompletedHeaders: false,
             plannedSection: { EmptyView() }
         )

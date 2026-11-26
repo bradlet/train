@@ -27,7 +27,7 @@ struct FavoriteWorkoutFormSheet: View {
     @State private var minutes = 0
     @State private var seconds = 0
     @State private var distance: Double?
-    @State private var countsTowardMileage = true
+    @State private var countsTowardTraining = true
     /// Guards `populateFields` so returning from a pushed picker doesn't reset edits.
     @State private var hasPopulated = false
 
@@ -61,11 +61,11 @@ struct FavoriteWorkoutFormSheet: View {
                         Text(useMetricUnits ? "km" : "mi")
                             .foregroundStyle(.secondary)
                     }
-                    Toggle("Counts Toward Mileage", isOn: $countsTowardMileage)
+                    Toggle("Counts Toward Training", isOn: $countsTowardTraining)
                 } header: {
                     Text("Distance")
                 } footer: {
-                    if !countsTowardMileage {
+                    if !countsTowardTraining {
                         Text("Distance is tracked but excluded from mileage totals.")
                     }
                 }
@@ -106,7 +106,7 @@ struct FavoriteWorkoutFormSheet: View {
         minutes = values.minutes
         seconds = values.seconds
         distance = values.displayDistance
-        countsTowardMileage = values.countsTowardMileage
+        countsTowardTraining = values.countsTowardTraining
     }
 
     /// Creates or updates the favorite and dismisses.
@@ -116,7 +116,7 @@ struct FavoriteWorkoutFormSheet: View {
             type: type,
             durationSeconds: FavoriteFormValues.durationSeconds(hours: hours, minutes: minutes, seconds: seconds),
             displayDistance: distance,
-            countsTowardMileage: countsTowardMileage
+            countsTowardTraining: countsTowardTraining
         )
         if let favorite {
             guard FavoriteWorkoutEditor.update(favorite, with: values, metric: useMetricUnits) else { return }

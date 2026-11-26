@@ -28,5 +28,4 @@ extension CalendarDisplayable {
 
 extension Exercise: CalendarDisplayable {
     var displayDate: Date { date }
-    var countsTowardTraining: Bool { countsTowardMileage }
 }

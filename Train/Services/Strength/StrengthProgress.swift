@@ -33,6 +33,8 @@ struct LiftSummary: Identifiable, Equatable {
     /// Recent values in that metric and measurement, oldest first (at most
     /// `StrengthProgress.sparklineLength`).
     let sparkline: [Double]
+    /// Whether the lift counts toward training (#17).
+    var countsTowardTraining: Bool = true
 
     var id: String { liftKey }
 }
@@ -97,7 +99,8 @@ enum StrengthProgress {
                 bestValue: values.max(),
                 lastDone: newest.date,
                 recordCount: history.count,
-                sparkline: Array(values.prefix(sparklineLength).reversed())
+                sparkline: Array(values.prefix(sparklineLength).reversed()),
+                countsTowardTraining: lift?.countsTowardTraining ?? true
             )
         }
         .sorted { $0.lastDone > $1.lastDone }
@@ -183,14 +186,23 @@ enum StrengthProgress {
 
     // MARK: Summary
 
-    /// This week's strength headline: lift records and distinct training days.
+    /// This week's strength headline: lift records and distinct training
+    /// days, leaving out lifts opted out of training (#17).
     /// - Parameters:
     ///   - records: All records.
     ///   - now: The current moment.
     ///   - firstWeekday: Calendar weekday convention (1=Sunday ... 7=Saturday).
-    static func thisWeek(_ records: [StrengthRecord], now: Date, firstWeekday: Int) -> (lifts: Int, days: Int) {
+    ///   - excludedLiftKeys: Lifts that don't count toward training.
+    static func thisWeek(
+        _ records: [StrengthRecord],
+        now: Date,
+        firstWeekday: Int,
+        excludedLiftKeys: Set<String> = []
+    ) -> (lifts: Int, days: Int) {
         let week = StrengthWeek.interval(containing: now, firstWeekday: firstWeekday)
-        let inWeek = records.filter { $0.date >= week.start && $0.date < week.end }
+        let inWeek = records.filter {
+            $0.date >= week.start && $0.date < week.end && !excludedLiftKeys.contains($0.liftKey)
+        }
         let days = Set(inWeek.map { Calendar.current.startOfDay(for: $0.date) })
         return (inWeek.count, days.count)
     }

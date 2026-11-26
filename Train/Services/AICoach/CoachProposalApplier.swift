@@ -132,7 +132,8 @@ enum CoachProposalApplier {
             durationSeconds: proposal.durationSeconds ?? 0,
             distanceMiles: proposal.distanceMiles ?? 0,
             notes: proposal.rationale,
-            date: proposal.date
+            date: proposal.date,
+            countsTowardTraining: TrainingInclusion.counts(appType, excluded: TrainingInclusion.excludedTypes(in: context))
         )
         context.insert(exercise)
         return exercise

@@ -180,7 +180,7 @@ struct WorkoutListView: View {
 /// A single row displaying a recorded exercise's key details: name, date,
 /// and the recorded distance, duration, and derived pace.
 ///
-/// Exercises opted out of training progress (`countsTowardMileage == false`)
+/// Exercises opted out of training progress (`countsTowardTraining == false`)
 /// are dimmed and carry an explicit badge, so a walk never reads as a session
 /// that contributed to the athlete's load.
 private struct WorkoutRow: View {
@@ -194,7 +194,7 @@ private struct WorkoutRow: View {
     private var durationSeconds: Int { exercise.workout?.durationSeconds ?? exercise.durationSeconds }
 
     /// Whether this exercise was opted out of training progress.
-    private var isNonTraining: Bool { !exercise.countsTowardMileage }
+    private var isNonTraining: Bool { !exercise.countsTowardTraining }
 
     var body: some View {
         HStack {

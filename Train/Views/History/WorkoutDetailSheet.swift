@@ -38,7 +38,7 @@ struct WorkoutDetailSheet: View {
     @State private var notes: String
     @State private var feeling: Int?
     @State private var perceivedExertion: Int?
-    @State private var countsTowardMileage: Bool
+    @State private var countsTowardTraining: Bool
     @State private var showDeleteConfirmation = false
     /// Whether the new-favorite form seeded from this workout is showing.
     @State private var isSavingFavorite = false
@@ -75,7 +75,7 @@ struct WorkoutDetailSheet: View {
         // unrated one both seed as nil.
         _feeling = State(initialValue: workout?.feeling ?? nil)
         _perceivedExertion = State(initialValue: workout?.perceivedExertion ?? nil)
-        _countsTowardMileage = State(initialValue: exercise.countsTowardMileage)
+        _countsTowardTraining = State(initialValue: exercise.countsTowardTraining)
     }
 
     /// Whether the form has enough data to save.
@@ -97,7 +97,7 @@ struct WorkoutDetailSheet: View {
                     notes: $notes,
                     feeling: $feeling,
                     perceivedExertion: $perceivedExertion,
-                    countsTowardMileage: $countsTowardMileage,
+                    countsTowardTraining: $countsTowardTraining,
                     usesCompletedHeaders: true
                 ) {
                     PlannedTargetFields(
@@ -171,7 +171,7 @@ struct WorkoutDetailSheet: View {
             plannedDisplayDistance: plannedDistance,
             actualDurationSeconds: FavoriteFormValues.durationSeconds(hours: hours, minutes: minutes, seconds: seconds),
             actualDisplayDistance: distance,
-            countsTowardMileage: countsTowardMileage
+            countsTowardTraining: countsTowardTraining
         )
     }
 
@@ -241,7 +241,7 @@ struct WorkoutDetailSheet: View {
             notes: notes,
             feeling: feeling,
             perceivedExertion: perceivedExertion,
-            countsTowardMileage: countsTowardMileage
+            countsTowardTraining: countsTowardTraining
         )
         WorkoutEditor.apply(edits, to: exercise)
         // Explicit save so the Google Sheets sync trigger sees the edit
@@ -298,7 +298,7 @@ enum WorkoutEditor {
         /// Subjective 1-10 perceived exertion; `nil` when unrated.
         var perceivedExertion: Int?
         /// Whether the exercise's distance counts toward mileage aggregates.
-        var countsTowardMileage: Bool = true
+        var countsTowardTraining: Bool = true
     }
 
     /// Writes the edited identity fields (`name`, `type`, `date`) and planned
@@ -311,7 +311,7 @@ enum WorkoutEditor {
         exercise.date = edits.date
         exercise.durationSeconds = edits.plannedDurationSeconds
         exercise.distanceMiles = edits.plannedDistanceMiles
-        exercise.countsTowardMileage = edits.countsTowardMileage
+        exercise.countsTowardTraining = edits.countsTowardTraining
         let existing = exercise.workout
         exercise.workout = Workout(
             durationSeconds: edits.durationSeconds,

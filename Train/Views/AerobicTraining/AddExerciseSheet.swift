@@ -14,6 +14,10 @@ struct AddExerciseSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.useMetricUnits) private var useMetricUnits
+    @Environment(\.trainingExcludedTypes) private var trainingExcludedTypes
+    /// The type the form was filled with, whose `onChange` is not the
+    /// athlete's doing.
+    @State private var populatedType: ExerciseType?
 
     /// The exercise to edit, or nil for create mode.
     let exercise: Exercise?
@@ -30,7 +34,7 @@ struct AddExerciseSheet: View {
     @State private var distance: Double?
     @State private var notes = ""
     @State private var scheduledDate: Date
-    @State private var countsTowardMileage = true
+    @State private var countsTowardTraining = true
 
     // Recurrence (create mode only).
     @State private var cadence: SeriesCadence = .oneOff
@@ -109,6 +113,16 @@ struct AddExerciseSheet: View {
                 if name == oldType.rawValue {
                     name = newType.rawValue
                 }
+                // Filling the form from an exercise, favorite or proposal
+                // also changes `type`; only the athlete's own change should
+                // move the toggle to the new type's default.
+                if newType == populatedType {
+                    populatedType = nil
+                } else {
+                    countsTowardTraining = TrainingInclusion.toggle(
+                        countsTowardTraining, afterChangingFrom: oldType, to: newType, excluded: trainingExcludedTypes
+                    )
+                }
             }
             .sheet(isPresented: $isSavingFavorite) {
                 FavoriteWorkoutFormSheet(
@@ -118,7 +132,7 @@ struct AddExerciseSheet: View {
                         type: type,
                         durationSeconds: enteredDurationSeconds,
                         displayDistance: distance,
-                        countsTowardMileage: countsTowardMileage
+                        countsTowardTraining: countsTowardTraining
                     )
                 )
             }
@@ -170,12 +184,12 @@ struct AddExerciseSheet: View {
                 Text(useMetricUnits ? "km" : "mi")
                     .foregroundStyle(.secondary)
             }
-            Toggle("Counts Toward Mileage", isOn: $countsTowardMileage)
-                .accessibilityIdentifier("workoutForm.countsTowardMileageToggle")
+            Toggle("Counts Toward Training", isOn: $countsTowardTraining)
+                .accessibilityIdentifier("workoutForm.countsTowardTrainingToggle")
         } header: {
             Text("Distance")
         } footer: {
-            if !countsTowardMileage {
+            if !countsTowardTraining {
                 Text("Distance is tracked but excluded from mileage totals.")
             }
         }
@@ -259,6 +273,7 @@ struct AddExerciseSheet: View {
 
     /// Pre-fills form fields from the exercise (edit mode) or defaults (create mode).
     private func populateFields() {
+        defer { populatedType = type == .run ? nil : type }
         if let exercise {
             name = exercise.name
             type = exercise.type
@@ -273,9 +288,10 @@ struct AddExerciseSheet: View {
             }
             notes = exercise.notes
             scheduledDate = exercise.date
-            countsTowardMileage = exercise.countsTowardMileage
+            countsTowardTraining = exercise.countsTowardTraining
         } else {
             name = type.rawValue
+            countsTowardTraining = TrainingInclusion.counts(type, excluded: trainingExcludedTypes)
             scheduledDate = defaultDate
         }
     }
@@ -285,12 +301,13 @@ struct AddExerciseSheet: View {
     private func apply(_ favorite: FavoriteWorkout) {
         let values = FavoriteFormValues(favorite, metric: useMetricUnits)
         name = values.name
+        if values.type != type { populatedType = values.type }
         type = values.type
         hours = values.hours
         minutes = values.minutes
         seconds = values.seconds
         distance = values.displayDistance
-        countsTowardMileage = values.countsTowardMileage
+        countsTowardTraining = values.countsTowardTraining
     }
 
     /// Planned duration from the wheel pickers, in seconds.
@@ -323,7 +340,7 @@ struct AddExerciseSheet: View {
             baseDistanceMiles: enteredDistanceMiles,
             baseDurationSeconds: enteredDurationSeconds,
             notes: notes,
-            countsTowardMileage: countsTowardMileage,
+            countsTowardTraining: countsTowardTraining,
             progression: progression
         )
     }
@@ -341,7 +358,7 @@ struct AddExerciseSheet: View {
                 distanceMiles: enteredDistanceMiles,
                 notes: notes,
                 date: scheduledDate,
-                countsTowardMileage: countsTowardMileage
+                countsTowardTraining: countsTowardTraining
             )
             modelContext.insert(newExercise)
         } else {
@@ -368,7 +385,7 @@ struct AddExerciseSheet: View {
                 name: name,
                 type: type,
                 notes: notes,
-                countsTowardMileage: countsTowardMileage,
+                countsTowardTraining: countsTowardTraining,
                 distanceMiles: enteredDistanceMiles,
                 durationSeconds: enteredDurationSeconds
             ),
@@ -385,7 +402,7 @@ struct AddExerciseSheet: View {
         exercise.distanceMiles = enteredDistanceMiles
         exercise.notes = notes
         exercise.date = scheduledDate.startOfDay
-        exercise.countsTowardMileage = countsTowardMileage
+        exercise.countsTowardTraining = countsTowardTraining
     }
 }
 

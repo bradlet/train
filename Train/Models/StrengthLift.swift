@@ -33,6 +33,10 @@ final class StrengthLift {
     private var defaultMeasurementRaw: String? = nil
     /// Creation timestamp; the oldest lift wins when duplicates sync in.
     var createdAt: Date = Date()
+    /// Whether this lift counts toward training (#17). Every lift counts by
+    /// default; opt out mobility or rehab moves, which then show dimmed with
+    /// a "Not training" badge and leave the week's strength totals alone.
+    var countsTowardTraining: Bool = true
 
     /// Primary muscle group. Unknown raw values read as `.other`.
     var muscleGroup: MuscleGroup {

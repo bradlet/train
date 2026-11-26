@@ -22,7 +22,7 @@ struct SummaryStatsView: View {
     /// Exercises whose distance counts toward mileage totals. Walks and other
     /// opted-out activity stay visible in History but don't inflate stats.
     private var countingExercises: [Exercise] {
-        exercises.filter(\.countsTowardMileage)
+        exercises.filter(\.countsTowardTraining)
     }
 
     /// Total recorded mileage across all exercises.
