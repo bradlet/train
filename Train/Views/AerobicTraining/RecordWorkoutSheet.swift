@@ -18,6 +18,7 @@ struct RecordWorkoutSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.useMetricUnits) private var useMetricUnits
     @Environment(\.trainingExcludedTypes) private var trainingExcludedTypes
+    @Environment(\.keyWorkoutTypes) private var keyWorkoutTypes
     /// The type the form was filled with, whose `onChange` is not the
     /// athlete's doing.
     @State private var populatedType: ExerciseType?
@@ -49,6 +50,7 @@ struct RecordWorkoutSheet: View {
     @State private var feeling: Int?
     @State private var perceivedExertion: Int?
     @State private var countsTowardTraining = true
+    @State private var isKeyWorkout = false
     @State private var previousType: ExerciseType = .run
 
     /// Whether the form has enough data to save.
@@ -75,7 +77,8 @@ struct RecordWorkoutSheet: View {
                     notes: $notes,
                     feeling: $feeling,
                     perceivedExertion: $perceivedExertion,
-                    countsTowardTraining: $countsTowardTraining
+                    countsTowardTraining: $countsTowardTraining,
+                    isKeyWorkout: $isKeyWorkout
                 )
             }
             .navigationTitle("Record Workout")
@@ -102,6 +105,9 @@ struct RecordWorkoutSheet: View {
                 } else {
                     countsTowardTraining = TrainingInclusion.toggle(
                         countsTowardTraining, afterChangingFrom: oldType, to: newType, excluded: trainingExcludedTypes
+                    )
+                    isKeyWorkout = KeyWorkoutDefaults.toggle(
+                        isKeyWorkout, afterChangingFrom: oldType, to: newType, keyTypes: keyWorkoutTypes
                     )
                 }
             }
@@ -130,12 +136,14 @@ struct RecordWorkoutSheet: View {
                 distance = useMetricUnits ? exercise.distanceMiles.toDisplayDistance(metric: true) : exercise.distanceMiles
             }
             countsTowardTraining = exercise.countsTowardTraining
+            isKeyWorkout = exercise.isKeyWorkout
             previousType = exercise.type
         } else if let initialFavorite {
             apply(initialFavorite)
         } else {
             name = type.rawValue
             countsTowardTraining = TrainingInclusion.counts(type, excluded: trainingExcludedTypes)
+            isKeyWorkout = KeyWorkoutDefaults.isKey(type, keyTypes: keyWorkoutTypes)
             previousType = type
         }
         workoutDate = defaultDate
@@ -155,6 +163,7 @@ struct RecordWorkoutSheet: View {
         seconds = values.seconds
         distance = values.displayDistance
         countsTowardTraining = values.countsTowardTraining
+        isKeyWorkout = values.isKeyWorkout
     }
 
     /// Fills the form from a coach proposal.
@@ -167,6 +176,7 @@ struct RecordWorkoutSheet: View {
         type = prefill.type
         previousType = prefill.type
         countsTowardTraining = TrainingInclusion.counts(prefill.type, excluded: trainingExcludedTypes)
+        isKeyWorkout = KeyWorkoutDefaults.isKey(prefill.type, keyTypes: keyWorkoutTypes)
         hours = prefill.durationSeconds / 3600
         minutes = (prefill.durationSeconds % 3600) / 60
         seconds = prefill.durationSeconds % 60
@@ -203,6 +213,7 @@ struct RecordWorkoutSheet: View {
             exercise.type = type
             exercise.date = workoutDate
             exercise.countsTowardTraining = countsTowardTraining
+            exercise.isKeyWorkout = isKeyWorkout
             exercise.workout = workout
         } else {
             let newExercise = Exercise(
@@ -213,6 +224,7 @@ struct RecordWorkoutSheet: View {
                 notes: notes,
                 date: workoutDate,
                 countsTowardTraining: countsTowardTraining,
+                isKeyWorkout: isKeyWorkout,
                 workout: workout
             )
             modelContext.insert(newExercise)

@@ -44,6 +44,36 @@ final class AppConfiguration {
     /// as comma-joined raw values. Access through `trainingExcludedTypes`.
     var trainingExcludedTypesRaw: String = TrainingInclusion.encode(TrainingInclusion.defaultExcluded)
 
+    /// Exercise types whose new sessions start marked as key workouts (#25),
+    /// as comma-joined raw values. Empty out of the box: what's hard is the
+    /// athlete's call. Access through `keyWorkoutTypes`.
+    var keyWorkoutTypesRaw: String = ""
+
+    /// Exercise types whose new sessions start marked as key workouts.
+    var keyWorkoutTypes: Set<ExerciseType> {
+        get { TrainingInclusion.decode(keyWorkoutTypesRaw) }
+        set { keyWorkoutTypesRaw = TrainingInclusion.encode(newValue) }
+    }
+
+    /// Raw `KeyDayStrategy` (#25). Access through `keyDayStrategy`.
+    var keyDayStrategyRaw: String = KeyDayStrategy.stack.rawValue
+
+    /// Whether lower-body strength stacks on key days or keeps them lift-free.
+    var keyDayStrategy: KeyDayStrategy {
+        get { KeyDayStrategy(rawValue: keyDayStrategyRaw) ?? .stack }
+        set { keyDayStrategyRaw = newValue.rawValue }
+    }
+
+    /// Weekday lanes (Sunday=0 ... Saturday=6) whose strength plan "Arrange my
+    /// week" never moves, comma-joined (#25). Access through `pinnedWeekdays`.
+    var pinnedWeekdaysRaw: String = ""
+
+    /// Weekday lanes the arranger leaves in place.
+    var pinnedWeekdays: Set<Int> {
+        get { Set(pinnedWeekdaysRaw.split(separator: ",").compactMap { Int($0) }.filter { (0...6).contains($0) }) }
+        set { pinnedWeekdaysRaw = newValue.sorted().map(String.init).joined(separator: ",") }
+    }
+
     /// Exercise types whose new workouts start out not counting toward
     /// training (walks and hikes by default).
     var trainingExcludedTypes: Set<ExerciseType> {

@@ -30,6 +30,8 @@ final class FavoriteWorkout {
         get { countsTowardMileage }
         set { countsTowardMileage = newValue }
     }
+    /// Whether sessions started from this favorite are key workouts (#25).
+    var isKeyWorkout: Bool = false
     /// Stored backing for `countsTowardTraining`, under its original name
     /// because CloudKit-backed stores can't rename properties.
     private var countsTowardMileage: Bool = true
@@ -54,6 +56,7 @@ final class FavoriteWorkout {
         distanceMiles: Double = 0,
         durationSeconds: Int = 0,
         countsTowardTraining: Bool = true,
+        isKeyWorkout: Bool = false,
         sortOrder: Int = 0
     ) {
         self.id = UUID()
@@ -62,6 +65,7 @@ final class FavoriteWorkout {
         self.distanceMiles = distanceMiles
         self.durationSeconds = durationSeconds
         self.countsTowardMileage = countsTowardTraining
+        self.isKeyWorkout = isKeyWorkout
         self.sortOrder = sortOrder
         self.createdAt = Date()
     }

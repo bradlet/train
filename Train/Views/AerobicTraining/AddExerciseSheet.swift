@@ -15,6 +15,7 @@ struct AddExerciseSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.useMetricUnits) private var useMetricUnits
     @Environment(\.trainingExcludedTypes) private var trainingExcludedTypes
+    @Environment(\.keyWorkoutTypes) private var keyWorkoutTypes
     /// The type the form was filled with, whose `onChange` is not the
     /// athlete's doing.
     @State private var populatedType: ExerciseType?
@@ -35,6 +36,7 @@ struct AddExerciseSheet: View {
     @State private var notes = ""
     @State private var scheduledDate: Date
     @State private var countsTowardTraining = true
+    @State private var isKeyWorkout = false
 
     // Recurrence (create mode only).
     @State private var cadence: SeriesCadence = .oneOff
@@ -122,6 +124,9 @@ struct AddExerciseSheet: View {
                     countsTowardTraining = TrainingInclusion.toggle(
                         countsTowardTraining, afterChangingFrom: oldType, to: newType, excluded: trainingExcludedTypes
                     )
+                    isKeyWorkout = KeyWorkoutDefaults.toggle(
+                        isKeyWorkout, afterChangingFrom: oldType, to: newType, keyTypes: keyWorkoutTypes
+                    )
                 }
             }
             .sheet(isPresented: $isSavingFavorite) {
@@ -132,7 +137,8 @@ struct AddExerciseSheet: View {
                         type: type,
                         durationSeconds: enteredDurationSeconds,
                         displayDistance: distance,
-                        countsTowardTraining: countsTowardTraining
+                        countsTowardTraining: countsTowardTraining,
+                        isKeyWorkout: isKeyWorkout
                     )
                 )
             }
@@ -186,6 +192,11 @@ struct AddExerciseSheet: View {
             }
             Toggle("Counts Toward Training", isOn: $countsTowardTraining)
                 .accessibilityIdentifier("workoutForm.countsTowardTrainingToggle")
+            Toggle(isOn: $isKeyWorkout) {
+                Label("Key workout", systemImage: "bolt.fill")
+            }
+            .tint(.orange)
+            .accessibilityIdentifier("workoutForm.keyWorkoutToggle")
         } header: {
             Text("Distance")
         } footer: {
@@ -289,9 +300,11 @@ struct AddExerciseSheet: View {
             notes = exercise.notes
             scheduledDate = exercise.date
             countsTowardTraining = exercise.countsTowardTraining
+            isKeyWorkout = exercise.isKeyWorkout
         } else {
             name = type.rawValue
             countsTowardTraining = TrainingInclusion.counts(type, excluded: trainingExcludedTypes)
+            isKeyWorkout = KeyWorkoutDefaults.isKey(type, keyTypes: keyWorkoutTypes)
             scheduledDate = defaultDate
         }
     }
@@ -308,6 +321,7 @@ struct AddExerciseSheet: View {
         seconds = values.seconds
         distance = values.displayDistance
         countsTowardTraining = values.countsTowardTraining
+        isKeyWorkout = values.isKeyWorkout
     }
 
     /// Planned duration from the wheel pickers, in seconds.
@@ -341,6 +355,7 @@ struct AddExerciseSheet: View {
             baseDurationSeconds: enteredDurationSeconds,
             notes: notes,
             countsTowardTraining: countsTowardTraining,
+            isKeyWorkout: isKeyWorkout,
             progression: progression
         )
     }
@@ -358,7 +373,8 @@ struct AddExerciseSheet: View {
                 distanceMiles: enteredDistanceMiles,
                 notes: notes,
                 date: scheduledDate,
-                countsTowardTraining: countsTowardTraining
+                countsTowardTraining: countsTowardTraining,
+                isKeyWorkout: isKeyWorkout
             )
             modelContext.insert(newExercise)
         } else {
@@ -386,6 +402,7 @@ struct AddExerciseSheet: View {
                 type: type,
                 notes: notes,
                 countsTowardTraining: countsTowardTraining,
+                isKeyWorkout: isKeyWorkout,
                 distanceMiles: enteredDistanceMiles,
                 durationSeconds: enteredDurationSeconds
             ),
@@ -403,6 +420,7 @@ struct AddExerciseSheet: View {
         exercise.notes = notes
         exercise.date = scheduledDate.startOfDay
         exercise.countsTowardTraining = countsTowardTraining
+        exercise.isKeyWorkout = isKeyWorkout
     }
 }
 

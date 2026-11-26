@@ -51,7 +51,12 @@ enum HealthKitWorkoutMapper {
     ///   - excludedTypes: Types that don't count toward training (#17), so
     ///     an imported walk is tracked but not counted by default.
     /// - Returns: A new unsaved completed `Exercise` instance.
-    static func toExercise(_ dto: HealthKitWorkout, excludedTypes: Set<ExerciseType> = TrainingInclusion.defaultExcluded) -> Exercise {
+    ///   - keyTypes: Types the athlete marks key by default (#25).
+    static func toExercise(
+        _ dto: HealthKitWorkout,
+        excludedTypes: Set<ExerciseType> = TrainingInclusion.defaultExcluded,
+        keyTypes: Set<ExerciseType> = []
+    ) -> Exercise {
         let type = exerciseType(for: dto.activityType)
         let seconds = Int(dto.duration)
         let miles = dto.distanceMiles ?? 0.0
@@ -63,6 +68,7 @@ enum HealthKitWorkoutMapper {
             notes: "",
             date: dto.startDate,
             countsTowardTraining: TrainingInclusion.counts(type, excluded: excludedTypes),
+            isKeyWorkout: KeyWorkoutDefaults.isKey(type, keyTypes: keyTypes),
             workout: Workout(
                 durationSeconds: seconds,
                 distanceMiles: miles,

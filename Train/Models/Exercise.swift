@@ -43,6 +43,13 @@ final class Exercise {
         set { countsTowardMileage = newValue }
     }
 
+    /// Whether the athlete marked this session as a **key** (hard) workout
+    /// (#25). Entirely the athlete's call: the app never infers hardness from
+    /// type, distance, pace or RPE. New sessions start from the athlete's
+    /// per-type defaults (`KeyWorkoutDefaults`); placement rules and hybrid
+    /// hints read only this flag.
+    var isKeyWorkout: Bool = false
+
     /// Stored backing for `countsTowardTraining`. Keeps its original name on
     /// purpose: a CloudKit-backed store refuses to migrate a renamed
     /// property, even with `@Attribute(originalName:)` (it fails to load).
@@ -87,6 +94,7 @@ final class Exercise {
     ///   - date: The day this activity is planned and/or performed.
     ///   - seriesID: Identifier shared by exercises bulk-created as one series.
     ///   - countsTowardTraining: Whether the distance counts toward mileage aggregates.
+    ///   - isKeyWorkout: Whether the athlete marked it as a key workout.
     ///   - workout: Recorded data, if the activity has been performed.
     init(
         name: String,
@@ -97,6 +105,7 @@ final class Exercise {
         date: Date,
         seriesID: UUID? = nil,
         countsTowardTraining: Bool = true,
+        isKeyWorkout: Bool = false,
         workout: Workout? = nil
     ) {
         self.id = UUID()
@@ -108,6 +117,7 @@ final class Exercise {
         self.date = date
         self.seriesID = seriesID
         self.countsTowardMileage = countsTowardTraining
+        self.isKeyWorkout = isKeyWorkout
         self.workout = workout
     }
 }

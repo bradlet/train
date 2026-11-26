@@ -28,6 +28,8 @@ struct FavoriteFormValues: Equatable {
     var displayDistance: Double? = nil
     /// Whether it counts toward training mileage.
     var countsTowardTraining: Bool = true
+    /// Whether it's a key workout (#25).
+    var isKeyWorkout: Bool = false
 
     /// Whole hours of `durationSeconds`.
     var hours: Int { durationSeconds / 3600 }
@@ -48,13 +50,15 @@ struct FavoriteFormValues: Equatable {
         type: ExerciseType = .run,
         durationSeconds: Int = 0,
         displayDistance: Double? = nil,
-        countsTowardTraining: Bool = true
+        countsTowardTraining: Bool = true,
+        isKeyWorkout: Bool = false
     ) {
         self.name = name
         self.type = type
         self.durationSeconds = max(durationSeconds, 0)
         self.displayDistance = displayDistance.flatMap { $0 > 0 ? $0 : nil }
         self.countsTowardTraining = countsTowardTraining
+        self.isKeyWorkout = isKeyWorkout
     }
 
     /// Reads a stored favorite into form units. A zero distance becomes nil
@@ -70,7 +74,8 @@ struct FavoriteFormValues: Equatable {
             displayDistance: favorite.distanceMiles > 0
                 ? favorite.distanceMiles.toDisplayDistance(metric: metric)
                 : nil,
-            countsTowardTraining: favorite.countsTowardTraining
+            countsTowardTraining: favorite.countsTowardTraining,
+            isKeyWorkout: favorite.isKeyWorkout
         )
     }
 
@@ -93,7 +98,8 @@ struct FavoriteFormValues: Equatable {
         plannedDisplayDistance: Double?,
         actualDurationSeconds: Int,
         actualDisplayDistance: Double?,
-        countsTowardTraining: Bool
+        countsTowardTraining: Bool,
+        isKeyWorkout: Bool = false
     ) -> FavoriteFormValues {
         let planned = (plannedDisplayDistance ?? 0) > 0 ? plannedDisplayDistance : nil
         return FavoriteFormValues(
@@ -101,7 +107,8 @@ struct FavoriteFormValues: Equatable {
             type: type,
             durationSeconds: plannedDurationSeconds > 0 ? plannedDurationSeconds : actualDurationSeconds,
             displayDistance: planned ?? actualDisplayDistance,
-            countsTowardTraining: countsTowardTraining
+            countsTowardTraining: countsTowardTraining,
+            isKeyWorkout: isKeyWorkout
         )
     }
 
@@ -150,6 +157,7 @@ enum FavoriteWorkoutEditor {
             distanceMiles: values.distanceMiles(metric: metric),
             durationSeconds: values.durationSeconds,
             countsTowardTraining: values.countsTowardTraining,
+            isKeyWorkout: values.isKeyWorkout,
             sortOrder: nextOrder
         )
         context.insert(favorite)
@@ -173,6 +181,7 @@ enum FavoriteWorkoutEditor {
         favorite.distanceMiles = values.distanceMiles(metric: metric)
         favorite.durationSeconds = values.durationSeconds
         favorite.countsTowardTraining = values.countsTowardTraining
+        favorite.isKeyWorkout = values.isKeyWorkout
         return true
     }
 

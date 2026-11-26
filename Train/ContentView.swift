@@ -45,6 +45,8 @@ struct ContentView: View {
         .environment(\.useMetricUnits, useMetric)
         .environment(\.weekStartDay, weekStartDay)
         .environment(\.trainingExcludedTypes, configurations.first?.trainingExcludedTypes ?? TrainingInclusion.defaultExcluded)
+        .environment(\.keyWorkoutTypes, configurations.first?.keyWorkoutTypes ?? [])
+        .environment(\.keyDayStrategy, configurations.first?.keyDayStrategy ?? .stack)
         .onAppear { ensureConfigurationExists() }
     }
 

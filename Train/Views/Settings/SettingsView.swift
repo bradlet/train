@@ -55,6 +55,7 @@ struct SettingsView: View {
                             .accessibilityIdentifier("settings.useMetricUnits")
                     }
                     trainingSection(config)
+                    keyWorkoutSection(config)
                 }
                 WorkoutDataSection(completedExercises: completedExercises)
             }
@@ -101,6 +102,42 @@ struct SettingsView: View {
             Button("New Workouts Only") { applyInclusion(pending, toPast: false, config: config) }
                 .accessibilityIdentifier("settings.training.newOnly")
             Button("Cancel", role: .cancel) { pendingInclusion = nil }
+        }
+    }
+
+    /// Key workouts by default and the key-day strategy (#25). Nothing is
+    /// ticked out of the box: what's hard is the athlete's call.
+    private func keyWorkoutSection(_ config: AppConfiguration) -> some View {
+        Section {
+            Picker("Key days", selection: Binding(
+                get: { config.keyDayStrategy },
+                set: { config.keyDayStrategy = $0; saveChanges() }
+            )) {
+                ForEach(KeyDayStrategy.allCases) { Text($0.displayName).tag($0) }
+            }
+            .accessibilityIdentifier("settings.keyDayStrategy")
+            DisclosureGroup("Key workouts by default") {
+                ForEach(ExerciseType.allCases) { type in
+                    Toggle(isOn: Binding(
+                        get: { config.keyWorkoutTypes.contains(type) },
+                        set: { isKey in
+                            var types = config.keyWorkoutTypes
+                            if isKey { types.insert(type) } else { types.remove(type) }
+                            config.keyWorkoutTypes = types
+                            saveChanges()
+                        }
+                    )) {
+                        Label(type.rawValue, systemImage: type.systemImage)
+                    }
+                    .tint(.orange)
+                    .accessibilityIdentifier("settings.keyDefault.\(type.rawValue)")
+                }
+            }
+            .accessibilityIdentifier("settings.keyDefaults")
+        } header: {
+            Text("Key Workouts")
+        } footer: {
+            Text("Mark your hard sessions with ⚡ on any workout; ticked types start marked. Strength placement keeps heavy legs off the day before a key workout and, if you stack, puts them on the key day after the run.")
         }
     }
 

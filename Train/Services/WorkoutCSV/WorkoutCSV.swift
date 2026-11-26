@@ -60,6 +60,8 @@ struct WorkoutCSVRow: Equatable {
     /// Whether the workout counts toward training (#29); `true` when the
     /// column is missing or blank, so older files import as before.
     var countsTowardTraining: Bool = true
+    /// Whether the athlete marked it key (#25); `false` when missing.
+    var isKeyWorkout: Bool = false
 }
 
 /// Errors raised only for whole-file failures. Per-row problems are
@@ -91,7 +93,7 @@ enum WorkoutCSV {
     /// are written on export but ignored on import (the schema is fixed).
     static let headerColumns = [
         "date", "name", "type", "duration", "distance", "notes",
-        "feeling", "perceived_exertion", "counts_toward_training"
+        "feeling", "perceived_exertion", "counts_toward_training", "key_workout"
     ]
 
     /// CSV header line (joined `headerColumns`).
@@ -148,7 +150,8 @@ enum WorkoutCSV {
             workout?.notes ?? exercise.notes,
             workout?.feeling.map(String.init) ?? "",
             workout?.perceivedExertion.map(String.init) ?? "",
-            exercise.countsTowardTraining ? "true" : "false"
+            exercise.countsTowardTraining ? "true" : "false",
+            exercise.isKeyWorkout ? "true" : "false"
         ]
     }
 
@@ -204,6 +207,7 @@ enum WorkoutCSV {
             notes: row.notes,
             date: row.date,
             countsTowardTraining: row.countsTowardTraining,
+            isKeyWorkout: row.isKeyWorkout,
             workout: Workout(
                 durationSeconds: row.durationSeconds,
                 distanceMiles: miles,
@@ -433,6 +437,7 @@ enum WorkoutCSV {
         let feelingString = fields.count > 6 ? fields[6] : ""
         let exertionString = fields.count > 7 ? fields[7] : ""
         let countsString = fields.count > 8 ? fields[8] : ""
+        let keyString = fields.count > 9 ? fields[9] : ""
 
         guard let date = parseDate(dateString) else {
             return .skip("invalid date '\(dateString)'")
@@ -469,7 +474,8 @@ enum WorkoutCSV {
             notes: notes,
             feeling: feeling,
             perceivedExertion: exertion,
-            countsTowardTraining: parseCounts(countsString)
+            countsTowardTraining: parseCounts(countsString),
+            isKeyWorkout: ["true", "yes", "1"].contains(keyString.trimmingCharacters(in: .whitespaces).lowercased())
         ))
     }
 

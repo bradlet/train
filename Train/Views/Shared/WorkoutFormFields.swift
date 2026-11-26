@@ -36,6 +36,7 @@ struct WorkoutFormFields<PlannedSection: View>: View {
     @Binding var feeling: Int?
     @Binding var perceivedExertion: Int?
     @Binding var countsTowardTraining: Bool
+    @Binding var isKeyWorkout: Bool
     /// Retitles the duration/distance headers as "Completed …" when a
     /// planned section is shown alongside them.
     var usesCompletedHeaders: Bool = false
@@ -67,6 +68,13 @@ struct WorkoutFormFields<PlannedSection: View>: View {
                         .tag(exerciseType)
                 }
             }
+            Toggle(isOn: $isKeyWorkout) {
+                Label("Key workout", systemImage: "bolt.fill")
+            }
+            .tint(.orange)
+            .accessibilityIdentifier("workoutForm.keyWorkoutToggle")
+        } footer: {
+            Text("Key workouts are your hard sessions. Strength placement plans around them.")
         }
     }
 
@@ -144,7 +152,8 @@ extension WorkoutFormFields where PlannedSection == EmptyView {
         notes: Binding<String>,
         feeling: Binding<Int?>,
         perceivedExertion: Binding<Int?>,
-        countsTowardTraining: Binding<Bool>
+        countsTowardTraining: Binding<Bool>,
+        isKeyWorkout: Binding<Bool>
     ) {
         self.init(
             name: name,
@@ -158,6 +167,7 @@ extension WorkoutFormFields where PlannedSection == EmptyView {
             feeling: feeling,
             perceivedExertion: perceivedExertion,
             countsTowardTraining: countsTowardTraining,
+            isKeyWorkout: isKeyWorkout,
             usesCompletedHeaders: false,
             plannedSection: { EmptyView() }
         )

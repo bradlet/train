@@ -24,6 +24,7 @@ struct ImportHealthKitSheet: View {
     @Environment(\.healthKitImport) private var service
     @Environment(\.modelContext) private var modelContext
     @Environment(\.trainingExcludedTypes) private var trainingExcludedTypes
+    @Environment(\.keyWorkoutTypes) private var keyWorkoutTypes
     @Environment(\.useMetricUnits) private var useMetricUnits
     @Environment(\.dismiss) private var dismiss
     @Environment(\.googleSheetsSync) private var sheetsSync
@@ -158,7 +159,7 @@ struct ImportHealthKitSheet: View {
         let skippedCount = selected.count - deduped.count
 
         for dto in deduped {
-            let exercise = HealthKitWorkoutMapper.toExercise(dto, excludedTypes: trainingExcludedTypes)
+            let exercise = HealthKitWorkoutMapper.toExercise(dto, excludedTypes: trainingExcludedTypes, keyTypes: keyWorkoutTypes)
             modelContext.insert(exercise)
         }
         do {

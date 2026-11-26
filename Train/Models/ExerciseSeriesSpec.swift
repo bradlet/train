@@ -57,6 +57,8 @@ struct ExerciseSeriesSpec: Codable, Equatable {
     var baseDurationSeconds: Int
     var notes: String = ""
     var countsTowardTraining: Bool = true
+    /// Whether it's a key workout (#25).
+    var isKeyWorkout: Bool = false
     /// Optional linear progression; nil keeps every occurrence at the base values.
     var progression: SeriesProgression? = nil
 }
