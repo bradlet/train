@@ -30,7 +30,7 @@ One ordered path through everything planned on 2026-11-24. Do one step at a time
 ### D. Progress
 8a. ✅ **#31** Chart clean-up before the Progress views reuse it: 1Y (two-week averages) and All (monthly averages) scales, the 6M x-axis "…" bug (a label on every week of alternate months), at most five labels, and per-chart gap styles (mileage zero, feeling dashed bridge). Added here because #16 depends on it.
 9. ✅ **#16** Strength → Progress: lift list, lift detail, PRs. Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §4. Shipped with the #24 group view and a week headline. The weekly chart and muscle-coverage parts of P3, and the plan-target step line, wait for later steps.
-10. **#17** Cardio → Progress refactor: training-inclusion opt-in and scoped views. Doc: [PROGRESS_VIEWS](PROGRESS_VIEWS.md)
+10. ✅ **#17** Cardio → Progress refactor: training-inclusion opt-in and scoped views. Doc: [PROGRESS_VIEWS](PROGRESS_VIEWS.md). Shipped with #29's CSV column. `countsTowardTraining` is a computed name over the stored `countsTowardMileage`: CloudKit stores refuse property renames, even in development.
 
 ### E. Hybrid planning
 11. **#18** Muscle-balance glance and copy day / duplicate card. Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §5
@@ -48,7 +48,7 @@ This is an independent track. It can run in parallel with any step after step 4,
 17. **#22** Garmin import: FIT files first, the API later. Doc: [CONNECTIONS](CONNECTIONS.md)
 
 ### H. Release readiness
-19. **#30** Deploy the CloudKit production schema and verify two-device sync. **Held on purpose (2026-11-26):** a deployed production schema is additive-only forever, and the backlog still plans a rename (#17's `countsTowardMileage` → `countsTowardTraining`) and model redesigns (#20 plans, #24 groups). Sync isn't needed until then: Release/TestFlight builds are local-only (`ModelContainerFactory.isCloudKitSyncEnabled`). When it's time: reset the development environment, launch a Debug build with `-initializeCloudKitSchema`, check the record types, deploy, flip sync on for Release, and re-check the privacy policy's iCloud wording.
+19. **#30** Deploy the CloudKit production schema and verify two-device sync. **Held on purpose (2026-11-26):** a deployed production schema is additive-only forever, and the backlog still plans model redesigns (#20 plans). #17's rename and #24's groups have landed. Sync isn't needed until then: Release/TestFlight builds are local-only (`ModelContainerFactory.isCloudKitSyncEnabled`). When it's time: reset the development environment, launch a Debug build with `-initializeCloudKitSchema`, check the record types, deploy, flip sync on for Release, and re-check the privacy policy's iCloud wording.
 
 ### I. Next brainstorm
 20. **Pick the next ideas** from [STRENGTH_IDEAS](STRENGTH_IDEAS.md): S8 self-maintaining board, S2 priority trim, S6 longevity check-ins, S7 power, S3 hybrid load. Design each one, then file an issue for it.

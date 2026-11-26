@@ -28,7 +28,7 @@ The single persisted entity — a training activity that is planned, recorded, o
 - `workout: Workout?` — embedded recorded-instance data; `nil` = planned only, non-nil = recorded. `isCompleted` is `workout != nil`
 - `id: UUID` is explicit for drag-and-drop `Transferable` support and list/navigation identity
 - `seriesID: UUID?` — shared by exercises bulk-created as one recurring series (see [Recurring exercise series](#recurring-exercise-series)); `nil` for one-off sessions
-- `countsTowardMileage: Bool` — `false` opts the activity out of mileage/training aggregates; it renders as a hollow calendar dot and a dimmed "Not training" History row
+- `countsTowardTraining: Bool` (renamed from `countsTowardMileage`, #17) — `false` opts the activity out of mileage/training aggregates; it renders as a hollow calendar dot and a dimmed "Not training" History row
 
 ### Workout
 The recorded-instance data for an `Exercise`. **Not** a `@Model` — a plain `Codable` value `struct` JSON-encoded into the exercise's private `workoutData: Data?` column and exposed as `Exercise.workout` (no second table; a `Workout?` composite attribute would crash SwiftData's decoder on fetch).
@@ -184,7 +184,7 @@ highlightedID with an ease-in-out animation.
 ## Testing
 
 Unit tests cover:
-- **Models**: Exercise persistence, the nested `workout` (JSON-encoded into `workoutData`) round-tripping through SwiftData, `isCompleted` / completed-vs-planned in-memory filtering, `Workout(draftFrom:)`, `feeling` / `perceivedExertion` defaults and persistence, `seriesID` and `countsTowardMileage`
+- **Models**: Exercise persistence, the nested `workout` (JSON-encoded into `workoutData`) round-tripping through SwiftData, `isCompleted` / completed-vs-planned in-memory filtering, `Workout(draftFrom:)`, `feeling` / `perceivedExertion` defaults and persistence, `seriesID` and `countsTowardTraining`
 - **Extensions**: date arithmetic (week boundaries, month boundaries, same-day/week/month checks), distance formatting, duration formatting, **pace formatting** (metric/imperial, zero-distance fallback, truncation behavior)
 - **Types**: ExerciseType codable round-trip, identifiable conformance
 - **Drag items**: ExerciseDragItem codable round-trip

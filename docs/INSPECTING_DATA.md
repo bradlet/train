@@ -69,7 +69,7 @@ ZDISTANCEMILES   → distanceMiles   (planned target)
 ZNOTES           → notes
 ZDATE            → date            (Core Data epoch — see above)
 ZSERIESID        → seriesID        (UUID blob, NULL = one-off)
-ZCOUNTSTOWARDMILEAGE → countsTowardMileage (0/1)
+ZCOUNTSTOWARDMILEAGE → countsTowardMileage (0/1), exposed in code as countsTowardTraining
 ZID              → id (UUID, stored as a blob)
 ZWORKOUTDATA     → workout         (JSON blob, NULL = planned only)
 ```

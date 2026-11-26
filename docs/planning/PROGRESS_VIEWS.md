@@ -1,6 +1,13 @@
 # Progress Views — Consistent History for Cardio and Strength (design draft)
 
 > Status: **design draft**, iteration 1 (2026-11-24). Part of the Cardio / Strength split (see [STRENGTH_ROADMAP.md](STRENGTH_ROADMAP.md) → target IA).
+>
+> **Built in #17** (2026-11-26).
+> - **Settings:** a new My Training section; walks and hikes start excluded.
+> - **Rename:** `countsTowardTraining` in code. It's a computed property over the stored `countsTowardMileage`, because CloudKit stores can't rename a property.
+> - **Scope:** a sticky `TrainingScope` chip row in Cardio → Progress, where a long-press on a family drills into its types. Inclusion still applies inside a scope.
+> - **Strength:** a per-lift opt-out, with sticky muscle-group chips.
+> - **Open questions:** 1 left as-is (mileage stays the headline, and scopes make per-type distance one tap away). 2 decided as no strength calendar for now: the list and weekly headline cover it. 3 handled by the movement-group section from #24 instead of a pattern scope.
 
 ## Goal
 

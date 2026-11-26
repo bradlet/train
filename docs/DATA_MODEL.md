@@ -32,7 +32,7 @@ erDiagram
         String notes "planning notes"
         Date date "single date, planned and/or performed"
         UUID seriesID "optional; shared by a recurring series"
-        Bool countsTowardMileage
+        Bool countsTowardTraining
         Data workoutData "private; nil = planned only"
     }
     Workout {
@@ -89,7 +89,7 @@ erDiagram
         ExerciseType type
         Double distanceMiles "0 = none"
         Int durationSeconds "0 = none"
-        Bool countsTowardMileage
+        Bool countsTowardTraining
         Int sortOrder "manual order"
         Date createdAt
     }
@@ -121,7 +121,7 @@ An Exercise represents a **single training activity** — planned, recorded, or 
 | `notes` | `String` | `""` | Free-text notes about the *planned* exercise. Post-workout notes live in `workout.notes`. |
 | `date` | `Date` | `Date()` | The **single** date for this activity — the day it is planned and/or performed (renamed from the old `scheduledDate`). Preserves the full timestamp so Cardio → Progress can show time-of-day. **Not** normalized to midnight; day/week grouping flows through `Date+Week` helpers (`startOfDay`, `startOfWeek`, `isSameDay`), which compare calendar components. If an activity is performed on a different day than planned, it is treated as a separate `Exercise` — there is no plan-date / done-date split. |
 | `seriesID` | `UUID?` | `nil` | Shared by every exercise bulk-created as one recurring series; `nil` for a one-off. See [Recurring Series](#recurring-series). |
-| `countsTowardMileage` | `Bool` | `true` | `false` keeps the activity (e.g. a casual walk) out of mileage aggregates — weekly totals, stat cards, charts. It renders as a hollow calendar dot and a dimmed History row with a "Not training" badge. |
+| `countsTowardTraining` | `Bool` | `true` | Stored as `countsTowardMileage` (CloudKit stores can't rename properties) and set from the type's default (#17). `false` keeps the activity (e.g. a casual walk) out of mileage aggregates — weekly totals, stat cards, charts. It renders as a hollow calendar dot and a dimmed History row with a "Not training" badge. |
 | `workout` | `Workout?` | `nil` | Recorded-instance data, present once the activity has been performed. `nil` means *planned only*. JSON-encoded into a private `workoutData: Data?` column on the same record — no second table. See [Workout](#workout) below. |
 | `isCompleted` | `Bool` (computed) | — | `workoutData != nil` (equivalent to `workout != nil`, without decoding). The single source of truth for "has this been recorded?". |
 
@@ -179,7 +179,7 @@ A saved aerobic workout preset. Picking one pre-fills the record (quick add) and
 | `type` | `ExerciseType` | `.run` | Exercise type to pre-fill. |
 | `distanceMiles` | `Double` | `0.0` | Target distance in miles; `0` means none. |
 | `durationSeconds` | `Int` | `0` | Target duration; `0` means none. |
-| `countsTowardMileage` | `Bool` | `true` | Copied onto workouts started from it. |
+| `countsTowardTraining` | `Bool` | `true` | Copied onto workouts started from it. |
 | `sortOrder` | `Int` | `0` | Manual order (drag to reorder); ties break on `createdAt`. |
 | `createdAt` | `Date` | `Date()` | Creation timestamp. |
 
@@ -357,9 +357,11 @@ All model properties **must have default values** in their declarations (not jus
 ```swift
 var name: String = ""           // Not var name: String (would crash on partial sync)
 var distanceMiles: Double = 0.0
-var countsTowardMileage: Bool = true
+private var countsTowardMileage: Bool = true   // exposed as countsTowardTraining
 private var workoutData: Data? = nil   // optional → defaults to nil
 ```
+
+**No renames.** A CloudKit-backed store refuses to migrate a renamed property, even with `@Attribute(originalName:)`, and the app fails to launch. To change a name, keep the stored property under its old name, make it private, and expose the new name as a computed property. `Exercise.countsTowardTraining` over `countsTowardMileage` (#17) is the example.
 
 **Embedded Codable values.** The nested `Workout` is JSON-encoded into a `Data?`
 column (`workoutData`) and exposed through the computed `Exercise.workout`; CloudKit
