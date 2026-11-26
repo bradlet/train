@@ -1,6 +1,6 @@
 # Strength as a First-Class Peer — Feature Roadmap (draft)
 
-> Status: **brainstorm draft**, iteration 2 (2026-11-24). Nothing here is built yet.
+> Status: **brainstorm draft**, iteration 2 (2026-11-24). §1 Foundation (F1–F3) is **built** (#13, 2026-11-25); see [STRENGTH_TRAINING.md](../STRENGTH_TRAINING.md) for the shipped model.
 > Related: [TRAINING_PLANS.md](TRAINING_PLANS.md) (templates, targets, light weeks, programs) · [PROGRESS_VIEWS.md](PROGRESS_VIEWS.md) · [CONNECTIONS.md](CONNECTIONS.md) · [STRENGTH_IDEAS.md](STRENGTH_IDEAS.md). The AI coach is out of scope for these docs (it is being reworked separately).
 > Guiding belief (see `CLAUDE.md` → Product Vision): consistent hybrid training — aerobic *and* strength — keeps athletes healthier and performing longer. Strength must stop feeling like a bolt-on tab.
 
@@ -44,6 +44,8 @@ flowchart LR
 ---
 
 ## 1. Foundation: data model
+
+> **Built in #13.** As shipped: records are their own `StrengthRecord` rows (not a list on the lift) so concurrent devices can't overwrite each other, linked by `liftKey`/`slotID` keys rather than relationships. The per-lift *default measurement* moved to #14 (R2).
 
 **F1 — Lift-owned history.** Introduce a lift identity (keyed by `libraryExerciseID`, falling back to a normalised name for un-linked entries) that owns the `StrengthWorkout` records, its primary metric and its default measurement. `StrengthExercise` becomes the board **slot** (day, section, order, planned sets×reps) that references the lift. Removing a slot never deletes history. Wipe the data rather than migrate it (per the existing preference).
 

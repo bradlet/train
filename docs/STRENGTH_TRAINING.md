@@ -9,86 +9,103 @@ like a project management app. Each column has two sections:
   wants to keep in mind, but has dragged out of the current week's plan. Cards can be
   dragged back into the active plan to reorganize workouts.
 
-Unlike aerobic training, **strength exercises are undated**: they live permanently in
-a day-of-week lane and accumulate dated weight records over time. A recorded
-"workout" is just a date, a weight, and the *type* of weight recording — max, average,
-first set, last set, or min — so trends like 1-rep max and average working weight can
-later be graphed independently.
+Unlike aerobic training, **strength exercises are undated**: a card lives permanently in
+a day-of-week lane as a *slot* for a lift. History belongs to the **lift**, not the card
+(#13): the same lift on two days shares one history, and removing a card keeps it. Each
+lift is tracked by one **primary metric** (weight, reps, time, or distance), and a record
+is a date, that one number — optional, since "done" with no number is a valid session —
+and, for weight and reps, which number it is (max, average, first set, last set, min).
 
 ## Data Model
 
 ```mermaid
 classDiagram
     class StrengthExercise {
-        <<SwiftData @Model>>
-        +UUID id
+        <<SwiftData @Model — board slot>>
+        +UUID id  «= record.slotID»
         +String name
         +String? libraryExerciseID
         +MuscleGroup muscleGroup
         +Int weekdayIndex  «Sun=0 … Sat=6»
         +Bool isOffloaded
         +Int sortOrder  «order within lane»
+        +Int? plannedSets / plannedReps
         +String notes
-        -Data? workoutsData  «JSON blob»
-        +workouts [StrengthWorkout]
-        +latestWorkout StrengthWorkout?
+        +liftKey String  «computed»
     }
-    class StrengthWorkout {
-        <<Codable value type>>
+    class StrengthLift {
+        <<SwiftData @Model>>
+        +String liftKey
+        +String name
+        +String? libraryExerciseID
+        +MuscleGroup muscleGroup
+        +LiftMetric primaryMetric
+        +Date createdAt  «oldest wins on duplicates»
+    }
+    class StrengthRecord {
+        <<SwiftData @Model>>
         +UUID id
+        +String liftKey
+        +UUID? slotID
         +Date date
-        +Double weightPounds  «internal unit»
-        +WeightRecordingType recordingType
+        +Double? value  «nil = done; internal unit»
+        +LiftMetric metric
+        +LiftMeasurement? measurement
         +String notes
     }
-    class WeightRecordingType {
+    class LiftMetric {
         <<enum>>
-        maxWeight
-        averageWeight
-        firstSetWeight
-        lastSetWeight
-        minWeight
+        weight «lb»
+        reps «count»
+        time «seconds»
+        distance «miles, shown yd/m»
+    }
+    class LiftMeasurement {
+        <<enum — weight & reps only>>
+        max, average, firstSet, lastSet, min
     }
     class LibraryExercise {
         <<Codable value type>>
         +String id  «slug»
         +String name
-        +String details
         +MuscleGroup muscleGroup
-        +[MuscleGroup] secondaryMuscleGroups
-        +String equipment
-        +String difficulty
-    }
-    class MuscleGroup {
-        <<enum, tolerant decode>>
-        chest, back, shoulders, …
-        other  «fallback for unknown»
+        +LiftMetric primaryMetric  «defaults to weight»
+        …
     }
 
-    StrengthExercise "1" *-- "0..*" StrengthWorkout : JSON-encoded inline
-    StrengthWorkout --> WeightRecordingType
+    StrengthExercise ..> StrengthLift : liftKey
+    StrengthRecord ..> StrengthLift : liftKey
+    StrengthRecord ..> StrengthExercise : slotID (card may be gone)
     StrengthExercise ..> LibraryExercise : libraryExerciseID
-    LibraryExercise --> MuscleGroup
-    StrengthExercise --> MuscleGroup
+    StrengthRecord --> LiftMetric
+    StrengthRecord --> LiftMeasurement
+    StrengthLift --> LiftMetric
 ```
 
 Design notes:
 
-- **Workouts ride inside the exercise entity.** `StrengthWorkout` is a plain Codable
-  struct stored as a JSON-encoded `Data?` blob on `StrengthExercise` — the same
-  pattern as `Exercise.workout`. SwiftData's composite decoder fatalErrors on fetch
-  of optional value structs, and CloudKit gets a single mirrored record with no
-  relationship management.
-- **Weight is stored in pounds internally**, mirroring the miles-internally
-  convention for distance. Display conversion goes through
-  `Double.formattedWeight(metric:)` / `to-/fromDisplayWeight(metric:)`
-  (`Extensions/Double+Weight.swift`) driven by `@Environment(\.useMetricUnits)`.
+- **Records are rows, linked by keys.** `StrengthRecord` is its own `@Model` so two
+  devices logging the same lift both survive a CloudKit sync (a JSON blob on the lift
+  would be last-writer-wins). Links are a `liftKey` string and a `slotID` UUID, never
+  SwiftData relationships — CloudKit-friendly, and deleting a card can't cascade.
+- **`liftKey`** is the `libraryExerciseID`, or `"name:"` + the normalised name for an
+  unlinked lift (`StrengthLiftKey.make`). CloudKit can't enforce uniqueness, so
+  `StrengthLiftRegistry` resolves duplicate lifts to the oldest; all lookups (lift,
+  metric, records, latest-per-lift) go through it.
+- **Lifts are created when a card is added** (library sheet, Home's Log Lift, the
+  coach's `plan_strength_day`), seeded with the library entry's primary metric; an
+  unmatched name gets weight. The record sheet falls back to `findOrCreate`.
+- **Each record stores its own metric**, so a later change to the lift's metric never
+  reinterprets old values. Values use one internal unit per metric — pounds, a rep
+  count, seconds, miles — mirroring the miles-internally convention; `LiftMetric`
+  owns display conversion and formatting.
+- **No value means "done".** Charts must plot `nil` as a gap, never 0.
 - **All model properties have defaults** for CloudKit compatibility.
 - `MuscleGroup` decodes unknown raw values to `.other` so newer server catalogs
   can't break older clients. Because of that custom `init(from:)`, SwiftData would
   treat the enum as a composite Codable attribute and **crash its encoder on save** —
-  so `StrengthExercise` stores the raw string (`muscleGroupRaw`) and exposes a
-  computed `muscleGroup`, the same pattern as `Workout.source`.
+  so the models store raw strings (`muscleGroupRaw`, `primaryMetricRaw`, …) and
+  expose computed enums, the same pattern as `Workout.source`.
 
 ## Exercise Library
 
@@ -119,7 +136,7 @@ patch bundled entries.
 
 ```mermaid
 flowchart TD
-    STV["StrengthTrainingView<br/>@Query all StrengthExercise<br/>(top-level view — no ViewModel)"]
+    STV["StrengthTrainingView<br/>@Query StrengthExercise + StrengthRecord<br/>(top-level view — no ViewModel)"]
     STRIP["Day strip (Sun–Sat chips)<br/>tap = select day · drop = move card to day"]
     TAB["TabView (.page)<br/>swipe left/right between days"]
     COL["StrengthDayColumn (×7)"]
@@ -127,7 +144,7 @@ flowchart TD
     OFF["Offloaded section<br/>ordered cards, drop targets"]
     CARD["StrengthExerciseCard<br/>draggable · tap to record ·<br/>context menu (move/offload/delete)"]
     LIB["ExerciseLibrarySheet<br/>search + muscle-group sections"]
-    REC["RecordStrengthWorkoutSheet<br/>date · weight · recording type · notes"]
+    REC["RecordStrengthSheet<br/>date · value in the lift's metric (optional) ·<br/>measurement · notes"]
     PLANNER["StrengthBoardPlanner<br/>lane / move / nextSortOrder<br/>(pure, unit-tested)"]
 
     STV --> STRIP
@@ -157,15 +174,18 @@ project's no-ViewModels convention.
 sequenceDiagram
     actor User
     participant Card as StrengthExerciseCard
-    participant Sheet as RecordStrengthWorkoutSheet
-    participant Model as StrengthExercise
+    participant Sheet as RecordStrengthSheet
+    participant Registry as StrengthLiftRegistry
+    participant Store as ModelContext
 
     User->>Card: tap
-    Card->>Sheet: present (exercise)
-    User->>Sheet: date, weight, recording type, notes
-    Sheet->>Sheet: convert display unit → pounds
-    Sheet->>Model: workouts += StrengthWorkout(...)
-    Note over Model: re-encoded to JSON blob,<br/>persisted by SwiftData + CloudKit
+    Card->>Sheet: present (slot)
+    Sheet->>Registry: metric(for: slot)
+    User->>Sheet: date, value (or blank = done), measurement, notes
+    Sheet->>Sheet: StrengthRecordDraft parses → internal unit
+    Sheet->>Registry: findOrCreate(lift for slot)
+    Sheet->>Store: insert StrengthRecord(liftKey, slotID: slot.id, …)
+    Note over Store: one row per record,<br/>persisted by SwiftData + CloudKit
 ```
 
 ## AI Coach Serialization
@@ -176,8 +196,10 @@ The strength board is part of the coaching snapshot:
   living in the AICoachCore package alongside `CoachWorkout` / `CoachExercise`
   so the Evals CLI shares them.
 - `CoachTypeConversions.swift` (app) bridges the SwiftData models to those
-  types: `CoachStrengthExercise(from:)` (empty notes → `nil`, workouts sorted
-  oldest-first) and `CoachStrengthExercise.snapshots(from:)` (board order).
+  types: `CoachStrengthExercise(from:records:)` (the card's lift history,
+  oldest first; empty notes → `nil`) and `CoachStrengthExercise.snapshots(from:records:)`
+  (board order). The coach snapshot is still weight-only, so only weight records
+  with a value reach it until the coach rework.
 - `CoachingRequest.strengthExercises` carries the board into
   `AICoachPromptBuilder`'s "Strength board" prompt section (active lanes only,
   one line per exercise with its sets × reps plan).
@@ -206,11 +228,10 @@ Planned extension points, in the order they were designed in:
    override bundled entries; `MuscleGroup`'s tolerant decoding means new muscle
    groups degrade gracefully to `.other` on old clients. Consider caching the last
    successful server payload so the merged library works offline.
-2. **Graphing weight over time.** `WeightRecordingType` exists precisely so charts
-   can plot 1-rep max (`maxWeight`) separately from actual working weight
-   (`averageWeight`), and first/last-set trends for fatigue analysis. A future
-   History integration can group `exercise.workouts` by `recordingType` and feed
-   Swift Charts — no schema change needed.
+2. **Graphing a lift over time** (#16). `LiftMeasurement` exists so charts can plot
+   a top set (`max`) separately from working weight (`average`). Strength → Progress
+   can group `StrengthLiftRegistry.records(forKey:in:)` by measurement and feed
+   Swift Charts, with value-less records as gaps — no schema change needed.
 3. **Richer coach integration.** The board is in the snapshot, and the coach
    can plan a day (`plan_strength_day`) and change individual board exercises
    (`update_strength_exercise`). A natural next step is recording lifts by
@@ -219,16 +240,20 @@ Planned extension points, in the order they were designed in:
    (`Resources/StrengthExerciseLibrary.json`, 100 exercises) is a plain JSON array —
    adding entries is a data change, not a code change. `LibraryExercise` keeps
    `equipment`/`difficulty` as free-form strings for forward compatibility.
-5. **Richer workout records.** `StrengthWorkout` is a versionless Codable struct;
-   new optional fields (sets, reps, RPE) decode as defaults on old data, matching
-   how `Workout` gained fields over time.
+5. **Richer records.** New `StrengthRecord` / `StrengthLift` fields must be
+   optional or defaulted (CloudKit's production schema is additive only) — e.g. the
+   per-lift default measurement planned for #14.
 
 ## Testing
 
 Unit tests live in `TrainTests/TrainTests.swift`:
 
 - Model defaults, explicit init, Codable round-trips, and SwiftData persistence
-  (`StrengthExerciseTests`, `StrengthWorkoutTests`, enum tests).
+  (`StrengthExerciseTests`, `StrengthRecordTests`, `StrengthLiftTests`, enum tests).
+- Lift identity and lookups — key normalisation, duplicate resolution, shared
+  history across cards, deleting a card keeps records (`StrengthLiftKeyTests`,
+  `StrengthLiftRegistryTests`); per-metric value parsing and "done" records
+  (`StrengthRecordDraftTests`, `LiftMetricTests`).
 - Weight conversion/formatting (`DoubleWeightTests`).
 - Library decoding incl. tolerant muscle-group fallback (`LibraryExerciseTests`),
   bundled catalog integrity (≥100 unique entries), and composite merge precedence

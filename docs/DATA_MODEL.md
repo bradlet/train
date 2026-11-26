@@ -12,12 +12,14 @@ Train uses **SwiftData**, Apple's ORM framework built on top of Core Data. If yo
 
 ## Entity-Relationship Diagram
 
-The persisted `@Model` entities are `Exercise`, `StrengthExercise`, `UserLibraryExercise`, `FavoriteWorkout`, and `AppConfiguration` (`ModelContainerFactory`'s schema). Recorded-instance data does **not** get its own table: `Exercise.workout` is a `Workout` value struct and `StrengthExercise.workouts` is a `[StrengthWorkout]` array, each JSON-encoded into a `Data?` column on its owner. An exercise with `workout == nil` is planned only; a non-nil `workout` means it was recorded.
+The persisted `@Model` entities are `Exercise`, `StrengthExercise`, `StrengthLift`, `StrengthRecord`, `UserLibraryExercise`, `FavoriteWorkout`, and `AppConfiguration` (`ModelContainerFactory`'s schema). An aerobic recording does **not** get its own table: `Exercise.workout` is a `Workout` value struct JSON-encoded into a `Data?` column. Strength records do: each `StrengthRecord` is a row owned by a lift (via `liftKey`) rather than by a board card, so history survives removing a card (see [STRENGTH_TRAINING.md](STRENGTH_TRAINING.md)). An exercise with `workout == nil` is planned only; a non-nil `workout` means it was recorded.
 
 ```mermaid
 erDiagram
     Exercise ||--o| Workout : "workout (JSON in workoutData)"
-    StrengthExercise ||--o{ StrengthWorkout : "workouts (JSON in workoutsData)"
+    StrengthLift ||..o{ StrengthExercise : "liftKey (by key, no relationship)"
+    StrengthLift ||..o{ StrengthRecord : "liftKey (by key, no relationship)"
+    StrengthExercise |o..o{ StrengthRecord : "slotID (card may be gone)"
     StrengthExercise }o..o| UserLibraryExercise : "libraryExerciseID (by id, no relationship)"
 
     Exercise {
@@ -50,10 +52,20 @@ erDiagram
         Int plannedSets "optional"
         Int plannedReps "optional"
     }
-    StrengthWorkout {
+    StrengthLift {
+        String liftKey "library id or name:normalised"
+        String name
+        String primaryMetricRaw "weight/reps/time/distance"
+        Date createdAt
+    }
+    StrengthRecord {
+        UUID id
+        String liftKey
+        UUID slotID "optional"
         Date date
-        Double weightPounds
-        String recordingType
+        Double value "optional; nil = done"
+        String metricRaw
+        String measurementRaw "optional"
     }
     UserLibraryExercise {
         String id
@@ -302,7 +314,7 @@ A factory enum (no instances, only static methods) that creates SwiftData's `Mod
 | `makeContainer()` | On-disk (SQLite) | Enabled (`.automatic`) | Production app |
 | `makePreviewContainer()` | In-memory only | Disabled | Unit tests and SwiftUI previews |
 
-The schema is explicitly defined as `[Exercise.self, StrengthExercise.self, UserLibraryExercise.self, FavoriteWorkout.self, AppConfiguration.self]`. `Workout` and `StrengthWorkout` are **not** in the schema — they are Codable values JSON-encoded onto their owning `@Model`, not separate entities.
+The schema is explicitly defined as `[Exercise.self, StrengthExercise.self, StrengthLift.self, StrengthRecord.self, UserLibraryExercise.self, FavoriteWorkout.self, AppConfiguration.self]`. `Workout` is **not** in the schema — it is a Codable value JSON-encoded onto its owning `Exercise`, not a separate entity.
 
 ### UnitEnvironment
 
