@@ -38,7 +38,8 @@ struct HomeView: View {
     /// The strength exercise a weight is being recorded against.
     @State private var recordingStrength: StrengthExercise?
     /// Whether the lift picker for today's lane is showing.
-    @State private var isLiftPickerPresented = false
+    /// Whether the whole-day sheet for today's lane is shown.
+    @State private var isLogDayPresented = false
     /// Whether the exercise library is showing (used when today's lane is empty).
     @State private var isLibraryPresented = false
     /// A coach workout proposal the athlete accepted, pending confirmation in
@@ -121,7 +122,7 @@ struct HomeView: View {
                             } else if todayStrength.count == 1 {
                                 recordingStrength = todayStrength[0]
                             } else {
-                                isLiftPickerPresented = true
+                                isLogDayPresented = true
                             }
                         }
                     )
@@ -197,15 +198,8 @@ struct HomeView: View {
                     addLiftFromLibrary(entry, plan: plan)
                 }
             }
-            .confirmationDialog(
-                "Which lift?",
-                isPresented: $isLiftPickerPresented,
-                titleVisibility: .visible
-            ) {
-                ForEach(todayStrength) { exercise in
-                    Button(exercise.name) { recordingStrength = exercise }
-                }
-                Button("Cancel", role: .cancel) { }
+            .sheet(isPresented: $isLogDayPresented) {
+                LogStrengthDaySheet(slots: todayStrength)
             }
             .alert(
                 "Couldn't apply that",

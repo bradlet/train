@@ -150,17 +150,39 @@ final class HomeUITests: XCTestCase {
         app.buttons["Cancel"].tap()
     }
 
+    /// With several lifts in today's lane, Log Lift opens the whole-day
+    /// sheet (#14): each row is prefilled from its lift's last session, and
+    /// Save records only the ticked rows.
     @MainActor
-    func testLogLiftAsksWhichWhenTheLaneHasSeveral() throws {
+    func testLogLiftLogsTheWholeDay() throws {
         let app = launchApp()
         let logLift = app.buttons["home.logLift"]
         XCTAssertTrue(logLift.waitForExistence(timeout: 5), "Log Lift should exist")
         logLift.tap()
 
-        // Two lifts are seeded into today's lane, so Home must ask.
+        let save = app.buttons["logDay.save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5), "the whole-day sheet should open")
+        XCTAssertFalse(save.isEnabled, "nothing is ticked yet")
+
+        // Test Lift 1 has a seeded 135 lb record, so its row is prefilled.
+        XCTAssertEqual(app.textFields["logDay.0.valueField"].value as? String, "135")
+
+        app.buttons["logDay.tick.0"].tap()
+        app.buttons["logDay.0.increment"].tap()
+        app.buttons["logDay.tick.1"].tap()
+        XCTAssertTrue(save.isEnabled)
+        save.tap()
+
+        // Both cards now show today's records on the board.
+        app.tabBars.buttons["Strength"].tap()
         XCTAssertTrue(
-            app.buttons["Test Lift 1"].waitForExistence(timeout: 5),
-            "the lift picker should list today's lane"
+            app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH '140 lb'")).firstMatch
+                .waitForExistence(timeout: 5),
+            "the nudged value was recorded for Test Lift 1"
+        )
+        XCTAssertTrue(
+            app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Done'")).firstMatch.exists,
+            "the blank row was recorded as done for Test Lift 2"
         )
     }
 
