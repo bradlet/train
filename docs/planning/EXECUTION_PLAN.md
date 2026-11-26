@@ -18,7 +18,7 @@ One ordered path through everything planned on 2026-11-24. Do one step at a time
    CloudKit syncs in Debug builds only (development environment); Release and TestFlight builds are local-only. Deploying the *production* schema is **#30**, deliberately held to the end of the plan (step 19).
 
 ### B. Foundation
-3. **#12** App structure: Home · Cardio (Plan | Progress) · Strength (Plan | Progress). History becomes Cardio → Progress. Docs: [README](README.md), [PROGRESS_VIEWS](PROGRESS_VIEWS.md)
+3. ✅ **#12** App structure: Home · Cardio (Plan | Progress) · Strength (Plan | Progress). History becomes Cardio → Progress. Docs: [README](README.md), [PROGRESS_VIEWS](PROGRESS_VIEWS.md). Shipped with a Settings gear on every tab, import/export moved into Settings → Data (interim, until #23), and a Strength → Progress placeholder (until #16).
 4. ✅ **#13** Lift-owned history, a metric per lift, and records linked to the card they were logged from (`slotID`). Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §1. Shipped as `StrengthLift` + `StrengthRecord` rows; its schema is ready for #30.
 
 ### C. Daily strength loop
