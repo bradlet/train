@@ -5165,6 +5165,175 @@ struct DateMostRecentWeekdayTests {
     }
 }
 
+// MARK: - StrengthWeek Tests
+
+struct StrengthWeekTests {
+
+    /// Thursday 2026-11-26, mid-afternoon.
+    private let thursday = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 15))!
+
+    private func day(_ dayOfMonth: Int, hour: Int = 9) -> Date {
+        Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: dayOfMonth, hour: hour))!
+    }
+
+    private func slot(_ name: String, lane: Int, order: Int = 0, offloaded: Bool = false) -> StrengthExercise {
+        StrengthExercise(name: name, muscleGroup: .chest, weekdayIndex: lane, isOffloaded: offloaded, sortOrder: order)
+    }
+
+    private func record(_ slot: StrengthExercise?, on date: Date, value: Double? = 100) -> StrengthRecord {
+        StrengthRecord(liftKey: slot?.liftKey ?? "k", slotID: slot?.id, date: date, value: value, metric: .weight, measurement: .average)
+    }
+
+    @Test func intervalFollowsTheWeekStartSetting() {
+        let sunday = StrengthWeek.interval(containing: thursday, firstWeekday: 1)
+        #expect(sunday.start == day(22, hour: 0))
+        #expect(sunday.end == day(29, hour: 0))
+        let monday = StrengthWeek.interval(containing: thursday, firstWeekday: 2)
+        #expect(monday.start == day(23, hour: 0))
+        #expect(monday.end == day(30, hour: 0))
+    }
+
+    @Test func laneDatesFollowTheWeekStartSetting() {
+        // Sunday lane: Nov 22 in a Sunday week, Nov 29 in a Monday week.
+        #expect(StrengthWeek.date(ofLane: 0, now: thursday, firstWeekday: 1) == day(22, hour: 0))
+        #expect(StrengthWeek.date(ofLane: 0, now: thursday, firstWeekday: 2) == day(29, hour: 0))
+        #expect(StrengthWeek.date(ofLane: 4, now: thursday, firstWeekday: 2) == day(26, hour: 0))
+    }
+
+    @Test func recordsBySlotKeepsTheLatestRecordThisWeek() {
+        let bench = slot("Bench", lane: 1)
+        let older = record(bench, on: day(23), value: 100)
+        let newer = record(bench, on: day(25), value: 110)
+        let result = StrengthWeek.recordsBySlot([newer, older], now: thursday, firstWeekday: 1)
+        #expect(result[bench.id]?.value == 110)
+    }
+
+    @Test func recordsBySlotIgnoresLastWeekAndCardlessRecords() {
+        let bench = slot("Bench", lane: 1)
+        let lastWeek = record(bench, on: day(20))
+        let cardless = record(nil, on: day(24))
+        #expect(StrengthWeek.recordsBySlot([lastWeek, cardless], now: thursday, firstWeekday: 1).isEmpty)
+    }
+
+    @Test func recordsBySlotResetsAtTheConfiguredWeekStart() {
+        // Sunday Nov 22 is this week for a Sunday start, last week for Monday.
+        let bench = slot("Bench", lane: 0)
+        let sundayRecord = record(bench, on: day(22))
+        #expect(StrengthWeek.recordsBySlot([sundayRecord], now: thursday, firstWeekday: 1)[bench.id] != nil)
+        #expect(StrengthWeek.recordsBySlot([sundayRecord], now: thursday, firstWeekday: 2).isEmpty)
+    }
+
+    @Test func carryoverListsUnrecordedActiveCardsFromEarlierDays() {
+        let monday = slot("Squat", lane: 1)
+        let tuesdayB = slot("Row", lane: 2, order: 1)
+        let tuesdayA = slot("Press", lane: 2, order: 0)
+        let today = slot("Deadlift", lane: 4)
+        let friday = slot("Curl", lane: 5)
+        let result = StrengthWeek.carryover(
+            [friday, today, tuesdayB, monday, tuesdayA], records: [], now: thursday, firstWeekday: 1
+        )
+        #expect(result.map(\.name) == ["Squat", "Press", "Row"], "earlier days only, by day then board order")
+    }
+
+    @Test func carryoverDropsRecordedAndOffloadedCards() {
+        let done = slot("Squat", lane: 1)
+        let offloaded = slot("Row", lane: 2, offloaded: true)
+        let missed = slot("Press", lane: 3)
+        let result = StrengthWeek.carryover(
+            [done, offloaded, missed],
+            records: [record(done, on: day(23), value: nil)],
+            now: thursday,
+            firstWeekday: 1
+        )
+        #expect(result.map(\.name) == ["Press"], "a done-without-a-number record still counts")
+    }
+
+    @Test func carryoverIsPerCardNotPerLift() {
+        // The same lift on Monday and Wednesday: recording Wednesday's card
+        // leaves Monday's still to do.
+        let mondayBench = slot("Bench", lane: 1)
+        let wednesdayBench = slot("Bench", lane: 3)
+        let result = StrengthWeek.carryover(
+            [mondayBench, wednesdayBench],
+            records: [record(wednesdayBench, on: day(25))],
+            now: thursday,
+            firstWeekday: 1
+        )
+        #expect(result.map(\.id) == [mondayBench.id])
+    }
+
+    @Test func carryoverNeverCrossesTheWeekBoundary() {
+        // Last week's Friday card is not still to do; with a Monday start,
+        // Sunday's lane is at the end of the week, not before Thursday.
+        let sunday = slot("Squat", lane: 0)
+        let lastRecord = record(sunday, on: day(15))
+        #expect(StrengthWeek.carryover([sunday], records: [lastRecord], now: thursday, firstWeekday: 2).isEmpty)
+        #expect(StrengthWeek.carryover([sunday], records: [lastRecord], now: thursday, firstWeekday: 1).count == 1)
+    }
+
+    @Test func carryoverIsEmptyOnTheFirstDayOfTheWeek() {
+        let sundayMorning = day(22)
+        let saturday = slot("Squat", lane: 6)
+        #expect(StrengthWeek.carryover([saturday], records: [], now: sundayMorning, firstWeekday: 1).isEmpty)
+    }
+}
+
+// MARK: - StrengthPersonalBest Tests
+
+struct StrengthPersonalBestTests {
+
+    private func record(
+        _ value: Double?,
+        _ metric: LiftMetric = .weight,
+        _ measurement: LiftMeasurement? = .average,
+        key: String = "bench"
+    ) -> StrengthRecord {
+        StrengthRecord(liftKey: key, value: value, metric: metric, measurement: measurement)
+    }
+
+    @Test func beatingThePreviousBestIsANewBest() {
+        #expect(StrengthPersonalBest.isNewBest(record(190), previous: [record(185), record(150)]))
+    }
+
+    @Test func tyingOrFallingShortIsNot() {
+        #expect(!StrengthPersonalBest.isNewBest(record(185), previous: [record(185)]))
+        #expect(!StrengthPersonalBest.isNewBest(record(180), previous: [record(185)]))
+    }
+
+    @Test func aFirstValueIsNotABest() {
+        #expect(!StrengthPersonalBest.isNewBest(record(185), previous: []))
+        #expect(!StrengthPersonalBest.isNewBest(record(185), previous: [record(nil, .weight, nil)]),
+                "done records have nothing to beat")
+    }
+
+    @Test func aDoneRecordIsNeverABest() {
+        #expect(!StrengthPersonalBest.isNewBest(record(nil, .weight, nil), previous: [record(100)]))
+    }
+
+    @Test func onlyTheSameMeasurementCompetes() {
+        let average = record(170, .weight, .average)
+        #expect(StrengthPersonalBest.isNewBest(average, previous: [record(200, .weight, .max), record(160, .weight, .average)]))
+        #expect(!StrengthPersonalBest.isNewBest(average, previous: [record(200, .weight, .max)]))
+    }
+
+    @Test func onlyTheSameLiftAndMetricCompete() {
+        let bench = record(190)
+        #expect(!StrengthPersonalBest.isNewBest(bench, previous: [record(100, key: "squat")]))
+        #expect(!StrengthPersonalBest.isNewBest(bench, previous: [record(12, .reps, .average)]))
+    }
+
+    @Test func longerHoldsAreBestsForTime() {
+        let plank = record(95, .time, nil, key: "plank")
+        #expect(StrengthPersonalBest.isNewBest(plank, previous: [record(90, .time, nil, key: "plank")]))
+    }
+
+    @Test func theRecordItselfIsIgnored() {
+        let saved = record(190)
+        #expect(StrengthPersonalBest.isNewBest(saved, previous: [saved, record(185)]))
+        #expect(!StrengthPersonalBest.isNewBest(saved, previous: [saved]))
+    }
+}
+
 // MARK: - StrengthLiftKey Tests
 
 struct StrengthLiftKeyTests {
