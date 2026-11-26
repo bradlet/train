@@ -111,7 +111,7 @@ struct StrengthExerciseCard: View {
         .draggable(StrengthExerciseDragItem(exerciseID: exercise.id))
         .contextMenu {
             Button { onRecord() } label: {
-                Label("Record Weight", systemImage: "checkmark.circle")
+                Label("Record", systemImage: "checkmark.circle")
             }
             Button { showPlanEditor = true } label: {
                 Label("Edit Plan", systemImage: "list.number")
