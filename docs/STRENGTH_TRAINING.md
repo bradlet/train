@@ -225,6 +225,19 @@ week follows the athlete's week-start setting (`@Environment(\.weekStartDay)`).
   bests through `onNewBest`, and Home and the board show a brief banner
   (`.newBestBanner`) with a success haptic, so saving never waits on it.
 
+### Log lifts as planned (#26)
+
+`PlannedDayLogger` (pure, unit-tested) records a lane in one tap, **strength only**.
+
+- **What it logs:** every active card with no record from that card on the day, in board order. Each is valued exactly as the whole-day sheet would prefill it, falling back to "done".
+- **Where it appears:**
+  - Home: in the **Strength** sub-header. That header now always shows when the button does, so it never sits next to the cardio cards.
+  - The board: in each lane. Today's lane logs today, an earlier lane this week backfills its own date, and a day still to come has no button (`logDate(forLane:)`).
+- **Toast:** "Logged N lifts · Undo · Adjust" (`.plannedLogToast`).
+  - **Undo** deletes exactly the record ids written.
+  - **Adjust** undoes the tap, then opens `LogStrengthDaySheet` pre-ticked (`LogStrengthDayRequest.startTicked`) with the same values.
+- **Long-press:** "Log with changes…" opens the sheet pre-ticked straight away.
+
 ## AI Coach Serialization
 
 The strength board is part of the coaching snapshot:

@@ -24,7 +24,7 @@ One ordered path through everything planned on 2026-11-24. Do one step at a time
 ### C. Daily strength loop
 5. ✅ **#14** Fast recording: prefill, per-lift default measurement, the whole-day sheet (a "done" record with no number already exists, from #13). Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §2
 6. ✅ **#15** Current-week checkmarks, missed-lift carryover, PR badge. Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §3. Shipped per card (`slotID`) on the week-start setting; the new best is a brief banner on Home and the board.
-7. **#26** "Log lifts as planned" in one tap, strength only. Doc: [DONE_AS_PLANNED](DONE_AS_PLANNED.md)
+7. ✅ **#26** "Log lifts as planned" in one tap, strength only. Doc: [DONE_AS_PLANNED](DONE_AS_PLANNED.md). It values each lift from its last session until plan targets and movement groups exist.
 8. **#24** Movement groups: smart rotation, with a toggle for one member per block. Doc: [MOVEMENT_GROUPS](MOVEMENT_GROUPS.md)
 
 ### D. Progress

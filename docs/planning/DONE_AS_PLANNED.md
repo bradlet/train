@@ -2,6 +2,14 @@
 
 > Status: **design draft**, iteration 2 (2026-11-24). Realises idea S4 from [STRENGTH_IDEAS.md](STRENGTH_IDEAS.md).
 > Builds on fast recording (#14) and the weekly loop (#15).
+>
+> **Built in #26** (2026-11-26). As shipped:
+> - "Log with changes…" is a context-menu item on the button, which is the long-press.
+> - Adjust undoes the tap and then opens the whole-day sheet pre-ticked with the same values.
+> - The sheet's express path is a *Tick all* action.
+> - The board button reads "Done as planned", with "· Tue" added when backfilling.
+> - The value comes from the last session through `StrengthPrefill`. Plan targets (TRAINING_PLANS) and up-next group members (#24) will plug into `PlannedDayLogger` when they exist.
+> - Open question 1 was decided as proposed: a card with no history records "done".
 
 ## The idea
 
