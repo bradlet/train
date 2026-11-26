@@ -169,7 +169,11 @@ struct LogStrengthDaySheet: View {
                     }
                 }
             }
+            // Borderless so the tick and the value editor's − / + stay
+            // separate tap targets in one form row; tinted primary because
+            // borderless otherwise paints the name in the accent colour.
             .buttonStyle(.borderless)
+            .tint(.primary)
             .accessibilityIdentifier("logDay.tick.\(index)")
             StrengthValueEditor(draft: row.draft, identifierPrefix: "logDay.\(index)")
                 .opacity(row.wrappedValue.isDone ? 1 : 0.5)
