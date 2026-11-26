@@ -67,6 +67,18 @@ enum LiftMetric: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// The ± stepper increment in display units: 5 lb / 2.5 kg, 1 rep,
+    /// 15 seconds, 10 yd / 10 m.
+    /// - Parameter metric: Whether the user prefers metric units.
+    func stepIncrement(metric: Bool) -> Double {
+        switch self {
+        case .weight: return metric ? 2.5 : 5
+        case .reps: return 1
+        case .time: return 15
+        case .distance: return 10
+        }
+    }
+
     /// Converts a stored value to the display unit (kg/lb, reps, seconds,
     /// m/yd).
     /// - Parameters:

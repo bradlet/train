@@ -4938,6 +4938,150 @@ struct LiftDefaultMeasurementTests {
     }
 }
 
+// MARK: - StrengthPrefill Tests
+
+struct StrengthPrefillTests {
+
+    private func record(_ value: Double?, _ metric: LiftMetric = .weight, _ measurement: LiftMeasurement? = .average, day: Double) -> StrengthRecord {
+        StrengthRecord(liftKey: "k", date: Date(timeIntervalSince1970: day * 86_400), value: value, metric: metric, measurement: measurement)
+    }
+
+    @Test func noHistoryStartsOnAverageAndBlank() {
+        #expect(StrengthPrefill.make(metric: .weight, lift: nil, records: []) == .empty)
+        #expect(StrengthPrefill.empty.measurement == .average)
+    }
+
+    @Test func liftDefaultWinsOverTheLatestRecord() {
+        let lift = StrengthLift(liftKey: "k", name: "Bench")
+        lift.defaultMeasurement = .max
+        let prefill = StrengthPrefill.make(metric: .weight, lift: lift, records: [
+            record(185, .weight, .max, day: 1),
+            record(155, .weight, .average, day: 2),
+        ])
+        #expect(prefill.measurement == .max)
+        #expect(prefill.value == 185, "value matches the chosen measurement")
+    }
+
+    @Test func withoutADefaultTheLatestRecordsMeasurementIsUsed() {
+        let prefill = StrengthPrefill.make(metric: .weight, lift: nil, records: [
+            record(185, .weight, .max, day: 1),
+            record(160, .weight, .lastSet, day: 3),
+        ])
+        #expect(prefill.measurement == .lastSet)
+        #expect(prefill.value == 160)
+    }
+
+    @Test func fallsBackToTheLatestValueWhenNoneMatchesTheMeasurement() {
+        let lift = StrengthLift(liftKey: "k", name: "Bench")
+        lift.defaultMeasurement = .min
+        let prefill = StrengthPrefill.make(metric: .weight, lift: lift, records: [
+            record(185, .weight, .max, day: 1),
+            record(175, .weight, .average, day: 2),
+        ])
+        #expect(prefill.value == 175)
+    }
+
+    @Test func doneRecordsAndOtherMetricsNeverPrefill() {
+        let prefill = StrengthPrefill.make(metric: .reps, lift: nil, records: [
+            record(12, .reps, .average, day: 1),
+            record(nil, .reps, nil, day: 3),
+            record(200, .weight, .average, day: 4),
+        ])
+        #expect(prefill.value == 12)
+    }
+
+    @Test func timeUsesTheLatestValueRegardlessOfMeasurement() {
+        let prefill = StrengthPrefill.make(metric: .time, lift: nil, records: [
+            record(60, .time, nil, day: 1),
+            record(75, .time, nil, day: 2),
+        ])
+        #expect(prefill.value == 75)
+    }
+
+    @Test func resolveReadsTheLiftAndRecordsFromAContext() {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let slot = StrengthExercise(name: "Plank", libraryExerciseID: "plank")
+        context.insert(slot)
+        StrengthLiftRegistry.findOrCreate(for: slot, metric: .time, in: context)
+        context.insert(StrengthRecord(liftKey: "plank", value: 90, metric: .time))
+        let resolved = StrengthPrefill.resolve(for: slot, in: context)
+        #expect(resolved.metric == .time)
+        #expect(resolved.prefill.value == 90)
+    }
+}
+
+// MARK: - Strength Stepper Tests
+
+struct StrengthStepperTests {
+
+    @Test func stepIncrementsPerMetricAndUnit() {
+        #expect(LiftMetric.weight.stepIncrement(metric: false) == 5)
+        #expect(LiftMetric.weight.stepIncrement(metric: true) == 2.5)
+        #expect(LiftMetric.reps.stepIncrement(metric: false) == 1)
+        #expect(LiftMetric.time.stepIncrement(metric: true) == 15)
+        #expect(LiftMetric.distance.stepIncrement(metric: false) == 10)
+        #expect(LiftMetric.distance.stepIncrement(metric: true) == 10)
+    }
+
+    @Test func prefillSeedsTheTextFields() {
+        let weight = StrengthRecordDraft(metric: .weight, prefill: StrengthPrefill(measurement: .max, value: 185), useMetricUnits: false)
+        #expect(weight.valueText == "185")
+        #expect(weight.measurement == .max)
+        let time = StrengthRecordDraft(metric: .time, prefill: StrengthPrefill(measurement: .average, value: 95), useMetricUnits: false)
+        #expect(time.minutesText == "1")
+        #expect(time.secondsText == "35")
+        let blank = StrengthRecordDraft(metric: .reps, prefill: .empty, useMetricUnits: false)
+        #expect(blank.valueText.isEmpty)
+    }
+
+    @Test func kilogramPrefillRoundsToOneDecimal() {
+        let draft = StrengthRecordDraft(metric: .weight, prefill: StrengthPrefill(measurement: .average, value: 185), useMetricUnits: true)
+        #expect(draft.valueText == "83.9")
+    }
+
+    @Test func nudgeStepsWeightInDisplayUnits() {
+        var lb = StrengthRecordDraft(metric: .weight)
+        lb.valueText = "185"
+        lb.nudge(by: 1, useMetricUnits: false)
+        #expect(lb.valueText == "190")
+        lb.nudge(by: -2, useMetricUnits: false)
+        #expect(lb.valueText == "180")
+
+        var kg = StrengthRecordDraft(metric: .weight)
+        kg.valueText = "80"
+        kg.nudge(by: 1, useMetricUnits: true)
+        #expect(kg.valueText == "82.5")
+    }
+
+    @Test func nudgeFromBlankStartsAtOneStepAndNeverDropsBelowIt() {
+        var reps = StrengthRecordDraft(metric: .reps)
+        reps.nudge(by: 1, useMetricUnits: false)
+        #expect(reps.valueText == "1")
+        reps.nudge(by: -5, useMetricUnits: false)
+        #expect(reps.valueText == "1")
+
+        var weight = StrengthRecordDraft(metric: .weight)
+        weight.nudge(by: -1, useMetricUnits: false)
+        #expect(weight.valueText == "5")
+    }
+
+    @Test func nudgeRollsTimeOverMinutes() {
+        var draft = StrengthRecordDraft(metric: .time)
+        draft.secondsText = "50"
+        draft.nudge(by: 1, useMetricUnits: false)
+        #expect(draft.minutesText == "1")
+        #expect(draft.secondsText == "5")
+    }
+
+    @Test func nudgeStepsDistanceInYardsOrMetres() {
+        var draft = StrengthRecordDraft(metric: .distance)
+        draft.valueText = "40"
+        draft.nudge(by: 1, useMetricUnits: true)
+        #expect(draft.valueText == "50")
+        #expect(draft.entry(useMetricUnits: true) != .invalid)
+    }
+}
+
 // MARK: - StrengthLiftKey Tests
 
 struct StrengthLiftKeyTests {

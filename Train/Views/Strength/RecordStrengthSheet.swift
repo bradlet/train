@@ -22,8 +22,11 @@ struct RecordStrengthSheet: View {
     @Environment(\.useMetricUnits) private var useMetricUnits
 
     @State private var draft: StrengthRecordDraft
+    /// Whether the lift's metric and prefill have been applied (once).
+    @State private var didPrefill = false
 
-    /// Creates the sheet. The lift's metric is resolved on appear.
+    /// Creates the sheet. The lift's metric and the prefill from its last
+    /// session are resolved on appear.
     /// - Parameter slot: The board card being recorded from.
     init(slot: StrengthExercise) {
         self.slot = slot
@@ -60,7 +63,15 @@ struct RecordStrengthSheet: View {
                 }
             }
             .onAppear {
-                draft.metric = StrengthLiftRegistry.metric(for: slot, in: modelContext)
+                guard !didPrefill else { return }
+                didPrefill = true
+                let resolved = StrengthPrefill.resolve(for: slot, in: modelContext)
+                draft = StrengthRecordDraft(
+                    metric: resolved.metric,
+                    prefill: resolved.prefill,
+                    useMetricUnits: useMetricUnits,
+                    date: draft.date
+                )
             }
             .navigationTitle("Record Lift")
             .navigationBarTitleDisplayMode(.inline)
@@ -77,10 +88,32 @@ struct RecordStrengthSheet: View {
         }
     }
 
-    /// The value entry for the lift's metric: minutes and seconds for time,
-    /// one field with a unit suffix otherwise.
-    @ViewBuilder
+    /// The value entry for the lift's metric — minutes and seconds for time,
+    /// one field with a unit suffix otherwise — between − / + nudges.
     private var valueFields: some View {
+        HStack(spacing: 12) {
+            nudgeButton(by: -1, systemImage: "minus.circle.fill", identifier: "recordStrength.decrement")
+            valueEntry
+            nudgeButton(by: 1, systemImage: "plus.circle.fill", identifier: "recordStrength.increment")
+        }
+    }
+
+    /// One stepper button; borderless so both work inside a form row.
+    private func nudgeButton(by steps: Int, systemImage: String, identifier: String) -> some View {
+        Button {
+            draft.nudge(by: steps, useMetricUnits: useMetricUnits)
+        } label: {
+            Image(systemName: systemImage)
+                .font(.title2)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(steps > 0 ? "Increase" : "Decrease")
+        .accessibilityIdentifier(identifier)
+    }
+
+    /// The text field(s) for the value.
+    @ViewBuilder
+    private var valueEntry: some View {
         if draft.metric == .time {
             HStack {
                 TextField("Min", text: $draft.minutesText)
@@ -105,7 +138,7 @@ struct RecordStrengthSheet: View {
 
     /// Explains the optional number and, where relevant, the measurement.
     private var footerText: String {
-        let done = "Leave it blank to log the session as done without a number."
+        let done = "Starts from your last session; nudge it with − and +. Leave it blank to log the session as done without a number."
         guard draft.metric.usesMeasurement else { return done }
         return "Choose what the number represents so trends like a top set and an average can be tracked separately. " + done
     }
@@ -153,6 +186,70 @@ struct StrengthRecordDraft: Equatable {
     var measurement: LiftMeasurement = .starting
     /// Optional notes.
     var notes: String = ""
+
+    /// A blank draft for a metric.
+    /// - Parameters:
+    ///   - metric: The metric being recorded.
+    ///   - date: The day the session was performed.
+    init(metric: LiftMetric, date: Date = Date()) {
+        self.metric = metric
+        self.date = date
+    }
+
+    /// A draft seeded from the lift's last session.
+    /// - Parameters:
+    ///   - metric: The metric being recorded.
+    ///   - prefill: The starting measurement and value.
+    ///   - useMetricUnits: Whether to show the value in metric units.
+    ///   - date: The day the session was performed.
+    init(metric: LiftMetric, prefill: StrengthPrefill, useMetricUnits: Bool, date: Date = Date()) {
+        self.init(metric: metric, date: date)
+        self.measurement = prefill.measurement
+        if let value = prefill.value {
+            setValue(stored: value, useMetricUnits: useMetricUnits)
+        }
+    }
+
+    /// Writes a stored value into the text fields, in display units: whole
+    /// numbers without decimals, otherwise one decimal; time as minutes and
+    /// seconds.
+    /// - Parameters:
+    ///   - stored: The value in the metric's internal unit.
+    ///   - useMetricUnits: Whether to show it in metric units.
+    mutating func setValue(stored: Double, useMetricUnits: Bool) {
+        switch metric {
+        case .time:
+            let total = Int(stored.rounded())
+            minutesText = String(total / 60)
+            secondsText = String(total % 60)
+        case .reps:
+            valueText = String(Int(stored.rounded()))
+        case .weight, .distance:
+            let display = (metric.displayValue(fromStored: stored, metric: useMetricUnits) * 10).rounded() / 10
+            valueText = display.truncatingRemainder(dividingBy: 1) == 0
+                ? String(format: "%.0f", display)
+                : String(format: "%.1f", display)
+        }
+    }
+
+    /// Steps the value by whole increments of `LiftMetric.stepIncrement`.
+    /// A blank or invalid value counts as zero, and the result never drops
+    /// below one step — the stepper is for numbers; blank is how "done" is
+    /// logged.
+    /// - Parameters:
+    ///   - steps: Increments to add (negative to subtract).
+    ///   - useMetricUnits: Whether the value is shown in metric units.
+    mutating func nudge(by steps: Int, useMetricUnits: Bool) {
+        let step = metric.stepIncrement(metric: useMetricUnits)
+        let current: Double
+        if case .value(let stored) = entry(useMetricUnits: useMetricUnits) {
+            current = metric.displayValue(fromStored: stored, metric: useMetricUnits)
+        } else {
+            current = 0
+        }
+        let next = Swift.max(current + Double(steps) * step, step)
+        setValue(stored: metric.storedValue(fromDisplay: next, metric: useMetricUnits), useMetricUnits: useMetricUnits)
+    }
 
     /// Parses the entered value into the metric's internal unit.
     /// - Parameter useMetricUnits: Whether the value was entered in metric.
