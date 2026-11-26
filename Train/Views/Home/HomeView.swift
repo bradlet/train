@@ -18,6 +18,7 @@ struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.useMetricUnits) private var useMetricUnits
     @Environment(\.weekStartDay) private var weekStartDay
+    @Environment(\.isLightWeek) private var isLightWeek
     @Environment(\.keyDayStrategy) private var keyDayStrategy
     @Environment(\.planRouter) private var planRouter
     @Query private var allLifts: [StrengthLift]
@@ -85,7 +86,7 @@ struct HomeView: View {
             groups: groups, now: Date(), firstWeekday: weekStartDay
         )
         let hints = HintDismissals.visible(
-            HybridWeek.hints(days, records: allStrengthRecords, lifts: allLifts, now: Date()),
+            HybridWeek.hints(days, records: allStrengthRecords, lifts: allLifts, now: Date(), isLightWeek: isLightWeek),
             in: dismissedHintsRaw, now: Date(), firstWeekday: weekStartDay
         )
         return HybridWeekSection(
@@ -505,7 +506,7 @@ struct HomeView: View {
 
     /// One tap: logs today's unrecorded lifts as planned (strength only).
     private func logTodayAsPlanned() {
-        guard let result = PlannedDayLogger.log(todayStrength, on: Date(), in: modelContext, firstWeekday: weekStartDay) else { return }
+        guard let result = PlannedDayLogger.log(todayStrength, on: Date(), in: modelContext, firstWeekday: weekStartDay, isLightWeek: isLightWeek, useMetricUnits: useMetricUnits) else { return }
         plannedLog = result
         if !result.newBests.isEmpty { newBest = NewBestAnnouncement(liftNames: result.newBests) }
     }

@@ -49,6 +49,9 @@ struct ContentView: View {
         .environment(\.trainingExcludedTypes, configurations.first?.trainingExcludedTypes ?? TrainingInclusion.defaultExcluded)
         .environment(\.keyWorkoutTypes, configurations.first?.keyWorkoutTypes ?? [])
         .environment(\.keyDayStrategy, configurations.first?.keyDayStrategy ?? .stack)
+        .environment(\.isLightWeek, StrengthTargets.isLightWeek(
+            start: configurations.first?.lightWeekStart, now: Date(), firstWeekday: weekStartDay
+        ))
         .onAppear { ensureConfigurationExists() }
     }
 

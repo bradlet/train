@@ -39,6 +39,12 @@ struct StrengthDayColumn: View {
     var onDuplicate: ((StrengthExercise, Int) -> Void)? = nil
     /// Copies this day's active plan onto another day (#18).
     var onCopyDay: ((Int) -> Void)? = nil
+    /// Each card's target and nudge (#20).
+    var targets: [UUID: CardTarget] = [:]
+    /// Accepts a card's nudge.
+    var onAcceptNudge: ((StrengthExercise, Double) -> Void)? = nil
+    /// Snoozes a card's nudge.
+    var onSnoozeNudge: ((StrengthExercise) -> Void)? = nil
     /// Called when the user taps a card to record a weight entry.
     let onRecord: (StrengthExercise) -> Void
     /// Called when the user taps the add button to open the exercise library.
@@ -188,6 +194,9 @@ struct StrengthDayColumn: View {
                         onGroup: onGroup.map { handler in { handler(exercise) } },
                         onHistory: onHistory.map { handler in { handler(exercise) } },
                         onDuplicate: onDuplicate.map { handler in { day in handler(exercise, day) } },
+                        target: targets[exercise.id],
+                        onAcceptNudge: onAcceptNudge.map { handler in { value in handler(exercise, value) } },
+                        onSnoozeNudge: onSnoozeNudge.map { handler in { handler(exercise) } },
                         onRecord: { onRecord(exercise) },
                         onMoveToDay: { day in onMoveToDay(exercise, day) },
                         onToggleOffloaded: {

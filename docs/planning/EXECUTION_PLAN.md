@@ -38,7 +38,7 @@ One ordered path through everything planned on 2026-11-24. Do one step at a time
 13. ✅ **#19** Home hybrid hub: week strip and dismissible hints, reusing the rule engine from step 12. Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §6 Shipped on Home below Today. A tap on a cell opens that day in Cardio or Strength Plan (`PlanRouter`). The light-week relaxation waits for #20.
 
 ### F. Training plans
-14. **#20** Generic plans (steady ↔ program, cardio, strength, hybrid, presets). This absorbs **#10**. Resolve the doc's §9 open questions first. Doc: [TRAINING_PLANS](TRAINING_PLANS.md)
+14. ✅ **#20** Generic plans (steady ↔ program, cardio, strength, hybrid, presets). This absorbs **#10**. Resolve the doc's §9 open questions first. Doc: [TRAINING_PLANS](TRAINING_PLANS.md) **Steady mode shipped:** per-card targets, ↑ and stall nudges, a target changelog drawn on the lift chart, and a one-off light week. The §9 questions were decided in the doc. Program mode is #33, hybrid plans are #34, and race presets (#10) follow #33.
 
 ### G. Connections
 This is an independent track. It can run in parallel with any step after step 4, because it needs the strength record format.

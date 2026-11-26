@@ -357,7 +357,7 @@ struct ModelContainerFactoryTests {
         let names = Set(ModelContainerFactory.modelTypes.map { String(describing: $0) })
         #expect(names == [
             "Exercise", "StrengthExercise", "StrengthLift", "StrengthRecord",
-            "UserLibraryExercise", "UserMovementGroup", "FavoriteWorkout", "AppConfiguration",
+            "UserLibraryExercise", "UserMovementGroup", "StrengthTargetChange", "FavoriteWorkout", "AppConfiguration",
         ])
     }
 
@@ -6897,6 +6897,125 @@ struct PlanRouterTests {
         #expect(router.tab == .cardio && router.cardioDay == day)
         router.openStrength(on: 3)
         #expect(router.tab == .strength && router.strengthWeekday == 3)
+    }
+}
+
+// MARK: - StrengthTargets Tests
+
+struct StrengthTargetsTests {
+
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private func record(_ value: Double?, daysAgo: Int, light: Bool = false) -> StrengthRecord {
+        let record = StrengthRecord(liftKey: "bench", date: now.addingTimeInterval(Double(-daysAgo) * 86_400),
+                                    value: value, metric: .weight, measurement: .average)
+        record.isLight = light
+        return record
+    }
+
+    @Test func stepsFollowTheDecidedDefaults() {
+        #expect(StrengthTargets.step(metric: .weight, lowerBody: false, useMetricUnits: false) == 5)
+        #expect(StrengthTargets.step(metric: .weight, lowerBody: true, useMetricUnits: false) == 10)
+        let kg = StrengthTargets.step(metric: .weight, lowerBody: true, useMetricUnits: true)
+        #expect(abs(LiftMetric.weight.displayValue(fromStored: kg, metric: true) - 5) < 0.001)
+        #expect(StrengthTargets.step(metric: .reps, lowerBody: false, useMetricUnits: false) == 1)
+        #expect(StrengthTargets.step(metric: .time, lowerBody: false, useMetricUnits: false) == 15)
+    }
+
+    @Test func twoMetSessionsNudgeUp() {
+        let records = [record(185, daysAgo: 1), record(190, daysAgo: 4)]
+        #expect(StrengthTargets.nudge(target: 185, records: records, since: nil, step: 5, snoozedUntil: nil, now: now) == .up(190))
+        #expect(StrengthTargets.nudge(target: 185, records: [record(185, daysAgo: 1)], since: nil, step: 5, snoozedUntil: nil, now: now) == nil, "one is not enough")
+        #expect(StrengthTargets.nudge(target: 185, records: [record(185, daysAgo: 1), record(180, daysAgo: 3)], since: nil, step: 5, snoozedUntil: nil, now: now) == nil)
+    }
+
+    @Test func threeMissesOfferAStepDown() {
+        let records = [record(175, daysAgo: 1), record(180, daysAgo: 3), record(170, daysAgo: 5)]
+        #expect(StrengthTargets.nudge(target: 185, records: records, since: nil, step: 5, snoozedUntil: nil, now: now) == .stall(180))
+        #expect(StrengthTargets.nudge(target: 5, records: [record(1, daysAgo: 1), record(1, daysAgo: 2), record(1, daysAgo: 3)], since: nil, step: 5, snoozedUntil: nil, now: now) == .stall(5), "never below one step")
+    }
+
+    @Test func onlySessionsSinceTheTargetWasSetCount() {
+        let records = [record(190, daysAgo: 10), record(190, daysAgo: 12)]
+        let setFiveDaysAgo = now.addingTimeInterval(-5 * 86_400)
+        #expect(StrengthTargets.nudge(target: 185, records: records, since: setFiveDaysAgo, step: 5, snoozedUntil: nil, now: now) == nil)
+    }
+
+    @Test func snoozesLightAndDoneSessionsAreIgnored() {
+        let met = [record(190, daysAgo: 1), record(190, daysAgo: 2)]
+        #expect(StrengthTargets.nudge(target: 185, records: met, since: nil, step: 5, snoozedUntil: now.addingTimeInterval(86_400), now: now) == nil)
+        let mixed = [record(nil, daysAgo: 1), record(150, daysAgo: 2, light: true), record(190, daysAgo: 3), record(190, daysAgo: 4)]
+        #expect(StrengthTargets.nudge(target: 185, records: mixed, since: nil, step: 5, snoozedUntil: nil, now: now) == .up(190))
+    }
+
+    @Test func lightTargetsScaleAndRoundDownToTheStepper() {
+        #expect(StrengthTargets.lightTarget(185, metric: .weight, useMetricUnits: false) == 165, "166.5 → 165")
+        #expect(StrengthTargets.lightTarget(10, metric: .reps, useMetricUnits: false) == 9)
+        #expect(StrengthTargets.lightTarget(4, metric: .weight, useMetricUnits: false) == 5, "never below one increment")
+    }
+
+    @Test func aLightWeekLastsItsWeekOnly() {
+        let thursday = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 12))!
+        let start = thursday.startOfWeek(firstWeekday: 2)
+        #expect(StrengthTargets.isLightWeek(start: start, now: thursday, firstWeekday: 2))
+        #expect(!StrengthTargets.isLightWeek(start: start, now: thursday.addingTimeInterval(7 * 86_400), firstWeekday: 2))
+        #expect(!StrengthTargets.isLightWeek(start: nil, now: thursday, firstWeekday: 2))
+    }
+
+    @Test func cardTargetsShowLightValuesWithoutNudges() {
+        let card = StrengthExercise(name: "Bench", libraryExerciseID: "bench")
+        card.targetValue = 185
+        let lift = StrengthLift(liftKey: "bench", name: "Bench")
+        lift.defaultMeasurement = .average
+        let met = [record(190, daysAgo: 1), record(190, daysAgo: 2)]
+        let normal = StrengthTargets.cardTarget(card, lift: lift, records: met, changes: [], lowerBody: false, isLightWeek: false, useMetricUnits: false, now: now)
+        #expect(normal == CardTarget(value: 185, metric: .weight, isLight: false, nudge: .up(190)))
+        let light = StrengthTargets.cardTarget(card, lift: lift, records: met, changes: [], lowerBody: false, isLightWeek: true, useMetricUnits: false, now: now)
+        #expect(light == CardTarget(value: 165, metric: .weight, isLight: true, nudge: nil))
+        let group = StrengthExercise(name: "Press", groupID: "group-chest-press")
+        group.targetValue = 100
+        #expect(StrengthTargets.cardTarget(group, lift: nil, records: [], changes: [], lowerBody: false, isLightWeek: false, useMetricUnits: false, now: now) == nil)
+    }
+
+    @Test func weekTargetsFeedPrefill() {
+        let card = StrengthExercise(name: "Bench")
+        #expect(StrengthTargets.weekTarget(for: card, metric: .weight, isLightWeek: false, useMetricUnits: false) == nil)
+        card.targetValue = 200
+        #expect(StrengthTargets.weekTarget(for: card, metric: .weight, isLightWeek: true, useMetricUnits: false) == 180)
+        let prefill = StrengthPrefill.make(metric: .weight, lift: nil, records: [record(150, daysAgo: 1)], target: 200)
+        #expect(prefill.value == 200, "the target wins over the last session")
+    }
+
+    @Test func editingLogsChangesAndClearsTheSnooze() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let card = StrengthExercise(name: "Bench", libraryExerciseID: "bench")
+        context.insert(card)
+        StrengthTargetEditor.snooze(card, now: now)
+        #expect(card.nudgeSnoozedUntil == now.addingTimeInterval(14 * 86_400))
+        StrengthTargetEditor.setTarget(185, on: card, metric: .weight, in: context, now: now)
+        StrengthTargetEditor.setTarget(185, on: card, metric: .weight, in: context, now: now)
+        StrengthTargetEditor.setTarget(nil, on: card, metric: .weight, in: context, now: now.addingTimeInterval(60))
+        #expect(card.targetValue == nil)
+        #expect(card.nudgeSnoozedUntil == nil)
+        let changes = try context.fetch(FetchDescriptor<StrengthTargetChange>())
+        #expect(changes.count == 2, "an unchanged target isn't logged")
+        #expect(StrengthTargets.lastSet(changes, slotID: card.id) == now.addingTimeInterval(60))
+        let history = StrengthTargets.history(changes, liftKey: "bench", metric: .weight)
+        #expect(history.map(\.value) == [185, nil])
+    }
+
+    @Test func newFieldsDefaultSafely() {
+        #expect(StrengthExercise(name: "X").targetValue == nil)
+        #expect(!StrengthRecord(liftKey: "k").isLight)
+        #expect(AppConfiguration().lightWeekStart == nil)
+    }
+
+    @Test func plannedLoggingUsesTheTargetAndTagsLight() {
+        let card = StrengthExercise(name: "Bench", libraryExerciseID: "bench", weekdayIndex: 4)
+        card.targetValue = 200
+        let made = PlannedDayLogger.records(for: [card], on: now, lifts: [], records: [record(150, daysAgo: 1)], isLightWeek: true)
+        #expect(made.first?.value == 180)
+        #expect(made.first?.isLight == true)
     }
 }
 

@@ -47,6 +47,12 @@ struct StrengthExerciseCard: View {
     var onHistory: (() -> Void)? = nil
     /// Duplicates the card onto another day's plan (#18).
     var onDuplicate: ((Int) -> Void)? = nil
+    /// The card's target this week and any nudge (#20).
+    var target: CardTarget? = nil
+    /// Accepts the nudge's suggested target.
+    var onAcceptNudge: ((Double) -> Void)? = nil
+    /// "Not yet": snoozes the nudge.
+    var onSnoozeNudge: (() -> Void)? = nil
     /// Called when the user taps the card to record a session.
     let onRecord: () -> Void
     /// Called when the user picks a destination day from the context menu.
@@ -109,6 +115,16 @@ struct StrengthExerciseCard: View {
                         .background(exercise.muscleGroup.color.opacity(0.15))
                         .foregroundStyle(exercise.muscleGroup.color)
                         .clipShape(Capsule())
+                    if let target {
+                        Label(target.metric.formatted(target.value, metric: useMetricUnits), systemImage: "scope")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background((target.isLight ? Color.teal : Color.orange).opacity(0.15))
+                            .foregroundStyle(target.isLight ? Color.teal : Color.orange)
+                            .clipShape(Capsule())
+                            .accessibilityIdentifier("strengthCard.target.\(exercise.name)")
+                    }
                     if let plan = exercise.plannedSummary {
                         Text(plan)
                             .font(.caption2.bold())
@@ -133,6 +149,9 @@ struct StrengthExerciseCard: View {
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
+                }
+                if let nudge = target?.nudge, let onAcceptNudge {
+                    nudgeChip(nudge, accept: onAcceptNudge)
                 }
             }
             .padding(10)
@@ -210,6 +229,32 @@ struct StrengthExerciseCard: View {
         } message: {
             Text("The card is removed from the board. Its recorded history stays with the lift.")
         }
+    }
+
+    /// "↑ 190 lb?" (met twice) or "Drop to 175 lb?" (stalled): tap to
+    /// accept, long-press for "Not yet".
+    private func nudgeChip(_ nudge: TargetNudge, accept: @escaping (Double) -> Void) -> some View {
+        let value = target?.metric.formatted(nudge.value, metric: useMetricUnits) ?? ""
+        let text: String
+        switch nudge {
+        case .up: text = "↑ \(value)?"
+        case .stall: text = "Drop to \(value)?"
+        }
+        return Button { accept(nudge.value) } label: {
+            Text(text)
+                .font(.caption.bold())
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.orange.opacity(0.18)))
+                .foregroundStyle(.orange)
+        }
+        .buttonStyle(.borderless)
+        .contextMenu {
+            if let onSnoozeNudge {
+                Button("Not Yet", action: onSnoozeNudge)
+            }
+        }
+        .accessibilityIdentifier("strengthCard.nudge.\(exercise.name)")
     }
 
     /// The group card's member line: "Up next: Incline Dumbbell Press",

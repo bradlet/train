@@ -58,12 +58,17 @@ enum StrengthDayLog {
         in context: ModelContext,
         useMetricUnits: Bool,
         date: Date,
-        firstWeekday: Int = AppConfiguration.defaultWeekStartDay
+        firstWeekday: Int = AppConfiguration.defaultWeekStartDay,
+        isLightWeek: Bool = false
     ) -> [StrengthDayLogRow] {
         let targets = StrengthSlotResolver.targets(for: slots, in: context, firstWeekday: firstWeekday)
         return slots.map { slot in
             let target = targets[slot.id] ?? LiftTarget(slot: slot)
-            let resolved = StrengthPrefill.resolve(for: target, in: context)
+            let metric = StrengthPrefill.resolve(for: target, in: context).metric
+            let goal = target.liftKey == slot.liftKey
+                ? StrengthTargets.weekTarget(for: slot, metric: metric, isLightWeek: isLightWeek, useMetricUnits: useMetricUnits)
+                : nil
+            let resolved = StrengthPrefill.resolve(for: target, in: context, slotTarget: goal)
             return StrengthDayLogRow(
                 slotID: slot.id,
                 liftKey: target.liftKey,
@@ -136,6 +141,7 @@ struct LogStrengthDaySheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.useMetricUnits) private var useMetricUnits
     @Environment(\.weekStartDay) private var weekStartDay
+    @Environment(\.isLightWeek) private var isLightWeek
 
     @State private var date: Date
     @State private var rows: [StrengthDayLogRow] = []
@@ -205,7 +211,8 @@ struct LogStrengthDaySheet: View {
                 guard !didLoad else { return }
                 didLoad = true
                 let loaded = StrengthDayLog.rows(
-                    for: slots, in: modelContext, useMetricUnits: useMetricUnits, date: date, firstWeekday: weekStartDay
+                    for: slots, in: modelContext, useMetricUnits: useMetricUnits, date: date,
+                    firstWeekday: weekStartDay, isLightWeek: isLightWeek
                 )
                 rows = startTicked ? StrengthDayLog.allTicked(loaded) : loaded
             }
@@ -270,6 +277,7 @@ struct LogStrengthDaySheet: View {
             if StrengthPersonalBest.isNewBest(record, previous: previous), let name = row?.name {
                 bests.append(name)
             }
+            record.isLight = isLightWeek
             modelContext.insert(record)
             StrengthLiftRegistry.rememberDefaults(after: record, in: modelContext)
         }

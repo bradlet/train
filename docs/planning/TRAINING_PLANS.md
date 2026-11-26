@@ -186,6 +186,22 @@ stateDiagram-v2
 
 ## 9. Open questions
 
+> **Decided 2026-11-26** (with #20; any can be revisited):
+> 1. **Keep the asymmetry.** Cardio stays materialised; strength stays a computed template.
+> 2. **A plan doesn't own the board.** Cards outside a program are extras.
+> 3. **One active cardio track and one active strength track.** A hybrid plan fills both.
+> 4. **Nudge defaults:** met 2 sessions in a row, then +5 lb upper / +10 lb lower (2.5 / 5 kg), +1 rep, +15 s, or the distance stepper's increment. A stall after 3 misses offers one step down, and *Not yet* snoozes for 2 weeks. Not configurable for now.
+> 5. **Light weeks:** targets ×0.9, rounded down to the stepper increment. Presets may override later.
+> 6. **`ExerciseSeriesSpec` stays** as the "repeat one session" tool.
+>
+> **Built in #20 (steady mode):**
+> - targets on single-lift cards (Edit Plan), recording that starts on the target, and the nudges above
+> - `StrengthTargetChange` as the changelog, drawn as a dashed step line on the lift chart
+> - *Take a Light Week* (board ⋯ menu): records are tagged light and the #19 hints relax
+>
+> **Not yet:** double progression (it needs reps recorded with weight) and targets on group cards. Program mode is #33, hybrid plans are #34, and presets are #10.
+
+
 1. **Keep the cardio/strength asymmetry?** The alternative is computing cardio weeks on the fly as well. That gives cleaner plan edits but is a big change to the current eager-series design.
 2. **Should a plan own the board?** When a strength program is active, should cards outside the plan be allowed? Proposal: yes, as "extras" that aren't part of the plan.
 3. **Multiple active plans:** limit to one active plan per discipline, or one hybrid plan? Proposal: one active cardio track and one active strength track, which a hybrid plan fills together.

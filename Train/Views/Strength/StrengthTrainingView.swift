@@ -18,12 +18,16 @@ import SwiftData
 struct StrengthTrainingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.weekStartDay) private var weekStartDay
+    @Environment(\.useMetricUnits) private var useMetricUnits
+    @Environment(\.isLightWeek) private var isLightWeek
     @Query private var allExercises: [StrengthExercise]
     @Query private var allRecords: [StrengthRecord]
     @Query(sort: \UserMovementGroup.createdAt) private var userGroups: [UserMovementGroup]
     /// Cardio sessions, for run-aware placement (#25).
     @Query private var cardioExercises: [Exercise]
     @Query private var configurations: [AppConfiguration]
+    @Query private var lifts: [StrengthLift]
+    @Query private var targetChanges: [StrengthTargetChange]
     @Environment(\.keyDayStrategy) private var keyDayStrategy
     /// Lane badges dismissed this week ("weekStart#day" tokens).
     @AppStorage("placementDismissed") private var dismissedRaw = ""
@@ -61,8 +65,16 @@ struct StrengthTrainingView: View {
         )
         let cardio = PlacementRules.cardioClasses(cardioExercises, weekContaining: Date(), firstWeekday: weekStartDay)
         let conflicts = visibleConflicts(groups: groups, cardio: cardio)
+        let targets = cardTargets(groups: groups)
         VStack(spacing: 0) {
             dayStrip(cardio: cardio)
+            if isLightWeek {
+                Label("Light week · targets 90%", systemImage: "leaf.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.teal)
+                    .padding(.bottom, 4)
+                    .accessibilityIdentifier("strength.lightWeekBanner")
+            }
             MuscleBalanceStrip(covered: MuscleBalance.covered(
                 allExercises, groups: groups, library: MuscleBalance.bundledLibraryByID
             ))
@@ -90,6 +102,12 @@ struct StrengthTrainingView: View {
                         onCopyDay: { day in
                             copy(StrengthBoardPlanner.lane(allExercises, day: dayIndex, offloaded: false), toDay: day)
                         },
+                        targets: targets,
+                        onAcceptNudge: { slot, value in
+                            let metric = targets[slot.id]?.metric ?? .weight
+                            withAnimation { StrengthTargetEditor.setTarget(value, on: slot, metric: metric, in: modelContext) }
+                        },
+                        onSnoozeNudge: { slot in withAnimation { StrengthTargetEditor.snooze(slot) } },
                         onRecord: { recordingExercise = $0 },
                         onAddExercise: { showLibrary = true },
                         onLogDay: {
@@ -133,6 +151,12 @@ struct StrengthTrainingView: View {
                         Label("Arrange My Week", systemImage: "calendar.badge.clock")
                     }
                     .accessibilityIdentifier("strength.arrangeWeek")
+                    Button {
+                        toggleLightWeek()
+                    } label: {
+                        Label(isLightWeek ? "End Light Week" : "Take a Light Week", systemImage: "leaf")
+                    }
+                    .accessibilityIdentifier("strength.lightWeek")
                 } label: {
                     Label("More", systemImage: "ellipsis.circle")
                 }
@@ -235,7 +259,7 @@ struct StrengthTrainingView: View {
         return StrengthDayColumn.AsPlannedAction(
             title: isToday ? "Done as planned" : "Done as planned · \(Calendar.current.shortWeekdaySymbols[dayIndex])",
             log: {
-                guard let result = PlannedDayLogger.log(lane, on: date, in: modelContext, firstWeekday: weekStartDay) else { return }
+                guard let result = PlannedDayLogger.log(lane, on: date, in: modelContext, firstWeekday: weekStartDay, isLightWeek: isLightWeek, useMetricUnits: useMetricUnits) else { return }
                 plannedLog = result
                 if !result.newBests.isEmpty { newBest = NewBestAnnouncement(liftNames: result.newBests) }
             },
@@ -360,6 +384,28 @@ struct StrengthTrainingView: View {
             modelContext.insert(exercise)
             StrengthLiftRegistry.findOrCreate(for: exercise, metric: entry.primaryMetric, in: modelContext)
         }
+    }
+
+    // MARK: - Targets (#20)
+
+    /// Each single-lift card's target this week and its nudge.
+    private func cardTargets(groups: [String: MovementGroup]) -> [UUID: CardTarget] {
+        var result: [UUID: CardTarget] = [:]
+        for card in allExercises where card.targetValue != nil {
+            let lift = StrengthLiftRegistry.lift(forKey: card.liftKey, in: lifts)
+            let lower = PlacementRules.isLowerBody(card, groups: groups, library: MuscleBalance.bundledLibraryByID)
+            result[card.id] = StrengthTargets.cardTarget(
+                card, lift: lift, records: allRecords, changes: targetChanges, lowerBody: lower,
+                isLightWeek: isLightWeek, useMetricUnits: useMetricUnits, now: Date()
+            )
+        }
+        return result
+    }
+
+    /// Starts or ends this week's one-off light week.
+    private func toggleLightWeek() {
+        guard let config = configurations.first else { return }
+        config.lightWeekStart = isLightWeek ? nil : Date().startOfWeek(firstWeekday: weekStartDay)
     }
 
     // MARK: - Placement (#25)

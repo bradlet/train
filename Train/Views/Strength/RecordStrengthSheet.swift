@@ -26,6 +26,7 @@ struct RecordStrengthSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.useMetricUnits) private var useMetricUnits
     @Environment(\.weekStartDay) private var weekStartDay
+    @Environment(\.isLightWeek) private var isLightWeek
 
     @State private var draft: StrengthRecordDraft
     /// The lift being recorded: the card's own, or a group member.
@@ -93,6 +94,13 @@ struct RecordStrengthSheet: View {
                     Text(draft.metric.displayName)
                 } footer: {
                     Text(footerText)
+                }
+                if let target, let goal = weekTarget(metric: draft.metric, for: target) {
+                    Section {
+                        LabeledContent(isLightWeek ? "Light-week target" : "Target",
+                                       value: draft.metric.formatted(goal, metric: useMetricUnits))
+                            .accessibilityIdentifier("recordStrength.target")
+                    }
                 }
                 Section("Notes") {
                     TextField("Optional notes", text: $draft.notes, axis: .vertical)
@@ -165,11 +173,18 @@ struct RecordStrengthSheet: View {
         return f
     }()
 
-    /// Switches the lift being recorded and re-prefills from its history,
-    /// keeping the chosen date.
+    /// The card's target this week, for the card's own lift only (#20).
+    private func weekTarget(metric: LiftMetric, for lift: LiftTarget) -> Double? {
+        guard lift.liftKey == slot.liftKey else { return nil }
+        return StrengthTargets.weekTarget(for: slot, metric: metric, isLightWeek: isLightWeek, useMetricUnits: useMetricUnits)
+    }
+
+    /// Switches the lift being recorded and re-prefills from its history
+    /// (or the card's target), keeping the chosen date.
     private func select(_ newTarget: LiftTarget) {
         target = newTarget
-        let resolved = StrengthPrefill.resolve(for: newTarget, in: modelContext)
+        let metric = StrengthPrefill.resolve(for: newTarget, in: modelContext).metric
+        let resolved = StrengthPrefill.resolve(for: newTarget, in: modelContext, slotTarget: weekTarget(metric: metric, for: newTarget))
         draft = StrengthRecordDraft(
             metric: resolved.metric,
             prefill: resolved.prefill,
@@ -188,6 +203,7 @@ struct RecordStrengthSheet: View {
             slotID: slot.id,
             useMetricUnits: useMetricUnits
         ) else { return }
+        record.isLight = isLightWeek
         let previous = StrengthLiftRegistry.records(forKey: lift.liftKey, in: modelContext)
         if StrengthPersonalBest.isNewBest(record, previous: previous) {
             onNewBest([recordTarget.name])

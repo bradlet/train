@@ -23,6 +23,7 @@ struct LiftDetailView: View {
 
     @Query private var records: [StrengthRecord]
     @Query private var lifts: [StrengthLift]
+    @Query private var targetChanges: [StrengthTargetChange]
     @Environment(\.modelContext) private var modelContext
     @Environment(\.useMetricUnits) private var useMetricUnits
     @State private var window: PerformanceTimeWindow = .allTime
@@ -34,6 +35,7 @@ struct LiftDetailView: View {
         self.liftKey = liftKey
         _records = Query(filter: #Predicate<StrengthRecord> { $0.liftKey == liftKey }, sort: \.date, order: .reverse)
         _lifts = Query(filter: #Predicate<StrengthLift> { $0.liftKey == liftKey })
+        _targetChanges = Query(filter: #Predicate<StrengthTargetChange> { $0.liftKey == liftKey }, sort: \.date)
     }
 
     private static let dateFormatter: DateFormatter = {
@@ -136,6 +138,18 @@ struct LiftDetailView: View {
                 .foregroundStyle(.secondary)
         } else {
             Chart {
+                // The plan's target as a dashed step line behind the
+                // results (#20), from the changelog.
+                ForEach(targetSteps(metric: metric, until: dates.last ?? Date()), id: \.offset) { step in
+                    LineMark(
+                        x: .value("Date", step.element.date),
+                        y: .value("Target", metric.displayValue(fromStored: step.element.value, metric: useMetricUnits)),
+                        series: .value("Measurement", "Target")
+                    )
+                    .interpolationMethod(.stepEnd)
+                    .foregroundStyle(Color.secondary)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                }
                 ForEach(series) { line in
                     ForEach(line.points) { point in
                         LineMark(
@@ -181,6 +195,21 @@ struct LiftDetailView: View {
             .frame(height: 180)
             .accessibilityIdentifier("liftDetail.chart")
         }
+    }
+
+    /// The target step line's points: each set target, held until the next
+    /// change (a cleared target ends it), extended to the last session.
+    private func targetSteps(metric: LiftMetric, until end: Date) -> [EnumeratedSequence<[(date: Date, value: Double)]>.Element] {
+        let history = StrengthTargets.history(targetChanges, liftKey: liftKey, metric: metric)
+        var points: [(date: Date, value: Double)] = []
+        for (index, change) in history.enumerated() {
+            guard let value = change.value else { continue }
+            points.append((change.date, value))
+            let next = index + 1 < history.count ? history[index + 1].date : max(end, change.date)
+            points.append((next, value))
+        }
+        if let since = sinceDate { points = points.filter { $0.date >= since } }
+        return Array(points.enumerated())
     }
 
     /// The start of the selected scale, or `nil` for all time.
