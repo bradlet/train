@@ -54,6 +54,31 @@ final class HistoryUITests: XCTestCase {
         app.buttons["workoutList.nextPage"]
     }
 
+    // MARK: - Chart scales (#31)
+
+    /// The mileage chart offers the long scales, and each one renders with
+    /// a long history seeded.
+    @MainActor
+    func testMileageChartOffersEveryScale() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestSeed", "-uiTestChartHistory"]
+        app.launch()
+        app.tabBars.buttons["Cardio"].tap()
+        app.segmentedControls["cardio.segment"].buttons["Progress"].tap()
+
+        // Page 2 of the hub is the mileage chart.
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.25))
+        start.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.25)))
+        let picker = app.segmentedControls["weeklyChart.window.Weekly Mileage"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 5), "the mileage chart's scale picker should show")
+        for scale in ["1M", "3M", "6M", "1Y", "All"] {
+            let button = picker.buttons[scale]
+            XCTAssertTrue(button.exists, "\(scale) should be offered")
+            button.tap()
+            XCTAssertTrue(button.isSelected, "\(scale) should select")
+        }
+    }
+
     // MARK: - Pagination
 
     @MainActor

@@ -125,6 +125,39 @@ enum UITestFixtures {
         try? context.save()
     }
 
+    /// Launch argument (with `-uiTestSeed`) that adds long run history for
+    /// the Progress charts' 1Y and All scales (#31).
+    static let chartHistoryArgument = "-uiTestChartHistory"
+
+    /// Adds about 20 months of older runs — weekly, with a five-week break
+    /// and a run of unrated weeks — before the standard 25 days, so the long
+    /// chart scales have data to bucket, gaps to break on and months to label.
+    static func seedChartHistory(into container: ModelContainer) {
+        let context = container.mainContext
+        let calendar = Calendar.current
+        let start = Date()
+        for week in 4..<88 {
+            // A five-week break around 8 months back.
+            if (34..<39).contains(week) { continue }
+            guard let day = calendar.date(byAdding: .day, value: -week * 7, to: start) else { continue }
+            let miles = 12 + Double((week * 7) % 11)
+            let rated = !(50..<54).contains(week)
+            context.insert(Exercise(
+                name: "History Run \(week)",
+                type: .run,
+                durationSeconds: Int(miles * 540),
+                distanceMiles: miles,
+                date: day,
+                workout: Workout(
+                    durationSeconds: Int(miles * 540),
+                    distanceMiles: miles,
+                    feeling: rated ? 2 + (week % 4) : nil
+                )
+            ))
+        }
+        try? context.save()
+    }
+
     /// Replaces any favorites with a single known one, so the Home chip and
     /// the in-sheet "Start from Favorite" menu have something to pick.
     private static func seedFavorites(into context: ModelContext) {

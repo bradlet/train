@@ -5882,6 +5882,203 @@ struct MovementGroupStoreTests {
     }
 }
 
+// MARK: - ChartBucketing Tests
+
+struct ChartBucketingTests {
+
+    private let calendar = Calendar.current
+
+    /// Midnight on a date.
+    private func day(_ year: Int, _ month: Int, _ dayOfMonth: Int) -> Date {
+        calendar.date(from: DateComponents(year: year, month: month, day: dayOfMonth))!
+    }
+
+    /// Consecutive weekly points from a Monday, with the given values.
+    private func weeks(from start: Date, _ values: [Double?]) -> [WeeklyMetricPoint] {
+        values.enumerated().map { index, value in
+            WeeklyMetricPoint(weekStart: calendar.date(byAdding: .day, value: index * 7, to: start)!, value: value)
+        }
+    }
+
+    @Test func weeklyBucketsAreUnchanged() {
+        let points = weeks(from: day(2026, 11, 2), [1, nil, 3])
+        #expect(ChartBucketing.bucket(points, size: .week, firstWeekday: 2) == points)
+    }
+
+    @Test func twoWeekBucketsAverageTheirWeeks() {
+        let points = weeks(from: day(2026, 1, 5), [10, 20, 30, 50, 6, 8])
+        let buckets = ChartBucketing.bucket(points, size: .twoWeeks, firstWeekday: 2)
+        let values = buckets.compactMap(\.value)
+        #expect(values.reduce(0, +) > 0)
+        // Every bucket holds one or two weeks, and the weekly total is kept
+        // as an average: summing bucket × weeks gives the original total.
+        let weeksPerBucket = buckets.indices.map { index -> Int in
+            let start = buckets[index].weekStart
+            let end = index + 1 < buckets.count ? buckets[index + 1].weekStart : .distantFuture
+            return points.filter { $0.weekStart >= start && $0.weekStart < end }.count
+        }
+        #expect(weeksPerBucket.allSatisfy { $0 == 1 || $0 == 2 })
+        #expect(weeksPerBucket.dropFirst().dropLast().allSatisfy { $0 == 2 }, "only the ends may be partial")
+        let total = zip(buckets, weeksPerBucket).reduce(0.0) { $0 + ($1.0.value ?? 0) * Double($1.1) }
+        #expect(total == 124)
+    }
+
+    @Test func twoWeekBucketsAreStableAsWeeksPass() {
+        let points = weeks(from: day(2026, 1, 5), Array(repeating: 1, count: 10))
+        let shifted = Array(points.dropFirst())
+        let a = Set(ChartBucketing.bucket(points, size: .twoWeeks, firstWeekday: 2).map(\.weekStart))
+        let b = Set(ChartBucketing.bucket(shifted, size: .twoWeeks, firstWeekday: 2).map(\.weekStart))
+        // Dropping the oldest week only changes the first bucket's start.
+        #expect(a.subtracting(b).count <= 1)
+        #expect(b.subtracting(a).count <= 1)
+    }
+
+    @Test func monthBucketsHoldFourOrFiveWeeks() {
+        // Mondays from Jun 1 2026: June has 5 Mondays (1, 8, 15, 22, 29),
+        // July 4 (6, 13, 20, 27).
+        let points = weeks(from: day(2026, 6, 1), [5, 5, 5, 5, 10, 4, 4, 4, 4])
+        let buckets = ChartBucketing.bucket(points, size: .month, firstWeekday: 2)
+        #expect(buckets.count == 2)
+        #expect(buckets[0].weekStart == day(2026, 6, 1))
+        #expect(buckets[0].value == 6, "(5×4 + 10) / 5 weeks")
+        #expect(buckets[1].weekStart == day(2026, 7, 6))
+        #expect(buckets[1].value == 4)
+    }
+
+    @Test func aRangeStartingMidMonthMakesAPartialFirstBucket() {
+        let points = weeks(from: day(2026, 6, 22), [3, 9, 2, 2, 2, 2])
+        let buckets = ChartBucketing.bucket(points, size: .month, firstWeekday: 2)
+        #expect(buckets.first?.weekStart == day(2026, 6, 22))
+        #expect(buckets.first?.value == 6, "June holds just its last two weeks")
+    }
+
+    @Test func emptyBucketsAreGapsNeverZero() {
+        let points = weeks(from: day(2026, 6, 1), [nil, nil, nil, nil, nil, 4, nil, 2, nil])
+        let buckets = ChartBucketing.bucket(points, size: .month, firstWeekday: 2)
+        #expect(buckets[0].value == nil)
+        #expect(buckets[1].value == 3, "nil weeks don't drag the average down")
+    }
+
+    @Test func emptyInputIsEmpty() {
+        #expect(ChartBucketing.bucket([], size: .month, firstWeekday: 1).isEmpty)
+        #expect(ChartBucketing.bucket([], size: .twoWeeks, firstWeekday: 1).isEmpty)
+    }
+
+    @Test func weekStartSettingMovesMonthMembership() {
+        // The week of Sun May 31 2026: Sunday-start puts it in May,
+        // Monday-start's week (Jun 1) in June.
+        let sundayWeeks = weeks(from: day(2026, 5, 31), [7, 1])
+        let mondayWeeks = weeks(from: day(2026, 6, 1), [7, 1])
+        #expect(ChartBucketing.bucket(sundayWeeks, size: .month, firstWeekday: 1).count == 2)
+        #expect(ChartBucketing.bucket(mondayWeeks, size: .month, firstWeekday: 2).count == 1)
+    }
+}
+
+// MARK: - ChartAxis Tests
+
+struct ChartAxisTests {
+
+    private let calendar = Calendar.current
+
+    private func weeklyDates(_ count: Int) -> [Date] {
+        let start = calendar.date(from: DateComponents(year: 2026, month: 5, day: 25))!
+        return (0..<count).map { calendar.date(byAdding: .day, value: $0 * 7, to: start)! }
+    }
+
+    @Test func monthlyLabelsNeverRepeatAMonth() {
+        // The 6M bug: 26 weeks used to label every week of alternate months.
+        let labels = ChartAxis.labelDates(weeklyDates(26), monthly: true)
+        let months = labels.map { calendar.component(.month, from: $0) }
+        #expect(Set(months).count == months.count)
+        #expect(labels.count <= ChartAxis.maxLabels)
+        #expect(labels.count >= 3)
+    }
+
+    @Test func dayLabelsAreEvenlyThinned() {
+        let dates = weeklyDates(13)
+        let labels = ChartAxis.labelDates(dates, monthly: false)
+        #expect(labels.first == dates.first)
+        #expect(labels.count <= ChartAxis.maxLabels)
+        #expect(ChartAxis.labelDates(weeklyDates(4), monthly: false).count == 3, "the edge label is dropped")
+        #expect(labels.last != dates.last)
+        #expect(ChartAxis.labelDates(weeklyDates(2), monthly: false).count == 2, "two labels are always kept")
+    }
+
+    @Test func emptyAndZeroBudget() {
+        #expect(ChartAxis.labelDates([], monthly: true).isEmpty)
+        #expect(ChartAxis.labelDates(weeklyDates(4), monthly: false, maxLabels: 0).isEmpty)
+    }
+}
+
+// MARK: - ChartGapStyle Tests
+
+struct ChartGapStyleTests {
+
+    private func points(_ values: [Double?]) -> [WeeklyMetricPoint] {
+        values.enumerated().map { WeeklyMetricPoint(weekStart: Date(timeIntervalSince1970: Double($0.offset) * 604_800), value: $0.element) }
+    }
+
+    @Test func zeroFillsGapsInOneRun() {
+        let runs = ChartSeriesBuilder.runs(points([1, nil, 3]), style: .zero)
+        #expect(runs.count == 1)
+        #expect(runs[0].points.map(\.value) == [1, 0, 3])
+    }
+
+    @Test func breakLineSplitsAtGaps() {
+        let runs = ChartSeriesBuilder.runs(points([1, nil, 3, 4]), style: .breakLine)
+        #expect(runs.map { $0.points.count } == [1, 2])
+        #expect(runs.allSatisfy { !$0.isBridge })
+        #expect(runs[0].isSingleton)
+    }
+
+    @Test func bridgeConnectsRunsWithoutInventingPoints() {
+        let runs = ChartSeriesBuilder.runs(points([1, 2, nil, nil, 5]), style: .bridge)
+        #expect(runs.map(\.isBridge) == [false, true, false])
+        #expect(runs[1].points.map(\.value) == [2, 5], "the bridge spans the last and next real values")
+        #expect(runs.flatMap(\.points).allSatisfy { $0.value != nil }, "no missing week is plotted")
+        #expect(runs.map(\.id) == [0, 1, 2])
+    }
+
+    @Test func noDataNoRuns() {
+        #expect(ChartSeriesBuilder.runs(points([nil, nil]), style: .bridge).isEmpty)
+        #expect(ChartSeriesBuilder.runs([], style: .zero).isEmpty)
+    }
+}
+
+// MARK: - PerformanceTimeWindow Tests
+
+struct PerformanceTimeWindowTests {
+
+    private let now = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 12))!
+
+    @Test func fixedScalesCoverTheirWeeks() {
+        #expect(PerformanceTimeWindow.oneMonth.weekCount(earliest: nil, now: now, firstWeekday: 2) == 4)
+        #expect(PerformanceTimeWindow.sixMonth.weekCount(earliest: nil, now: now, firstWeekday: 2) == 26)
+        #expect(PerformanceTimeWindow.oneYear.weekCount(earliest: nil, now: now, firstWeekday: 2) == 52)
+    }
+
+    @Test func allTimeReachesTheEarliestWeek() {
+        let earliest = Calendar.current.date(byAdding: .day, value: -70, to: now)!
+        #expect(PerformanceTimeWindow.allTime.weekCount(earliest: earliest, now: now, firstWeekday: 2) == 11)
+        #expect(PerformanceTimeWindow.allTime.weekCount(earliest: nil, now: now, firstWeekday: 2) == 4)
+        #expect(PerformanceTimeWindow.allTime.weekCount(earliest: now, now: now, firstWeekday: 2) == 4)
+    }
+
+    @Test func longScalesDownsampleAndLabelMonths() {
+        #expect(PerformanceTimeWindow.oneYear.bucketSize == .twoWeeks)
+        #expect(PerformanceTimeWindow.allTime.bucketSize == .month)
+        #expect(PerformanceTimeWindow.sixMonth.bucketSize == .week)
+        #expect(PerformanceTimeWindow.sixMonth.monthlyLabels)
+        #expect(!PerformanceTimeWindow.threeMonth.monthlyLabels)
+        #expect(PerformanceTimeWindow.allCases.map(\.label) == ["1M", "3M", "6M", "1Y", "All"])
+    }
+
+    @Test func chartConfigurationsPickTheirGapStyle() {
+        #expect(WeeklyChartConfiguration.mileage.gapStyle == .zero)
+        #expect(WeeklyChartConfiguration.feeling.gapStyle == .bridge)
+    }
+}
+
 // MARK: - StrengthLiftKey Tests
 
 struct StrengthLiftKeyTests {

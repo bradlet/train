@@ -58,6 +58,9 @@ struct TrainApp: App {
         // will use (preview container when seeded — see makeContainerForLaunch).
         if CommandLine.arguments.contains("-uiTestSeed") {
             UITestFixtures.seed(into: sharedModelContainer)
+            if CommandLine.arguments.contains(UITestFixtures.chartHistoryArgument) {
+                UITestFixtures.seedChartHistory(into: sharedModelContainer)
+            }
         }
     }
 

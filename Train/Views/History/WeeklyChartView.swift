@@ -4,7 +4,7 @@
 //
 //  Pages 2 and 3 of the Performance Hub. A parameterized line chart
 //  that displays a weekly metric (mileage or average feeling) over
-//  a selectable rolling window (1M / 3M / 6M). A single view is reused
+//  a selectable scale (1M / 3M / 6M / 1Y / All; the long scales downsample). A single view is reused
 //  for both charts because they differ only in data source, y-scale,
 //  and axis label — captured in `WeeklyChartConfiguration`.
 //
@@ -13,22 +13,17 @@ import SwiftUI
 import SwiftData
 import Charts
 
-/// Selectable rolling time windows for the Performance Hub weekly charts.
+/// Selectable time scales for the Progress charts. The longer scales
+/// downsample (see `ChartBucketing`): 1Y plots one point per two weeks and
+/// All one per month, each the average weekly value across its weeks.
 enum PerformanceTimeWindow: String, CaseIterable, Identifiable {
     case oneMonth
     case threeMonth
     case sixMonth
+    case oneYear
+    case allTime
 
     var id: String { rawValue }
-
-    /// Number of Sunday-start weeks this window covers.
-    var weekCount: Int {
-        switch self {
-        case .oneMonth:   return 4
-        case .threeMonth: return 13
-        case .sixMonth:   return 26
-        }
-    }
 
     /// Short label for the segmented pill.
     var label: String {
@@ -36,27 +31,48 @@ enum PerformanceTimeWindow: String, CaseIterable, Identifiable {
         case .oneMonth:   return "1M"
         case .threeMonth: return "3M"
         case .sixMonth:   return "6M"
+        case .oneYear:    return "1Y"
+        case .allTime:    return "All"
         }
     }
 
-    /// Stride used for x-axis *labels*. Tick marks and grid lines are
-    /// still drawn every week regardless of this stride — only the
-    /// textual labels are thinned out so wide windows stay readable.
-    var labelStride: (component: Calendar.Component, count: Int) {
+    /// How many weeks one plotted point covers.
+    var bucketSize: ChartBucketSize {
         switch self {
-        case .oneMonth:   return (.weekOfYear, 1)
-        case .threeMonth: return (.weekOfYear, 4)
-        case .sixMonth:   return (.month, 2)
+        case .oneMonth, .threeMonth, .sixMonth: return .week
+        case .oneYear:  return .twoWeeks
+        case .allTime:  return .month
         }
     }
 
-    /// Whether x-axis labels include the day of month. The 6-month
-    /// window uses month-only labels ("Apr") to avoid clutter; the
-    /// shorter windows use month + day ("Apr 6").
-    var labelIncludesDay: Bool {
+    /// Whether x-axis labels show months only ("Apr") rather than a day
+    /// ("Apr 6").
+    var monthlyLabels: Bool {
         switch self {
-        case .oneMonth, .threeMonth: return true
-        case .sixMonth:              return false
+        case .oneMonth, .threeMonth: return false
+        case .sixMonth, .oneYear, .allTime: return true
+        }
+    }
+
+    /// Weeks of weekly data the scale covers, ending with the current week.
+    /// All time reaches back to the week of the earliest data (at least
+    /// four weeks, so a new athlete's chart isn't a single point).
+    /// - Parameters:
+    ///   - earliest: The earliest data date, if any.
+    ///   - now: The current moment.
+    ///   - firstWeekday: Calendar weekday convention (1=Sunday ... 7=Saturday).
+    func weekCount(earliest: Date?, now: Date, firstWeekday: Int) -> Int {
+        switch self {
+        case .oneMonth:   return 4
+        case .threeMonth: return 13
+        case .sixMonth:   return 26
+        case .oneYear:    return 52
+        case .allTime:
+            guard let earliest, earliest < now else { return 4 }
+            let first = earliest.startOfWeek(firstWeekday: firstWeekday)
+            let current = now.startOfWeek(firstWeekday: firstWeekday)
+            let days = Calendar.current.dateComponents([.day], from: first, to: current).day ?? 0
+            return max(Int((Double(days) / 7).rounded()) + 1, 4)
         }
     }
 }
@@ -73,6 +89,8 @@ struct WeeklyChartConfiguration {
     /// fixed domains pin a stride so Charts labels every step of the scale
     /// (including its maximum) instead of every other one.
     let yAxisStride: Double?
+    /// How weeks without a value are drawn.
+    let gapStyle: ChartGapStyle
     /// Projects recorded exercises into weekly points. The last parameter
     /// is the first weekday of the aggregation week (1=Sunday ... 7=Saturday).
     let projection: (_ exercises: [Exercise], _ weekCount: Int, _ anchor: Date, _ firstWeekday: Int) -> [WeeklyMetricPoint]
@@ -81,15 +99,18 @@ struct WeeklyChartConfiguration {
         title: "Weekly Mileage",
         fixedYScale: nil,
         yAxisStride: nil,
+        gapStyle: .zero,
         projection: WorkoutAggregations.weeklyMileage
     )
 
     /// Feeling runs 1–5, but the domain starts at 0 so a "Very Weak" week
-    /// isn't glued to the frame's bottom edge.
+    /// isn't glued to the frame's bottom edge. Unrated weeks are never
+    /// plotted: a dashed bridge spans them so the trend still reads.
     static let feeling = WeeklyChartConfiguration(
         title: "How it's been feeling",
         fixedYScale: 0...5,
         yAxisStride: 1,
+        gapStyle: .bridge,
         projection: WorkoutAggregations.weeklyAverageFeeling
     )
 }
@@ -104,50 +125,40 @@ struct WeeklyChartView: View {
     @Environment(\.weekStartDay) private var weekStartDay
     @State private var selectedWindow: PerformanceTimeWindow = .oneMonth
 
-    /// Derived chart points for the current window, one per week including
-    /// weeks with no data (whose `value` is `nil`).
+    /// Points for the current scale: weekly values from the projection,
+    /// downsampled for the long scales. Valueless points stay `nil`.
     private var points: [WeeklyMetricPoint] {
-        configuration.projection(exercises, selectedWindow.weekCount, Date(), weekStartDay)
+        let now = Date()
+        let earliest = exercises.map(\.date).min()
+        let weeks = selectedWindow.weekCount(earliest: earliest, now: now, firstWeekday: weekStartDay)
+        let weekly = configuration.projection(exercises, weeks, now, weekStartDay)
+        return ChartBucketing.bucket(weekly, size: selectedWindow.bucketSize, firstWeekday: weekStartDay)
     }
 
-    /// Contiguous runs of weeks that carry a value. Weeks without one are
-    /// dropped, and each run becomes its own Charts series so the line
-    /// breaks at the gap instead of drawing a chord across it.
-    private var segments: [WeeklyChartSegment] {
-        WeeklyChartSeries.segments(points)
+    /// Drawable runs per the configuration's gap style.
+    private var runs: [ChartRun] {
+        ChartSeriesBuilder.runs(points, style: configuration.gapStyle)
     }
 
-    /// Pinned x-domain spanning the whole selected window. Required because
-    /// the marks no longer include valueless weeks — without this, a 6-month
-    /// window whose only data is in the last 3 weeks would silently render
-    /// as a 3-week chart.
+    /// Pinned x-domain spanning the whole scale, so a scale whose data sits
+    /// in its last weeks still spans the full range.
     private var xDomain: ClosedRange<Date> {
         let dates = points.map(\.weekStart)
-        guard let first = dates.first, let last = dates.last, first <= last else {
+        guard let first = dates.first, let last = dates.last, first < last else {
             let now = Date()
-            return now...now.addingTimeInterval(1)
+            return now.addingTimeInterval(-7 * 86_400)...now
         }
         return first...last
     }
 
-    /// Subset of `points` dates used for x-axis tick marks and labels.
-    /// Filtered from the actual week-start data dates so ticks align
-    /// exactly with plotted points.
+    /// X-axis label dates: at most `ChartAxis.maxLabels`, one per month at
+    /// most on the month-labelled scales.
     private var labelDates: [Date] {
-        let dates = points.map(\.weekStart)
-        guard let first = dates.first else { return [] }
-        let (component, count) = selectedWindow.labelStride
-        return dates.filter { date in
-            let comps = Calendar.current.dateComponents([component], from: first, to: date)
-            let diff: Int
-            switch component {
-            case .weekOfYear: diff = comps.weekOfYear ?? 0
-            case .month:      diff = comps.month ?? 0
-            default:          diff = 0
-            }
-            return diff % count == 0
-        }
+        ChartAxis.labelDates(points.map(\.weekStart), monthly: selectedWindow.monthlyLabels)
     }
+
+    /// Point symbols get in the way once a line has many points.
+    private var showsSymbols: Bool { points.count <= 26 }
 
     /// Y-scale domain for the chart. Rating charts clamp to their fixed
     /// scale; mileage auto-scales to the max value with a zero baseline so
@@ -175,29 +186,34 @@ struct WeeklyChartView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Chart {
-                ForEach(segments) { segment in
-                    ForEach(segment.points) { point in
+                ForEach(runs) { run in
+                    ForEach(run.points) { point in
                         LineMark(
                             x: .value("Week", point.weekStart),
                             y: .value("Value", point.value ?? 0),
-                            series: .value("Segment", segment.id)
+                            series: .value("Run", run.id)
                         )
                         .interpolationMethod(.monotone)
-                        .foregroundStyle(Color.accentColor)
-                        .symbol(Circle().strokeBorder(lineWidth: 1.5))
+                        .foregroundStyle(run.isBridge ? Color.accentColor.opacity(0.5) : Color.accentColor)
+                        .lineStyle(run.isBridge
+                                   ? StrokeStyle(lineWidth: 1.5, dash: [3, 4])
+                                   : StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                        .symbol {
+                            if showsSymbols && !run.isBridge {
+                                Circle().fill(Color.accentColor).frame(width: 5, height: 5)
+                            }
+                        }
                     }
                 }
-                // A one-week run has a zero-length path and so draws nothing.
-                // Give it an explicit dot; where the line's own symbol does
-                // render the two coincide exactly.
-                ForEach(segments.filter(\.isSingleton)) { segment in
-                    if let point = segment.points.first, let value = point.value {
+                // A one-point run has a zero-length path and so draws nothing.
+                ForEach(runs.filter(\.isSingleton)) { run in
+                    if let point = run.points.first, let value = point.value {
                         PointMark(
                             x: .value("Week", point.weekStart),
                             y: .value("Value", value)
                         )
                         .foregroundStyle(Color.accentColor)
-                        .symbol(Circle().strokeBorder(lineWidth: 1.5))
+                        .symbolSize(30)
                     }
                 }
             }
@@ -206,7 +222,7 @@ struct WeeklyChartView: View {
             .chartLegend(.hidden)
             .chartYAxis {
                 AxisMarks(position: .leading, values: yAxisValues) { value in
-                    AxisGridLine()
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
                     AxisValueLabel {
                         if let d = value.as(Double.self) {
                             Text("\(Int(d))")
@@ -216,11 +232,13 @@ struct WeeklyChartView: View {
             }
             .chartXAxis {
                 AxisMarks(values: labelDates) { _ in
-                    AxisTick()
-                    if selectedWindow.labelIncludesDay {
-                        AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                    AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
+                    if selectedWindow == .allTime {
+                        AxisValueLabel(format: .dateTime.month(.abbreviated).year(.twoDigits), collisionResolution: .greedy)
+                    } else if selectedWindow.monthlyLabels {
+                        AxisValueLabel(format: .dateTime.month(.abbreviated), collisionResolution: .greedy)
                     } else {
-                        AxisValueLabel(format: .dateTime.month(.abbreviated))
+                        AxisValueLabel(format: .dateTime.month(.abbreviated).day(), collisionResolution: .greedy)
                     }
                 }
             }
@@ -234,6 +252,7 @@ struct WeeklyChartView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .accessibilityIdentifier("weeklyChart.window.\(configuration.title)")
         }
     }
 }
