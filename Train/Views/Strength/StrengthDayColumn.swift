@@ -20,6 +20,9 @@ struct StrengthDayColumn: View {
     /// The latest record per lift key (see
     /// `StrengthLiftRegistry.latestByLiftKey`), for each card's summary.
     let latestRecords: [String: StrengthRecord]
+    /// This week's latest record per card (see `StrengthWeek.recordsBySlot`),
+    /// for each card's ✓.
+    var weekRecords: [UUID: StrengthRecord] = [:]
     /// Called when the user taps a card to record a weight entry.
     let onRecord: (StrengthExercise) -> Void
     /// Called when the user taps the add button to open the exercise library.
@@ -111,6 +114,7 @@ struct StrengthDayColumn: View {
                     StrengthExerciseCard(
                         exercise: exercise,
                         latestRecord: latestRecords[exercise.liftKey],
+                        weekRecord: weekRecords[exercise.id],
                         onRecord: { onRecord(exercise) },
                         onMoveToDay: { day in onMoveToDay(exercise, day) },
                         onToggleOffloaded: {

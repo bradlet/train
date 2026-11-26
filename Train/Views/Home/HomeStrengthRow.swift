@@ -2,7 +2,8 @@
 //  HomeStrengthRow.swift
 //  Train
 //
-//  Compact row for one of today's strength exercises on the Home tab.
+//  Compact row for one of today's strength exercises on the Home tab, or for
+//  a card from earlier this week that is still to do (#15).
 //
 //  Deliberately not `StrengthExerciseCard`: that card owns drag-and-drop,
 //  move-to-day, and offload affordances, which are weekly-board semantics and
@@ -16,6 +17,11 @@ struct HomeStrengthRow: View {
     let exercise: StrengthExercise
     /// The latest record of this exercise's lift, if any.
     let latestRecord: StrengthRecord?
+    /// This card's latest record in the current week — shown as a ✓.
+    var weekRecord: StrengthRecord? = nil
+    /// The lane's short weekday name when the row is carried over from an
+    /// earlier day this week ("Mon"); `nil` for today's lane.
+    var carryoverDay: String? = nil
     /// Called when the row is tapped to record a session.
     let onRecord: () -> Void
 
@@ -34,6 +40,11 @@ struct HomeStrengthRow: View {
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.primary)
                     HStack(spacing: 6) {
+                        if let carryoverDay {
+                            Text(carryoverDay)
+                                .fontWeight(.semibold)
+                            Text("•")
+                        }
                         Text(exercise.muscleGroup.rawValue)
                         if let plan = exercise.plannedSummary {
                             Text("•")
@@ -46,7 +57,15 @@ struct HomeStrengthRow: View {
 
                 Spacer()
 
-                if let latest = latestRecord {
+                if let thisWeek = weekRecord {
+                    Label(
+                        thisWeek.metric.formatted(thisWeek.value, metric: useMetricUnits),
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .accessibilityIdentifier("home.strengthWeekCheck.\(exercise.name)")
+                } else if let latest = latestRecord {
                     Text(latest.metric.formatted(latest.value, metric: useMetricUnits))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -64,6 +83,8 @@ struct HomeStrengthRow: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("home.strengthRow.\(exercise.name)")
+        .accessibilityIdentifier(
+            carryoverDay == nil ? "home.strengthRow.\(exercise.name)" : "home.carryoverRow.\(exercise.name)"
+        )
     }
 }

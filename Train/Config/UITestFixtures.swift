@@ -143,8 +143,10 @@ enum UITestFixtures {
 
     /// Seeds the strength board: `todayStrengthCount` exercises in today's
     /// lane, one offloaded (so Home's exclusion of offloaded work is
-    /// exercised), and one on another day. The first lift has a lift row and
-    /// one recorded session, so cards render lift-owned history.
+    /// exercised), one on another day, and one in yesterday's lane with no
+    /// record — Home's "Still to do this week" (#15) on any day but the week's
+    /// first. The first lift has a lift row and one recorded session (last
+    /// week, so it has no ✓), so cards render lift-owned history.
     private static func seedStrength(into context: ModelContext) {
         let today = Date().weekdayIndex
         let otherDay = (today + 1) % 7
@@ -184,6 +186,13 @@ enum UITestFixtures {
             name: "Test Other Day Lift",
             muscleGroup: .shoulders,
             weekdayIndex: otherDay,
+            sortOrder: 0
+        ))
+
+        context.insert(StrengthExercise(
+            name: "Test Missed Lift",
+            muscleGroup: .hamstrings,
+            weekdayIndex: (today + 6) % 7,
             sortOrder: 0
         ))
     }

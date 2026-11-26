@@ -2,8 +2,9 @@
 //  TodayTrainingSection.swift
 //  Train
 //
-//  The "today" block on the Home tab: the day's aerobic sessions and the day's
-//  active strength lane. Selection and ordering live in `TodayTraining`; this
+//  The "today" block on the Home tab: the day's aerobic sessions, the day's
+//  active strength lane, and the strength cards from earlier this week that
+//  are still to do (#15). Selection and ordering live in `TodayTraining`; this
 //  file is presentation only.
 //
 
@@ -17,6 +18,11 @@ struct TodayTrainingSection: View {
     let strength: [StrengthExercise]
     /// The latest record per lift key, for each strength row's value.
     let latestStrengthRecords: [String: StrengthRecord]
+    /// This week's latest record per card, for each strength row's ✓.
+    var weekStrengthRecords: [UUID: StrengthRecord] = [:]
+    /// Active cards from earlier days this week with no record yet
+    /// (`StrengthWeek.carryover`).
+    var carryover: [StrengthExercise] = []
     /// Called to record (or re-open) an aerobic exercise.
     let onRecordAerobic: (Exercise) -> Void
     /// Called to edit an aerobic exercise's plan or recorded data.
@@ -31,7 +37,7 @@ struct TodayTrainingSection: View {
         VStack(alignment: .leading, spacing: 12) {
             header
 
-            if TodayTraining.isEmpty(aerobic: aerobic, strength: strength) {
+            if TodayTraining.isEmpty(aerobic: aerobic, strength: strength, carryover: carryover) {
                 emptyState
             } else {
                 if !aerobic.isEmpty {
@@ -59,18 +65,44 @@ struct TodayTrainingSection: View {
                         ForEach(strength) { exercise in
                             HomeStrengthRow(
                                 exercise: exercise,
-                                latestRecord: latestStrengthRecords[exercise.liftKey]
+                                latestRecord: latestStrengthRecords[exercise.liftKey],
+                                weekRecord: weekStrengthRecords[exercise.id]
                             ) {
                                 onRecordStrength(exercise)
                             }
                         }
                     }
                 }
+
+                if !carryover.isEmpty {
+                    carryoverSection
+                }
             }
         }
     }
 
     // MARK: - Subviews
+
+    /// "Still to do this week": earlier days' unrecorded lifts. Tapping one
+    /// records it for today against its own card, which ticks that card.
+    private var carryoverSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Still to do this week")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+                .accessibilityIdentifier("home.carryoverHeader")
+            ForEach(carryover) { exercise in
+                HomeStrengthRow(
+                    exercise: exercise,
+                    latestRecord: latestStrengthRecords[exercise.liftKey],
+                    carryoverDay: Calendar.current.shortWeekdaySymbols[exercise.weekdayIndex]
+                ) {
+                    onRecordStrength(exercise)
+                }
+            }
+        }
+    }
 
     private var header: some View {
         HStack {

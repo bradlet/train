@@ -48,11 +48,13 @@ enum TodayTraining {
         StrengthBoardPlanner.lane(all, day: day.weekdayIndex, offloaded: false)
     }
 
-    /// Whether the day has nothing scheduled or recorded at all.
+    /// Whether the day has nothing scheduled or recorded at all, and no
+    /// lifts carried over from earlier this week.
     static func isEmpty(
         aerobic aerobicExercises: [Exercise],
-        strength strengthExercises: [StrengthExercise]
+        strength strengthExercises: [StrengthExercise],
+        carryover: [StrengthExercise] = []
     ) -> Bool {
-        aerobicExercises.isEmpty && strengthExercises.isEmpty
+        aerobicExercises.isEmpty && strengthExercises.isEmpty && carryover.isEmpty
     }
 }

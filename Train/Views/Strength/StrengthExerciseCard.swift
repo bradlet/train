@@ -2,7 +2,8 @@
 //  StrengthExerciseCard.swift
 //  Train
 //
-//  A kanban card for one strength exercise: name, muscle group, and its
+//  A kanban card for one strength exercise: name, muscle group, and either a
+//  ✓ with this week's value (when the card was recorded this week) or its
 //  lift's most recent record. Draggable between lanes/days; tap to record a
 //  session; context menu for moving, offloading, and deleting.
 //
@@ -34,6 +35,9 @@ struct StrengthExerciseCard: View {
     let exercise: StrengthExercise
     /// The latest record of this card's lift (from any card), if any.
     let latestRecord: StrengthRecord?
+    /// This card's latest record in the current week, if any (see
+    /// `StrengthWeek.recordsBySlot`). Shown as a ✓ in place of `latestRecord`.
+    var weekRecord: StrengthRecord? = nil
     /// Called when the user taps the card to record a session.
     let onRecord: () -> Void
     /// Called when the user picks a destination day from the context menu.
@@ -67,6 +71,13 @@ struct StrengthExerciseCard: View {
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                     Spacer(minLength: 0)
+                    if weekRecord != nil {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.subheadline)
+                            .accessibilityLabel("Done this week")
+                            .accessibilityIdentifier("strengthCard.weekCheck.\(exercise.name)")
+                    }
                 }
                 HStack(spacing: 6) {
                     Text(exercise.muscleGroup.rawValue)
@@ -85,7 +96,12 @@ struct StrengthExerciseCard: View {
                             .foregroundStyle(.secondary)
                             .clipShape(Capsule())
                     }
-                    if let latest = latestRecord {
+                    if let thisWeek = weekRecord {
+                        Text(thisWeek.summary(useMetricUnits: useMetricUnits))
+                            .font(.caption2.bold())
+                            .foregroundStyle(.green)
+                            .lineLimit(1)
+                    } else if let latest = latestRecord {
                         Text(latestSummary(latest))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
