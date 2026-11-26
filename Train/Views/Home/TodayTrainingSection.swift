@@ -23,6 +23,9 @@ struct TodayTrainingSection: View {
     /// Active cards from earlier days this week with no record yet
     /// (`StrengthWeek.carryover`).
     var carryover: [StrengthExercise] = []
+    /// Whether to show "Key workout first, lift later" (#25): a key session
+    /// and leg work today under the Stack strategy.
+    var showsStackCue = false
     /// Each group card's member (#24).
     var groupAssignments: [UUID: GroupAssignment] = [:]
     /// Called to record (or re-open) an aerobic exercise.
@@ -67,6 +70,12 @@ struct TodayTrainingSection: View {
                     // rows — so it can never read as completing a run.
                     if !aerobic.isEmpty || onLogAsPlanned != nil {
                         strengthHeader
+                    }
+                    if showsStackCue {
+                        Label(PlacementRules.stackCue, systemImage: "bolt.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .accessibilityIdentifier("home.stackCue")
                     }
                     VStack(spacing: 8) {
                         ForEach(strength) { exercise in

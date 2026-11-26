@@ -34,7 +34,7 @@ One ordered path through everything planned on 2026-11-24. Do one step at a time
 
 ### E. Hybrid planning
 11. ✅ **#18** Muscle-balance glance and copy day / duplicate card. Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §5. The glance is a five-region strip under the day chips. A copy is skipped when the target day already plans that lift or group.
-12. **#25** Run-aware placement: the athlete-marked ⚡ key flag, the key-day strategy (stack or lift-free), and "Arrange my week". Doc: [RUN_AWARE_PLACEMENT](RUN_AWARE_PLACEMENT.md)
+12. ✅ **#25** Run-aware placement: the athlete-marked ⚡ key flag, the key-day strategy (stack or lift-free), and "Arrange my week". Doc: [RUN_AWARE_PLACEMENT](RUN_AWARE_PLACEMENT.md) Shipped without the drag tint: SwiftUI's `draggable` can't tell the chips what is being dragged. The chip markers, lane badges and arranger cover it.
 13. **#19** Home hybrid hub: week strip and dismissible hints, reusing the rule engine from step 12. Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §6
 
 ### F. Training plans

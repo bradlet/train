@@ -21,6 +21,16 @@ struct StrengthTrainingView: View {
     @Query private var allExercises: [StrengthExercise]
     @Query private var allRecords: [StrengthRecord]
     @Query(sort: \UserMovementGroup.createdAt) private var userGroups: [UserMovementGroup]
+    /// Cardio sessions, for run-aware placement (#25).
+    @Query private var cardioExercises: [Exercise]
+    @Query private var configurations: [AppConfiguration]
+    @Environment(\.keyDayStrategy) private var keyDayStrategy
+    /// Lane badges dismissed this week ("weekStart#day" tokens).
+    @AppStorage("placementDismissed") private var dismissedRaw = ""
+    /// Whether the Arrange sheet is shown.
+    @State private var showArrange = false
+    /// Undo state for the last arrangement.
+    @State private var arrangeUndo: [UUID: Int]?
 
     /// The day column currently shown (Sunday=0 ... Saturday=6).
     @State private var selectedDay: Int = Date().weekdayIndex
@@ -48,8 +58,10 @@ struct StrengthTrainingView: View {
         let assignments = GroupRotation.assignments(
             slots: allExercises, groups: groups, records: allRecords, now: Date(), firstWeekday: weekStartDay
         )
+        let cardio = PlacementRules.cardioClasses(cardioExercises, weekContaining: Date(), firstWeekday: weekStartDay)
+        let conflicts = visibleConflicts(groups: groups, cardio: cardio)
         VStack(spacing: 0) {
-            dayStrip
+            dayStrip(cardio: cardio)
             MuscleBalanceStrip(covered: MuscleBalance.covered(
                 allExercises, groups: groups, library: MuscleBalance.bundledLibraryByID
             ))
@@ -62,6 +74,13 @@ struct StrengthTrainingView: View {
                         latestRecords: latestRecords,
                         weekRecords: weekRecords,
                         assignments: assignments,
+                        conflict: conflicts[dayIndex],
+                        onArrange: { showArrange = true },
+                        onDismissConflict: {
+                            dismissedRaw = PlacementDismissals.dismiss(
+                                day: dayIndex, in: dismissedRaw, now: Date(), firstWeekday: weekStartDay
+                            )
+                        },
                         onGroup: { slot in groupEdit = SlotGroupEdit(slot: slot, groups: groups) },
                         onHistory: { slot in
                             historyRoute = slot.groupID.map(StrengthProgressRoute.group) ?? .lift(slot.liftKey)
@@ -104,6 +123,57 @@ struct StrengthTrainingView: View {
                     Label("Exercise Library", systemImage: "books.vertical")
                 }
                 .accessibilityIdentifier("strength.libraryButton")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button {
+                        showArrange = true
+                    } label: {
+                        Label("Arrange My Week", systemImage: "calendar.badge.clock")
+                    }
+                    .accessibilityIdentifier("strength.arrangeWeek")
+                } label: {
+                    Label("More", systemImage: "ellipsis.circle")
+                }
+                .accessibilityIdentifier("strength.moreMenu")
+            }
+        }
+        .sheet(isPresented: $showArrange) {
+            ArrangeWeekSheet(
+                cards: allExercises,
+                exercises: cardioExercises,
+                groups: movementGroups,
+                pinned: configurations.first?.pinnedWeekdays ?? [],
+                strategy: keyDayStrategy,
+                onStrategyChange: { configurations.first?.keyDayStrategy = $0 },
+                onApply: { proposal in
+                    withAnimation { arrangeUndo = WeekArranger.apply(proposal, to: allExercises) }
+                }
+            )
+        }
+        .overlay(alignment: .bottom) {
+            if arrangeUndo != nil {
+                HStack(spacing: 12) {
+                    Label("Week arranged", systemImage: "calendar.badge.checkmark")
+                        .font(.subheadline.weight(.semibold))
+                    Button("Undo") {
+                        if let previous = arrangeUndo {
+                            withAnimation { WeekArranger.undo(previous, cards: allExercises) }
+                        }
+                        arrangeUndo = nil
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityIdentifier("arrange.undo")
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(.regularMaterial, in: Capsule())
+                .padding(.bottom, 12)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .task {
+                    try? await Task.sleep(for: .seconds(6))
+                    arrangeUndo = nil
+                }
             }
         }
         .sheet(isPresented: $showLibrary) {
@@ -192,11 +262,13 @@ struct StrengthTrainingView: View {
     // MARK: - Day Strip
 
     /// Tappable Sun-Sat chips above the board. Each chip is also a drop
-    /// target, so a card can be dragged onto a chip to move it to that day.
-    private var dayStrip: some View {
+    /// target, so a card can be dragged onto a chip to move it to that day,
+    /// and shows that day's cardio (⚡ key, • easy) so strength is planned
+    /// around the runs (#25).
+    private func dayStrip(cardio: [CardioDayClass]) -> some View {
         HStack(spacing: 4) {
             ForEach(0..<7, id: \.self) { dayIndex in
-                dayChip(dayIndex)
+                dayChip(dayIndex, cardio: cardio[dayIndex])
             }
         }
         .padding(.horizontal, 12)
@@ -204,7 +276,7 @@ struct StrengthTrainingView: View {
     }
 
     /// One day chip with the short weekday name and planned-exercise count.
-    private func dayChip(_ dayIndex: Int) -> some View {
+    private func dayChip(_ dayIndex: Int, cardio: CardioDayClass) -> some View {
         let isSelected = selectedDay == dayIndex
         let isToday = Date().weekdayIndex == dayIndex
         let count = StrengthBoardPlanner.lane(allExercises, day: dayIndex, offloaded: false).count
@@ -217,6 +289,18 @@ struct StrengthTrainingView: View {
                 Text("\(count)")
                     .font(.caption2)
                     .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                Text(cardio.marker.isEmpty ? " " : cardio.marker)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(cardio == .key ? Color.orange : (isSelected ? Color.white.opacity(0.8) : Color.secondary))
+                    .accessibilityHidden(true)
+            }
+            .overlay(alignment: .topTrailing) {
+                if isPinned(dayIndex) {
+                    Image(systemName: "pin.fill")
+                        .font(.system(size: 8))
+                        .foregroundStyle(isSelected ? .white : .secondary)
+                        .padding(3)
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
@@ -228,6 +312,19 @@ struct StrengthTrainingView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("strength.dayChip.\(dayIndex)")
+        .accessibilityValue(cardio == .key ? "Key workout day" : cardio == .easy ? "Easy cardio" : "")
+        .contextMenu {
+            Button {
+                togglePin(dayIndex)
+            } label: {
+                Label(
+                    isPinned(dayIndex)
+                        ? "Unpin \(Calendar.current.weekdaySymbols[dayIndex])"
+                        : "Pin \(Calendar.current.weekdaySymbols[dayIndex])'s Plan",
+                    systemImage: isPinned(dayIndex) ? "pin.slash" : "pin"
+                )
+            }
+        }
         // Dragging a card onto a chip moves it to the end of that day's plan.
         // The board deliberately stays on the day the user is viewing — the
         // chip's count updating is the confirmation that the move landed.
@@ -257,6 +354,29 @@ struct StrengthTrainingView: View {
             modelContext.insert(exercise)
             StrengthLiftRegistry.findOrCreate(for: exercise, metric: entry.primaryMetric, in: modelContext)
         }
+    }
+
+    // MARK: - Placement (#25)
+
+    /// Lane conflicts not dismissed this week.
+    private func visibleConflicts(groups: [String: MovementGroup], cardio: [CardioDayClass]) -> [Int: String] {
+        let loads = PlacementRules.laneLoads(allExercises, groups: groups, library: MuscleBalance.bundledLibraryByID)
+        return PlacementRules.conflicts(loads, cardio: cardio, strategy: keyDayStrategy).filter { day, _ in
+            !PlacementDismissals.isDismissed(day: day, in: dismissedRaw, now: Date(), firstWeekday: weekStartDay)
+        }
+    }
+
+    /// Whether Arrange leaves a weekday's lane in place.
+    private func isPinned(_ day: Int) -> Bool {
+        configurations.first?.pinnedWeekdays.contains(day) ?? false
+    }
+
+    /// Pins or unpins a weekday's lane.
+    private func togglePin(_ day: Int) {
+        guard let config = configurations.first else { return }
+        var pinned = config.pinnedWeekdays
+        if pinned.contains(day) { pinned.remove(day) } else { pinned.insert(day) }
+        config.pinnedWeekdays = pinned
     }
 
     /// Copies cards onto another day, leaving the board on the current

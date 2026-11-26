@@ -18,6 +18,7 @@ struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.useMetricUnits) private var useMetricUnits
     @Environment(\.weekStartDay) private var weekStartDay
+    @Environment(\.keyDayStrategy) private var keyDayStrategy
     @Environment(\.coachChat) private var coachChat
     @Environment(\.aiCoach) private var coach
     @Environment(\.coachLauncher) private var coachLauncher
@@ -70,6 +71,16 @@ struct HomeView: View {
         TodayTraining.strength(allStrengthExercises, on: Date())
     }
 
+    /// Whether Today shows the "key workout first" cue (#25).
+    private var showsStackCue: Bool {
+        let groups = StrengthSlotResolver.byID(MovementGroupCatalog.merged(
+            builtIns: MovementGroupCatalog.bundled, user: userGroups.map(\.group)
+        ))
+        let load = PlacementRules.laneLoads(todayStrength, groups: groups, library: MuscleBalance.bundledLibraryByID)[Date().weekdayIndex]
+        let cardio: CardioDayClass = todayAerobic.contains(where: \.isKeyWorkout) ? .key : (todayAerobic.isEmpty ? .rest : .easy)
+        return PlacementRules.showsStackCue(load: load, cardio: cardio, strategy: keyDayStrategy)
+    }
+
     /// Today's lifts not yet recorded today — what "Log lifts as planned"
     /// would log.
     private var todayAsPlannedPending: [StrengthExercise] {
@@ -116,6 +127,7 @@ struct HomeView: View {
                         carryover: StrengthWeek.carryover(
                             allStrengthExercises, records: allStrengthRecords, now: Date(), firstWeekday: weekStartDay
                         ),
+                        showsStackCue: showsStackCue,
                         groupAssignments: GroupRotation.assignments(
                             slots: allStrengthExercises,
                             groups: StrengthSlotResolver.byID(MovementGroupCatalog.merged(

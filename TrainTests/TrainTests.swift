@@ -4192,9 +4192,10 @@ struct WorkoutCSVRowsTests {
         #expect(rows.count == 2)
         #expect(rows[0] == WorkoutCSV.headerColumns)
         // date, name, type, duration, distance, notes, feeling,
-        // perceived_exertion, counts_toward_training
-        #expect(rows[1].count == 9)
+        // perceived_exertion, counts_toward_training, key_workout
+        #expect(rows[1].count == 10)
         #expect(rows[1][8] == "true")
+        #expect(rows[1][9] == "false")
         #expect(rows[1][1] == "Easy Run")
         #expect(rows[1][2] == ExerciseType.easyRun.rawValue)
         #expect(rows[1][4] == "3.00")
@@ -4202,8 +4203,8 @@ struct WorkoutCSVRowsTests {
         #expect(rows[1][7] == "7")
     }
 
-    @Test func headerEndsWithRatingsThenTrainingFlag() {
-        #expect(WorkoutCSV.headerColumns.suffix(3) == ["feeling", "perceived_exertion", "counts_toward_training"])
+    @Test func headerEndsWithRatingsThenTrainingAndKeyFlags() {
+        #expect(WorkoutCSV.headerColumns.suffix(4) == ["feeling", "perceived_exertion", "counts_toward_training", "key_workout"])
     }
 
     @Test func unratedWorkoutEmitsBlankRatingColumns() {
@@ -6404,8 +6405,8 @@ struct WorkoutCSVTrainingColumnTests {
     @Test func exportWritesTheColumn() {
         let excluded = Exercise(name: "Walk", type: .walk, durationSeconds: 1800, distanceMiles: 2, date: Date(),
                                 countsTowardTraining: false, workout: Workout(durationSeconds: 1800, distanceMiles: 2))
-        #expect(WorkoutCSV.headerColumns.last == "counts_toward_training")
-        #expect(WorkoutCSV.encodeRow(exercise: excluded, unit: .miles).hasSuffix(",false"))
+        #expect(WorkoutCSV.headerColumns.contains("counts_toward_training"))
+        #expect(WorkoutCSV.encodeRow(exercise: excluded, unit: .miles).hasSuffix(",false,false"), "not training, not key")
     }
 
     @Test func roundTripKeepsTheFlag() throws {
@@ -6552,6 +6553,238 @@ struct MuscleBalanceTests {
 
     @Test func fullBodyCoversEveryLimbRegion() {
         #expect(MuscleBalance.regions(for: .fullBody) == [.push, .pull, .legsFront, .legsBack])
+    }
+}
+
+// MARK: - Key workout Tests
+
+struct KeyWorkoutTests {
+
+    @Test func keyFlagDefaultsOffAndPersists() throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        let run = Exercise(name: "Tempo", type: .tempoRun, durationSeconds: 1800, distanceMiles: 4, date: Date())
+        #expect(!run.isKeyWorkout)
+        run.isKeyWorkout = true
+        context.insert(run)
+        try context.save()
+        #expect(try ModelContext(container).fetch(FetchDescriptor<Exercise>()).first?.isKeyWorkout == true)
+        #expect(!FavoriteWorkout(name: "Fav").isKeyWorkout)
+        #expect(FavoriteWorkout(name: "Fav", isKeyWorkout: true).isKeyWorkout)
+    }
+
+    @Test func nothingIsKeyUntilTheAthleteSaysSo() {
+        #expect(AppConfiguration().keyWorkoutTypes.isEmpty)
+        #expect(!KeyWorkoutDefaults.isKey(.intervalRun, keyTypes: []), "never inferred from type")
+        #expect(KeyWorkoutDefaults.isKey(.longRun, keyTypes: [.longRun]))
+    }
+
+    @Test func theToggleFollowsTheTypeUnlessOverridden() {
+        let keys: Set<ExerciseType> = [.tempoRun]
+        #expect(KeyWorkoutDefaults.toggle(false, afterChangingFrom: .easyRun, to: .tempoRun, keyTypes: keys))
+        #expect(!KeyWorkoutDefaults.toggle(true, afterChangingFrom: .tempoRun, to: .easyRun, keyTypes: keys))
+        #expect(KeyWorkoutDefaults.toggle(true, afterChangingFrom: .easyRun, to: .bike, keyTypes: keys), "an override sticks")
+    }
+
+    @Test func configurationStoresStrategyAndPins() {
+        let config = AppConfiguration()
+        #expect(config.keyDayStrategy == .stack)
+        config.keyDayStrategy = .liftFree
+        #expect(config.keyDayStrategyRaw == "liftFree")
+        config.pinnedWeekdays = [4, 1, 9]
+        #expect(config.pinnedWeekdays == [1, 4], "out-of-range days are dropped")
+        config.keyWorkoutTypes = [.longRun, .intervalRun]
+        #expect(config.keyWorkoutTypes == [.longRun, .intervalRun])
+    }
+
+    @Test func favoritesAndCSVCarryTheFlag() throws {
+        let favorite = FavoriteWorkout(name: "Long", type: .longRun, isKeyWorkout: true)
+        #expect(FavoriteFormValues(favorite, metric: false).isKeyWorkout)
+        let key = Exercise(name: "Long", type: .longRun, durationSeconds: 3600, distanceMiles: 10, date: Date(),
+                           isKeyWorkout: true, workout: Workout(durationSeconds: 3600, distanceMiles: 10))
+        let csv = WorkoutCSV.encode(exercises: [key], unit: .miles)
+        #expect(WorkoutCSV.headerColumns.last == "key_workout")
+        #expect(try WorkoutCSV.parse(csv).rows.first?.isKeyWorkout == true)
+        #expect(try WorkoutCSV.parse("h\n1/2/2026,Run,run,30m,3\n").rows.first?.isKeyWorkout == false)
+    }
+
+    @Test func healthImportsUseTheAthletesKeyTypes() {
+        let long = HealthKitWorkout(id: "l", activityType: .running, startDate: Date(), duration: 3600, distanceMiles: 8)
+        #expect(!HealthKitWorkoutMapper.toExercise(long).isKeyWorkout)
+        #expect(HealthKitWorkoutMapper.toExercise(long, keyTypes: [.run]).isKeyWorkout)
+    }
+}
+
+// MARK: - PlacementRules Tests
+
+struct PlacementRulesTests {
+
+    private let groups = StrengthSlotResolver.byID(MovementGroupCatalog.bundled)
+    private let library = MuscleBalance.bundledLibraryByID
+
+    /// A week of classes from a compact string, Sunday first: K key, E easy, - rest.
+    private func cardio(_ pattern: String) -> [CardioDayClass] {
+        pattern.map { $0 == "K" ? .key : $0 == "E" ? .easy : .rest }
+    }
+
+    /// Lane loads, Sunday first: L lower, U upper, - empty.
+    private func loads(_ pattern: String) -> [LaneLoad] {
+        pattern.map { $0 == "L" ? .lower : $0 == "U" ? .upper : .empty }
+    }
+
+    @Test func cardioClassesComeOnlyFromTheKeyFlag() {
+        let thursday = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 7))!
+        let tuesday = Calendar.current.date(byAdding: .day, value: -2, to: thursday)!
+        let lastWeek = Calendar.current.date(byAdding: .day, value: -7, to: thursday)!
+        let intervals = Exercise(name: "Intervals", type: .intervalRun, durationSeconds: 3000, distanceMiles: 6, date: tuesday)
+        let key = Exercise(name: "Long", type: .longRun, durationSeconds: 3000, distanceMiles: 12, date: thursday, isKeyWorkout: true)
+        let easy = Exercise(name: "Easy", type: .easyRun, durationSeconds: 1800, distanceMiles: 3, date: thursday)
+        let old = Exercise(name: "Old", type: .run, durationSeconds: 1800, distanceMiles: 3, date: lastWeek, isKeyWorkout: true)
+        let classes = PlacementRules.cardioClasses([intervals, key, easy, old], weekContaining: thursday, firstWeekday: 2)
+        #expect(classes[2] == .easy, "an unmarked interval run is not inferred as key")
+        #expect(classes[4] == .key, "one key session makes the day key")
+        #expect(classes.filter { $0 == .key }.count == 1, "other weeks don't count")
+    }
+
+    @Test func lowerBodyComesFromPatternThenMuscle() {
+        #expect(PlacementRules.isLowerBody(StrengthExercise(name: "Squat", groupID: "group-squat"), groups: groups, library: library))
+        #expect(PlacementRules.isLowerBody(StrengthExercise(name: "RDL", libraryExerciseID: "romanian-deadlift"), groups: groups, library: library))
+        #expect(!PlacementRules.isLowerBody(StrengthExercise(name: "Bench", libraryExerciseID: "barbell-bench-press", muscleGroup: .quads), groups: groups, library: library), "pattern beats muscle")
+        #expect(PlacementRules.isLowerBody(StrengthExercise(name: "Custom", muscleGroup: .glutes), groups: groups, library: library))
+        #expect(!PlacementRules.isLowerBody(StrengthExercise(name: "Plank", libraryExerciseID: "plank"), groups: groups, library: library))
+    }
+
+    @Test func laneLoadsIgnoreOffloadedCards() {
+        let cards = [
+            StrengthExercise(name: "Squat", muscleGroup: .quads, weekdayIndex: 1),
+            StrengthExercise(name: "Bench", muscleGroup: .chest, weekdayIndex: 3),
+            StrengthExercise(name: "Lunge", muscleGroup: .quads, weekdayIndex: 3, isOffloaded: true),
+        ]
+        #expect(PlacementRules.laneLoads(cards, groups: groups, library: library) == loads("-L-U---"))
+    }
+
+    @Test func theVerdictTableMatchesTheDesign() {
+        let week = cardio("-E-K-E-")   // Sun rest, Mon easy, Wed key, Fri easy
+        #expect(PlacementRules.verdict(.lower, day: 3, cardio: week, strategy: .stack) == .stack)
+        #expect(PlacementRules.verdict(.lower, day: 3, cardio: week, strategy: .liftFree) == .avoid(PlacementRules.keyDayLiftFree))
+        #expect(PlacementRules.verdict(.lower, day: 2, cardio: week, strategy: .stack) == .avoid(PlacementRules.dayBeforeKey))
+        #expect(PlacementRules.verdict(.lower, day: 5, cardio: week, strategy: .stack) == .good)
+        #expect(PlacementRules.verdict(.lower, day: 0, cardio: week, strategy: .stack) == .neutral)
+        #expect(PlacementRules.verdict(.upper, day: 2, cardio: week, strategy: .stack) == .good, "upper body is fine anywhere")
+    }
+
+    @Test func theDayBeforeWrapsAcrossTheWeek() {
+        // A Sunday key session makes Saturday the day before.
+        #expect(PlacementRules.verdict(.lower, day: 6, cardio: cardio("K------"), strategy: .stack) == .avoid(PlacementRules.dayBeforeKey))
+    }
+
+    @Test func conflictsAddTheSpacingWarning() {
+        let result = PlacementRules.conflicts(loads("-LL----"), cardio: cardio("-EE----"), strategy: .stack)
+        #expect(result == [2: PlacementRules.tooClose])
+        #expect(PlacementRules.conflicts(loads("-L-L---"), cardio: cardio("-------"), strategy: .stack).isEmpty)
+    }
+
+    @Test func noKeyDaysMeansNoKeyConflicts() {
+        #expect(PlacementRules.conflicts(loads("-L-L-L-"), cardio: cardio("EEEEEEE"), strategy: .stack).isEmpty)
+    }
+
+    @Test func theStackCueNeedsKeyLegsAndStack() {
+        #expect(PlacementRules.showsStackCue(load: .lower, cardio: .key, strategy: .stack))
+        #expect(!PlacementRules.showsStackCue(load: .lower, cardio: .key, strategy: .liftFree))
+        #expect(!PlacementRules.showsStackCue(load: .upper, cardio: .key, strategy: .stack))
+        #expect(!PlacementRules.showsStackCue(load: .lower, cardio: .easy, strategy: .stack))
+    }
+
+    @Test func cardioMarkers() {
+        #expect(CardioDayClass.key.marker == "⚡")
+        #expect(CardioDayClass.easy.marker == "•")
+        #expect(CardioDayClass.rest.marker.isEmpty)
+    }
+}
+
+// MARK: - WeekArranger Tests
+
+struct WeekArrangerTests {
+
+    private func cardio(_ pattern: String) -> [CardioDayClass] {
+        pattern.map { $0 == "K" ? .key : $0 == "E" ? .easy : .rest }
+    }
+
+    private func loads(_ pattern: String) -> [LaneLoad] {
+        pattern.map { $0 == "L" ? .lower : $0 == "U" ? .upper : .empty }
+    }
+
+    @Test func movesLegsOffTheDayBeforeAKeySession() throws {
+        // Legs on Tuesday, key long run on Wednesday: one move fixes it.
+        let proposal = try #require(WeekArranger.propose(
+            loads: loads("--L----"), cardio: cardio("-E-K-E-"), pinned: [], strategy: .stack
+        ))
+        #expect(proposal.moves.count == 1)
+        #expect(proposal.moves[0].from == 2)
+        #expect([3, 1, 5].contains(proposal.moves[0].to), "stack on the key day or an easy day")
+        #expect(proposal.costAfter < proposal.costBefore)
+    }
+
+    @Test func stackStrategyPrefersTheKeyDay() throws {
+        let proposal = try #require(WeekArranger.propose(
+            loads: loads("--L----"), cardio: cardio("---K---"), pinned: [], strategy: .stack
+        ))
+        #expect(proposal.moves == [.init(from: 2, to: 3)])
+    }
+
+    @Test func liftFreeKeepsLegsOffKeyDays() throws {
+        let proposal = try #require(WeekArranger.propose(
+            loads: loads("---L---"), cardio: cardio("-E-K-E-"), pinned: [], strategy: .liftFree
+        ))
+        #expect(proposal.moves.allSatisfy { $0.to != 3 && $0.to != 2 })
+    }
+
+    @Test func aWorkingWeekGetsNoProposal() {
+        #expect(WeekArranger.propose(loads: loads("-L-U---"), cardio: cardio("-E-K---"), pinned: [], strategy: .stack) == nil)
+        #expect(WeekArranger.propose(loads: loads("-------"), cardio: cardio("---K---"), pinned: [], strategy: .stack) == nil)
+    }
+
+    @Test func pinnedLanesNeverMove() {
+        let proposal = WeekArranger.propose(loads: loads("--L----"), cardio: cardio("---K---"), pinned: [2], strategy: .stack)
+        #expect(proposal == nil || proposal!.moves.allSatisfy { $0.from != 2 && $0.to != 2 })
+    }
+
+    @Test func applyMovesWholeLanesAndUndoRestoresThem() throws {
+        let squat = StrengthExercise(name: "Squat", muscleGroup: .quads, weekdayIndex: 2)
+        let parked = StrengthExercise(name: "Calf", muscleGroup: .calves, weekdayIndex: 2, isOffloaded: true)
+        let bench = StrengthExercise(name: "Bench", muscleGroup: .chest, weekdayIndex: 5)
+        let proposal = try #require(WeekArranger.propose(
+            loads: loads("--L--U-"), cardio: cardio("---K-E-"), pinned: [], strategy: .stack
+        ))
+        let previous = WeekArranger.apply(proposal, to: [squat, parked, bench])
+        #expect(squat.weekdayIndex == proposal.destination[2])
+        #expect(parked.weekdayIndex == squat.weekdayIndex, "the lane moves intact")
+        WeekArranger.undo(previous, cards: [squat, parked, bench])
+        let days: [Int] = [squat.weekdayIndex, parked.weekdayIndex, bench.weekdayIndex]
+        #expect(days == [2, 2, 5])
+    }
+}
+
+// MARK: - PlacementDismissals Tests
+
+struct PlacementDismissalsTests {
+
+    private let thursday = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 12))!
+
+    @Test func aDismissalLastsTheWeek() {
+        let raw = PlacementDismissals.dismiss(day: 2, in: "", now: thursday, firstWeekday: 2)
+        #expect(PlacementDismissals.isDismissed(day: 2, in: raw, now: thursday, firstWeekday: 2))
+        #expect(!PlacementDismissals.isDismissed(day: 3, in: raw, now: thursday, firstWeekday: 2))
+        let nextWeek = Calendar.current.date(byAdding: .day, value: 7, to: thursday)!
+        #expect(!PlacementDismissals.isDismissed(day: 2, in: raw, now: nextWeek, firstWeekday: 2))
+    }
+
+    @Test func oldWeeksAreDroppedAndRepeatsIgnored() {
+        let lastWeek = Calendar.current.date(byAdding: .day, value: -7, to: thursday)!
+        var raw = PlacementDismissals.dismiss(day: 1, in: "", now: lastWeek, firstWeekday: 2)
+        raw = PlacementDismissals.dismiss(day: 2, in: raw, now: thursday, firstWeekday: 2)
+        raw = PlacementDismissals.dismiss(day: 2, in: raw, now: thursday, firstWeekday: 2)
+        #expect(raw.split(separator: ",").count == 1)
     }
 }
 

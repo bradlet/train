@@ -26,6 +26,12 @@ struct StrengthDayColumn: View {
     /// Each group card's member (#24, `GroupRotation.assignments`).
     var assignments: [UUID: GroupAssignment] = [:]
     /// Opens the group editor for a card.
+    /// This lane's placement conflict, if any (#25).
+    var conflict: String? = nil
+    /// Opens "Arrange my week".
+    var onArrange: () -> Void = {}
+    /// Dismisses this lane's badge for the week.
+    var onDismissConflict: () -> Void = {}
     var onGroup: ((StrengthExercise) -> Void)? = nil
     /// Opens a card's history.
     var onHistory: ((StrengthExercise) -> Void)? = nil
@@ -161,6 +167,10 @@ struct StrengthDayColumn: View {
             if !offloaded, let asPlanned {
                 asPlannedButton(asPlanned)
             }
+            if !offloaded, let conflict {
+                ConflictBadge(reason: conflict, onArrange: onArrange, onDismiss: onDismissConflict)
+                    .accessibilityIdentifier("strengthDayColumn.conflict.\(dayIndex)")
+            }
             if exercises.isEmpty {
                 Text(emptyHint)
                     .font(.caption)
@@ -223,4 +233,46 @@ struct StrengthDayColumn: View {
         onDelete: { _ in }
     )
     .modelContainer(ModelContainerFactory.makePreviewContainer())
+}
+
+/// A lane's placement warning (#25): tap for the explanation, Arrange my
+/// week, or Dismiss for this week.
+private struct ConflictBadge: View {
+    let reason: String
+    let onArrange: () -> Void
+    let onDismiss: () -> Void
+    @State private var showOptions = false
+
+    var body: some View {
+        Button {
+            showOptions = true
+        } label: {
+            Label(reason, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.orange)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .confirmationDialog(reason, isPresented: $showOptions, titleVisibility: .visible) {
+            Button("Arrange My Week", action: onArrange)
+            Button("Dismiss for This Week", action: onDismiss)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(Self.explanation(reason))
+        }
+    }
+
+    /// A one-line why for each reason.
+    static func explanation(_ reason: String) -> String {
+        switch reason {
+        case PlacementRules.dayBeforeKey:
+            return "Lower-body lifting the day before a key workout leaves your legs tired for it. Move the lift, or the key session."
+        case PlacementRules.keyDayLiftFree:
+            return "You've chosen to keep key days free of lifting. Change that under Settings → My Training."
+        case PlacementRules.tooClose:
+            return "Two leg days in a row leave little time to recover. Spread them at least 48 hours apart."
+        default:
+            return reason
+        }
+    }
 }

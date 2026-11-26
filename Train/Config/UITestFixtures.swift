@@ -121,7 +121,10 @@ enum UITestFixtures {
             type: .longRun,
             durationSeconds: 3600,
             distanceMiles: 6.0,
-            date: tomorrow
+            date: tomorrow,
+            // Marked key, so tomorrow is a key day for run-aware placement
+            // (#25) — the only key session in the seed.
+            isKeyWorkout: true
         )
         context.insert(concreteExercise)
 

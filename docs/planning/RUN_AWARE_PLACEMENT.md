@@ -2,6 +2,16 @@
 
 > Status: **design draft**, iteration 3 (2026-11-24). Realises idea S1 from [STRENGTH_IDEAS.md](STRENGTH_IDEAS.md).
 > Shares its rule engine with the Home hybrid hints (roadmap H2, issue #19).
+>
+> **Built in #25** (2026-11-26).
+> - **The flag:** `Exercise.isKeyWorkout` and `FavoriteWorkout.isKeyWorkout`, with a ⚡ toggle on every form.
+> - **Settings → Key Workouts:** the strategy, plus *Key workouts by default*, where nothing is ticked out of the box.
+> - **CSV:** a `key_workout` column.
+> - **Rules:** pure `PlacementRules` and `WeekArranger`.
+> - **Surfaces:** ⚡ / • on the day chips, pinning from a chip's long-press menu, lane badges with *Arrange My Week* and *Dismiss for This Week*, the Arrange sheet with an Undo toast, and the Home cue under Today's strength header.
+> - **Not built:** the drag tint. SwiftUI's `draggable` doesn't expose the dragged item to other drop targets.
+> - **Open question 2:** the same-day cue is shown on Home only.
+> - **Open question 3:** recorded sessions keep their key flag.
 
 ## The idea
 
