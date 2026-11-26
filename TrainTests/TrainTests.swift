@@ -6,6 +6,7 @@
 //
 
 import Testing
+import CoreData
 import Foundation
 import SwiftData
 import SwiftUI
@@ -343,6 +344,35 @@ struct DoubleDistanceTests {
 // MARK: - ModelContainerFactory Tests
 
 struct ModelContainerFactoryTests {
+
+    @Test func schemaCoversEveryModel() {
+        let names = Set(ModelContainerFactory.modelTypes.map { String(describing: $0) })
+        #expect(names == [
+            "Exercise", "StrengthExercise", "StrengthLift", "StrengthRecord",
+            "UserLibraryExercise", "FavoriteWorkout", "AppConfiguration",
+        ])
+    }
+
+    /// CloudKit's production schema accepts only optional or defaulted
+    /// attributes, no uniqueness constraints and optional relationships.
+    @Test func schemaMeetsCloudKitRules() throws {
+        let model = try #require(NSManagedObjectModel.makeManagedObjectModel(for: ModelContainerFactory.modelTypes))
+        #expect(model.entities.count == ModelContainerFactory.modelTypes.count)
+        for entity in model.entities {
+            let name = entity.name ?? "?"
+            #expect(entity.uniquenessConstraints.isEmpty, "\(name) has a uniqueness constraint")
+            for attribute in entity.attributesByName.values {
+                #expect(
+                    attribute.isOptional || attribute.defaultValue != nil,
+                    "\(name).\(attribute.name) needs a default or must be optional"
+                )
+            }
+            for relationship in entity.relationshipsByName.values {
+                #expect(relationship.isOptional, "\(name).\(relationship.name) must be optional")
+            }
+        }
+    }
+
 
     @Test func previewContainerIsInMemoryAndNeverSyncs() throws {
         let container = ModelContainerFactory.makePreviewContainer()

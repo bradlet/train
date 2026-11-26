@@ -6,16 +6,35 @@
 //  Configures SwiftData with CloudKit sync.
 //
 
+import CoreData
 import Foundation
 import SwiftData
 
 /// Factory for creating configured ModelContainer instances.
 enum ModelContainerFactory {
 
+    /// The iCloud container the app syncs to.
+    static let cloudKitContainerIdentifier = "iCloud.com.bradlet.train"
+
+    /// Every persisted model type — the schema, and what CloudKit mirrors.
+    static let modelTypes: [any PersistentModel.Type] = [
+        Exercise.self,
+        StrengthExercise.self,
+        StrengthLift.self,
+        StrengthRecord.self,
+        UserLibraryExercise.self,
+        FavoriteWorkout.self,
+        AppConfiguration.self,
+    ]
+
     /// The full schema used by the app.
     private static var schema: Schema {
-        Schema([Exercise.self, StrengthExercise.self, StrengthLift.self, StrengthRecord.self, UserLibraryExercise.self, FavoriteWorkout.self, AppConfiguration.self])
+        Schema(modelTypes)
     }
+
+    /// Launch argument that makes a Debug build push the complete schema to
+    /// CloudKit's *development* environment before opening the store (#30).
+    static let initializeSchemaArgument = "-initializeCloudKitSchema"
 
     /// Creates the production ModelContainer with CloudKit sync enabled.
     /// - Returns: A configured ModelContainer.
@@ -51,4 +70,43 @@ enum ModelContainerFactory {
             fatalError("Could not create preview ModelContainer: \(error)")
         }
     }
+
+    #if DEBUG
+    /// Creates every record type and field of the schema in CloudKit's
+    /// development environment, ready for Deploy Schema Changes to
+    /// production.
+    ///
+    /// Creating one of each record by hand is not enough: CloudKit only adds
+    /// a field when a saved record carries a value for it, so optional
+    /// properties that happen to be `nil` (`StrengthRecord.slotID`, …) would
+    /// be missing from production, and later syncs of those fields would
+    /// fail. `initializeCloudKitSchema()` uploads a representative record
+    /// with every field populated, then deletes it. It runs against a
+    /// throwaway store so the athlete's real store is untouched. Debug-only:
+    /// Debug builds talk to the development environment.
+    static func initializeCloudKitDevelopmentSchema() throws {
+        guard let model = NSManagedObjectModel.makeManagedObjectModel(for: modelTypes) else {
+            throw CocoaError(.featureUnsupported)
+        }
+        let storeURL = URL.temporaryDirectory.appending(path: "CloudKitSchemaInit.store")
+        let description = NSPersistentStoreDescription(url: storeURL)
+        description.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(
+            containerIdentifier: cloudKitContainerIdentifier
+        )
+        description.shouldAddStoreAsynchronously = false
+
+        let container = NSPersistentCloudKitContainer(name: "Train", managedObjectModel: model)
+        container.persistentStoreDescriptions = [description]
+        var loadError: Error?
+        container.loadPersistentStores { _, error in loadError = error }
+        if let loadError { throw loadError }
+
+        try container.initializeCloudKitSchema()
+
+        for store in container.persistentStoreCoordinator.persistentStores {
+            try container.persistentStoreCoordinator.remove(store)
+        }
+        try? FileManager.default.removeItem(at: storeURL)
+    }
+    #endif
 }

@@ -122,10 +122,22 @@ struct TrainApp: App {
     /// - Normally returns `ModelContainerFactory.makeContainer()` (on-disk + CloudKit).
     /// - When launched with `-uiTestSeed`, returns an in-memory preview container
     ///   so UI tests get a clean, deterministic state that never touches CloudKit.
+    /// - Debug builds launched with `-initializeCloudKitSchema` first push the
+    ///   full schema to CloudKit's development environment (#30).
     private static func makeContainerForLaunch() -> ModelContainer {
         if CommandLine.arguments.contains("-uiTestSeed") {
             return ModelContainerFactory.makePreviewContainer()
         }
+        #if DEBUG
+        if CommandLine.arguments.contains(ModelContainerFactory.initializeSchemaArgument) {
+            do {
+                try ModelContainerFactory.initializeCloudKitDevelopmentSchema()
+                print("[CloudKitSchema] Development schema initialized.")
+            } catch {
+                print("[CloudKitSchema] Initialization failed: \(error)")
+            }
+        }
+        #endif
         return ModelContainerFactory.makeContainer()
     }
 }
