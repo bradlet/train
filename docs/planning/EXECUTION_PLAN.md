@@ -28,6 +28,7 @@ One ordered path through everything planned on 2026-11-24. Do one step at a time
 8. ✅ **#24** Movement groups: smart rotation, with a toggle for one member per block. Doc: [MOVEMENT_GROUPS](MOVEMENT_GROUPS.md). Blocks are steady N-week only until #20, and the Progress group view folds into #16.
 
 ### D. Progress
+8a. ✅ **#31** Chart clean-up before the Progress views reuse it: 1Y (two-week averages) and All (monthly averages) scales, the 6M x-axis "…" bug (a label on every week of alternate months), at most five labels, and per-chart gap styles (mileage zero, feeling dashed bridge). Added here because #16 depends on it.
 9. **#16** Strength → Progress: lift list, lift detail, PRs. Doc: [STRENGTH_ROADMAP](STRENGTH_ROADMAP.md) §4
 10. **#17** Cardio → Progress refactor: training-inclusion opt-in and scoped views. Doc: [PROGRESS_VIEWS](PROGRESS_VIEWS.md)
 
