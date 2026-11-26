@@ -91,6 +91,20 @@ enum StrengthLiftRegistry {
         records.filter { $0.liftKey == key }.sorted { $0.date < $1.date }
     }
 
+    /// A lift's records fetched from a context — including inserted but
+    /// unsaved ones — oldest first. Used to compare a new record against the
+    /// lift's history before it is inserted.
+    /// - Parameters:
+    ///   - key: The lift key.
+    ///   - context: The context to fetch from.
+    static func records(forKey key: String, in context: ModelContext) -> [StrengthRecord] {
+        let descriptor = FetchDescriptor<StrengthRecord>(
+            predicate: #Predicate { $0.liftKey == key },
+            sortBy: [SortDescriptor(\.date)]
+        )
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
     /// The most recently dated record per lift key, for card display.
     /// - Parameter records: All records.
     static func latestByLiftKey(_ records: [StrengthRecord]) -> [String: StrengthRecord] {

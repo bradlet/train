@@ -89,6 +89,8 @@ enum StrengthDayLog {
 struct LogStrengthDaySheet: View {
     /// The lane's active cards, in board order.
     let slots: [StrengthExercise]
+    /// Called with the names of lifts that set a new best on save.
+    let onNewBest: ([String]) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -102,8 +104,11 @@ struct LogStrengthDaySheet: View {
     /// - Parameters:
     ///   - slots: The lane's active cards, in board order.
     ///   - date: The day being logged (defaults to today).
-    init(slots: [StrengthExercise], date: Date = Date()) {
+    ///   - onNewBest: Called with the names of lifts whose saved record is a
+    ///     new best (only when there is at least one).
+    init(slots: [StrengthExercise], date: Date = Date(), onNewBest: @escaping ([String]) -> Void = { _ in }) {
         self.slots = slots
+        self.onNewBest = onNewBest
         self._date = State(initialValue: date)
     }
 
@@ -182,16 +187,23 @@ struct LogStrengthDaySheet: View {
     }
 
     /// Records every ticked row against its card's lift, remembers each
-    /// lift's measurement, and dismisses.
+    /// lift's measurement, reports new bests, and dismisses.
     private func save() {
         let records = StrengthDayLog.makeRecords(rows, date: date, useMetricUnits: useMetricUnits)
+        var bests: [String] = []
         for record in records {
-            if let slot = slots.first(where: { $0.id == record.slotID }) {
+            let slot = slots.first(where: { $0.id == record.slotID })
+            if let slot {
                 StrengthLiftRegistry.findOrCreate(for: slot, metric: record.metric, in: modelContext)
+            }
+            let previous = StrengthLiftRegistry.records(forKey: record.liftKey, in: modelContext)
+            if StrengthPersonalBest.isNewBest(record, previous: previous), let name = slot?.name {
+                bests.append(name)
             }
             modelContext.insert(record)
             StrengthLiftRegistry.rememberDefaults(after: record, in: modelContext)
         }
+        if !bests.isEmpty { onNewBest(bests) }
         dismiss()
     }
 }

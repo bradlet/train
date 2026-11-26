@@ -17,6 +17,7 @@ import AICoachCore
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.useMetricUnits) private var useMetricUnits
+    @Environment(\.weekStartDay) private var weekStartDay
     @Environment(\.coachChat) private var coachChat
     @Environment(\.aiCoach) private var coach
     @Environment(\.coachLauncher) private var coachLauncher
@@ -37,6 +38,8 @@ struct HomeView: View {
     @State private var detailExercise: Exercise?
     /// The strength exercise a weight is being recorded against.
     @State private var recordingStrength: StrengthExercise?
+    /// The "New best" banner after a strength save beats a lift's best.
+    @State private var newBest: NewBestAnnouncement?
     /// Whether the lift picker for today's lane is showing.
     /// Whether the whole-day sheet for today's lane is shown.
     @State private var isLogDayPresented = false
@@ -99,6 +102,12 @@ struct HomeView: View {
                         aerobic: todayAerobic,
                         strength: todayStrength,
                         latestStrengthRecords: StrengthLiftRegistry.latestByLiftKey(allStrengthRecords),
+                        weekStrengthRecords: StrengthWeek.recordsBySlot(
+                            allStrengthRecords, now: Date(), firstWeekday: weekStartDay
+                        ),
+                        carryover: StrengthWeek.carryover(
+                            allStrengthExercises, records: allStrengthRecords, now: Date(), firstWeekday: weekStartDay
+                        ),
                         onRecordAerobic: { recordingExercise = $0 },
                         onEditAerobic: { exercise in
                             // Matches the Training tab: a recorded exercise opens
@@ -139,6 +148,7 @@ struct HomeView: View {
                 .padding()
             }
             .background(Color(.systemGroupedBackground))
+            .newBestBanner($newBest)
             .navigationTitle("Home")
             .navigationBarTitleDisplayMode(.inline)
             .settingsToolbarButton()
@@ -182,7 +192,7 @@ struct HomeView: View {
                 WorkoutDetailSheet(exercise: exercise)
             }
             .sheet(item: $recordingStrength) { exercise in
-                RecordStrengthSheet(slot: exercise)
+                RecordStrengthSheet(slot: exercise) { newBest = NewBestAnnouncement(liftNames: $0) }
             }
             .sheet(item: $proposedWorkout) { request in
                 RecordWorkoutSheet(
@@ -199,7 +209,7 @@ struct HomeView: View {
                 }
             }
             .sheet(isPresented: $isLogDayPresented) {
-                LogStrengthDaySheet(slots: todayStrength)
+                LogStrengthDaySheet(slots: todayStrength) { newBest = NewBestAnnouncement(liftNames: $0) }
             }
             .alert(
                 "Couldn't apply that",

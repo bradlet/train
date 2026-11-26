@@ -5332,6 +5332,36 @@ struct StrengthPersonalBestTests {
         #expect(StrengthPersonalBest.isNewBest(saved, previous: [saved, record(185)]))
         #expect(!StrengthPersonalBest.isNewBest(saved, previous: [saved]))
     }
+
+    @Test func registryFetchesALiftsRecordsIncludingUnsavedOnes() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let other = StrengthRecord(liftKey: "squat", value: 200)
+        let newer = StrengthRecord(liftKey: "bench", date: Date(timeIntervalSince1970: 200), value: 185)
+        let older = StrengthRecord(liftKey: "bench", date: Date(timeIntervalSince1970: 100), value: 175)
+        [other, newer, older].forEach(context.insert)
+        let fetched = StrengthLiftRegistry.records(forKey: "bench", in: context)
+        #expect(fetched.map(\.value) == [175, 185], "only the lift's records, oldest first")
+    }
+}
+
+// MARK: - NewBestAnnouncement Tests
+
+struct NewBestAnnouncementTests {
+
+    @Test func namesOneOrTwoLiftsAndCountsMore() {
+        #expect(NewBestAnnouncement.message(for: []) == "New best")
+        #expect(NewBestAnnouncement.message(for: ["Bench"]) == "New best · Bench")
+        #expect(NewBestAnnouncement.message(for: ["Squat", "Row"]) == "New bests · Squat, Row")
+        #expect(NewBestAnnouncement.message(for: ["A", "B", "C"]) == "New bests on 3 lifts")
+    }
+
+    @Test func eachAnnouncementIsDistinct() {
+        // A fresh id per save re-triggers the banner and haptic for repeat bests.
+        let first = NewBestAnnouncement(liftNames: ["Bench"])
+        let second = NewBestAnnouncement(liftNames: ["Bench"])
+        #expect(first != second)
+        #expect(first.message == second.message)
+    }
 }
 
 // MARK: - StrengthLiftKey Tests
@@ -7836,6 +7866,8 @@ struct TodayTrainingTests {
         #expect(!TodayTraining.isEmpty(aerobic: [exercise], strength: []))
         #expect(!TodayTraining.isEmpty(aerobic: [], strength: [lift]))
         #expect(!TodayTraining.isEmpty(aerobic: [exercise], strength: [lift]))
+        #expect(!TodayTraining.isEmpty(aerobic: [], strength: [], carryover: [lift]),
+                "lifts still to do this week keep Today from looking empty")
     }
 }
 

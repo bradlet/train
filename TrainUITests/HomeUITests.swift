@@ -173,8 +173,21 @@ final class HomeUITests: XCTestCase {
         XCTAssertTrue(save.isEnabled)
         save.tap()
 
-        // Both cards now show today's records on the board.
+        // 140 beats the seeded 135 for Test Lift 1 (#15).
+        XCTAssertTrue(
+            app.descendants(matching: .any)["newBestBanner"].firstMatch.waitForExistence(timeout: 5),
+            "a new best should be announced"
+        )
+        // Both rows are ticked for this week on Home.
+        XCTAssertTrue(app.descendants(matching: .any)["home.strengthWeekCheck.Test Lift 1"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["home.strengthWeekCheck.Test Lift 2"].exists)
+
+        // Both cards now show today's records on the board, with a ✓.
         app.tabBars.buttons["Strength"].tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["strengthCard.weekCheck.Test Lift 1"].waitForExistence(timeout: 5),
+            "the card recorded this week shows a check"
+        )
         XCTAssertTrue(
             app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH '140 lb'")).firstMatch
                 .waitForExistence(timeout: 5),
@@ -183,6 +196,37 @@ final class HomeUITests: XCTestCase {
         XCTAssertTrue(
             app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Done'")).firstMatch.exists,
             "the blank row was recorded as done for Test Lift 2"
+        )
+    }
+
+    /// An unrecorded card from yesterday's lane is still to do this week
+    /// (#15): recording it from Home logs it against that card, which drops
+    /// it from the list and ticks it on the board.
+    @MainActor
+    func testMissedLiftCarriesOverUntilRecorded() throws {
+        // The fixture uses the default Monday week start; on a Monday,
+        // yesterday's lane belongs to last week, so nothing carries over.
+        try XCTSkipIf(Calendar.current.component(.weekday, from: Date()) == 2, "yesterday is last week on a Monday")
+        let app = launchApp()
+        let row = app.buttons["home.carryoverRow.Test Missed Lift"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "yesterday's unrecorded lift should carry over")
+        XCTAssertTrue(app.staticTexts["home.carryoverHeader"].exists)
+        XCTAssertFalse(app.buttons["home.carryoverRow.Test Other Day Lift"].exists, "later days don't carry over")
+
+        row.tap()
+        let save = app.buttons["recordStrength.save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5), "the record sheet should open")
+        save.tap() // blank: logged as done
+
+        XCTAssertTrue(row.waitForNonExistence(timeout: 5), "a recorded lift is no longer still to do")
+        XCTAssertFalse(app.staticTexts["home.carryoverHeader"].exists)
+
+        app.tabBars.buttons["Strength"].tap()
+        let yesterday = (Calendar.current.component(.weekday, from: Date()) + 5) % 7
+        app.buttons["strength.dayChip.\(yesterday)"].tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["strengthCard.weekCheck.Test Missed Lift"].waitForExistence(timeout: 5),
+            "the missed card is ticked for this week"
         )
     }
 

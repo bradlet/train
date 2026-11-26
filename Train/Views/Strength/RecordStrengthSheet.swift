@@ -16,6 +16,8 @@ import SwiftData
 struct RecordStrengthSheet: View {
     /// The board card being recorded from.
     let slot: StrengthExercise
+    /// Called with the lift's name when the saved record is a new best.
+    var onNewBest: ([String]) -> Void = { _ in }
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -27,9 +29,12 @@ struct RecordStrengthSheet: View {
 
     /// Creates the sheet. The lift's metric and the prefill from its last
     /// session are resolved on appear.
-    /// - Parameter slot: The board card being recorded from.
-    init(slot: StrengthExercise) {
+    /// - Parameters:
+    ///   - slot: The board card being recorded from.
+    ///   - onNewBest: Called with the lift's name when the save is a new best.
+    init(slot: StrengthExercise, onNewBest: @escaping ([String]) -> Void = { _ in }) {
         self.slot = slot
+        self.onNewBest = onNewBest
         self._draft = State(initialValue: StrengthRecordDraft(metric: .weight))
     }
 
@@ -95,7 +100,8 @@ struct RecordStrengthSheet: View {
         return "Choose what the number represents so trends like a top set and an average can be tracked separately. " + done
     }
 
-    /// Resolves the card's lift, inserts the record, and dismisses.
+    /// Resolves the card's lift, inserts the record, reports a new best,
+    /// and dismisses.
     private func save() {
         let lift = StrengthLiftRegistry.findOrCreate(for: slot, metric: draft.metric, in: modelContext)
         guard let record = draft.makeRecord(
@@ -103,6 +109,10 @@ struct RecordStrengthSheet: View {
             slotID: slot.id,
             useMetricUnits: useMetricUnits
         ) else { return }
+        let previous = StrengthLiftRegistry.records(forKey: lift.liftKey, in: modelContext)
+        if StrengthPersonalBest.isNewBest(record, previous: previous) {
+            onNewBest([slot.name])
+        }
         modelContext.insert(record)
         StrengthLiftRegistry.rememberDefaults(after: record, in: modelContext)
         dismiss()

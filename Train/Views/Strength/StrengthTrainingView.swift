@@ -17,6 +17,7 @@ import SwiftData
 /// The strength training tab displaying the weekly kanban board.
 struct StrengthTrainingView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.weekStartDay) private var weekStartDay
     @Query private var allExercises: [StrengthExercise]
     @Query private var allRecords: [StrengthRecord]
 
@@ -28,8 +29,12 @@ struct StrengthTrainingView: View {
     @State private var loggingDay: LogDayRequest?
     /// The card a session is being recorded from (nil = sheet hidden).
     @State private var recordingExercise: StrengthExercise?
+    /// The "New best" banner after a save beats a lift's best.
+    @State private var newBest: NewBestAnnouncement?
 
     var body: some View {
+        let latestRecords = StrengthLiftRegistry.latestByLiftKey(allRecords)
+        let weekRecords = StrengthWeek.recordsBySlot(allRecords, now: Date(), firstWeekday: weekStartDay)
         VStack(spacing: 0) {
             dayStrip
             Divider()
@@ -38,7 +43,8 @@ struct StrengthTrainingView: View {
                     StrengthDayColumn(
                         dayIndex: dayIndex,
                         allExercises: allExercises,
-                        latestRecords: StrengthLiftRegistry.latestByLiftKey(allRecords),
+                        latestRecords: latestRecords,
+                        weekRecords: weekRecords,
                         onRecord: { recordingExercise = $0 },
                         onAddExercise: { showLibrary = true },
                         onLogDay: { loggingDay = LogDayRequest(dayIndex: dayIndex) },
@@ -73,15 +79,15 @@ struct StrengthTrainingView: View {
             }
         }
         .sheet(item: $recordingExercise) { exercise in
-            RecordStrengthSheet(slot: exercise)
+            RecordStrengthSheet(slot: exercise) { newBest = NewBestAnnouncement(liftNames: $0) }
         }
         .sheet(item: $loggingDay) { request in
             LogStrengthDaySheet(
                 slots: StrengthBoardPlanner.lane(allExercises, day: request.dayIndex, offloaded: false),
                 date: Date().mostRecent(weekdayIndex: request.dayIndex)
-            )
+            ) { newBest = NewBestAnnouncement(liftNames: $0) }
         }
-    
+        .newBestBanner($newBest)
     }
 
     // MARK: - Day Strip
