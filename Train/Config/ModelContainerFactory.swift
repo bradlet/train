@@ -26,6 +26,7 @@ enum ModelContainerFactory {
         UserMovementGroup.self,
         StrengthTargetChange.self,
         FavoriteWorkout.self,
+        ImportBatch.self,
         AppConfiguration.self,
     ]
 
