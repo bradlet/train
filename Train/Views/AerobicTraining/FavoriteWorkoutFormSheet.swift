@@ -2,7 +2,7 @@
 //  FavoriteWorkoutFormSheet.swift
 //  Train
 //
-//  Create/edit form for a favorite workout. Holds only the preset's identity
+//  Create/edit form for a favorite cardio session. Holds only the preset's identity
 //  and targets — no date, notes or ratings, which belong to a workout, not a
 //  preset. Mutations go through `FavoriteWorkoutEditor`.
 //
@@ -10,7 +10,7 @@
 import SwiftUI
 import SwiftData
 
-/// A form sheet that creates a favorite workout or edits an existing one.
+/// A form sheet that creates a favorite cardio session or edits an existing one.
 struct FavoriteWorkoutFormSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss

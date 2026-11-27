@@ -2,15 +2,16 @@
 //  ManageFavoritesSheet.swift
 //  Train
 //
-//  The favorites list behind the Home card's Edit button: add, edit,
-//  swipe-delete and drag-reorder favorite workouts. Receives the favorites as
-//  a `let` from `HomeView`, which owns the query.
+//  The favorites list behind "Manage Favorites…" in the cardio record and
+//  schedule sheets: add, edit, swipe-delete and drag-reorder favorite cardio
+//  sessions. Receives the favorites as a `let` through the presenting sheet;
+//  the top-level view that presented it owns the query.
 //
 
 import SwiftUI
 import SwiftData
 
-/// A sheet listing every favorite workout for management.
+/// A sheet listing every favorite cardio session for management.
 struct ManageFavoritesSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -34,7 +35,7 @@ struct ManageFavoritesSheet: View {
                     ContentUnavailableView(
                         "No Favorites",
                         systemImage: "star",
-                        description: Text("Save workouts you repeat to pre-fill them when recording or scheduling.")
+                        description: Text("Save cardio sessions you repeat to pre-fill them when recording or scheduling.")
                     )
                 }
                 ForEach(favorites) { favorite in

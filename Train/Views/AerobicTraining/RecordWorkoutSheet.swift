@@ -34,8 +34,6 @@ struct RecordWorkoutSheet: View {
     /// so the athlete confirms the numbers the coach heard before anything
     /// lands in their history.
     var prefill: CoachProposalApplier.WorkoutPrefill? = nil
-    /// A favorite to pre-fill a quick add from (a Home favorite chip), or nil.
-    var initialFavorite: FavoriteWorkout? = nil
     /// Favorites offered by the "Start from Favorite" menu on a quick add.
     var favorites: [FavoriteWorkout] = []
 
@@ -138,8 +136,6 @@ struct RecordWorkoutSheet: View {
             countsTowardTraining = exercise.countsTowardTraining
             isKeyWorkout = exercise.isKeyWorkout
             previousType = exercise.type
-        } else if let initialFavorite {
-            apply(initialFavorite)
         } else {
             name = type.rawValue
             countsTowardTraining = TrainingInclusion.counts(type, excluded: trainingExcludedTypes)

@@ -61,10 +61,6 @@ struct HomeView: View {
     /// The navigation stack. Value-based so an external launch (widget,
     /// Siri) can replace whatever is pushed with a fresh coach chat.
     @State private var path: [HomeDestination] = []
-    /// Whether the favorites manager is showing.
-    @State private var isManagingFavorites = false
-    /// Whether the new-favorite form is showing (from the card's empty state).
-    @State private var isAddingFavorite = false
 
     /// Today's aerobic sessions, unrecorded first.
     private var todayAerobic: [Exercise] {
@@ -201,15 +197,6 @@ struct HomeView: View {
                             }
                         }
                     )
-
-                    FavoritesSection(
-                        favorites: favorites,
-                        onSelect: { favorite in
-                            quickAddRequest = QuickAddWorkoutRequest(date: Date(), favorite: favorite)
-                        },
-                        onEdit: { isManagingFavorites = true },
-                        onAdd: { isAddingFavorite = true }
-                    )
                 }
                 .padding()
             }
@@ -239,15 +226,8 @@ struct HomeView: View {
                 RecordWorkoutSheet(
                     exercise: nil,
                     defaultDate: request.date,
-                    initialFavorite: request.favorite,
                     favorites: favorites
                 )
-            }
-            .sheet(isPresented: $isManagingFavorites) {
-                ManageFavoritesSheet(favorites: favorites)
-            }
-            .sheet(isPresented: $isAddingFavorite) {
-                FavoriteWorkoutFormSheet(favorite: nil)
             }
             .sheet(item: $recordingExercise) { exercise in
                 RecordWorkoutSheet(exercise: exercise, defaultDate: exercise.date)
@@ -554,8 +534,6 @@ struct HomeView: View {
 private struct QuickAddWorkoutRequest: Identifiable {
     let id = UUID()
     let date: Date
-    /// The favorite chip that started this quick add, or nil for a blank one.
-    var favorite: FavoriteWorkout? = nil
 }
 
 /// Identifiable wrapper for a coach-proposed workout awaiting confirmation.

@@ -2,15 +2,18 @@
 //  FavoriteMenuSection.swift
 //  Train
 //
-//  The "Start from Favorite" form section shared by the record (quick add)
-//  and schedule sheets. Picking a favorite hands it back to the sheet, which
-//  fills its own fields. Favorites arrive as a `let` from the presenting
+//  The "Start from Favorite" form section shared by the cardio record (quick
+//  add) and schedule sheets. Picking a favorite hands it back to the sheet,
+//  which fills its own fields. This section is also where favorites are
+//  managed: they are cardio presets, so they live only where a cardio session
+//  is recorded or scheduled. Favorites arrive as a `let` from the presenting
 //  top-level view — sheets don't own queries.
 //
 
 import SwiftUI
 
-/// A form section with a menu of favorite workouts to pre-fill from.
+/// A form section with a menu of favorite cardio sessions to pre-fill from,
+/// plus the entry point into managing them.
 struct FavoriteMenuSection: View {
     @Environment(\.useMetricUnits) private var useMetricUnits
 
@@ -19,13 +22,19 @@ struct FavoriteMenuSection: View {
     /// Called with the picked favorite.
     let onSelect: (FavoriteWorkout) -> Void
 
+    /// Whether the favorites manager is showing.
+    @State private var isManaging = false
+
     var body: some View {
         Section {
             if favorites.isEmpty {
-                Label("No favorites yet — add them from Home", systemImage: "star")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("favoriteMenu.empty")
+                Button {
+                    isManaging = true
+                } label: {
+                    Label("Save sessions you repeat as favorites", systemImage: "star")
+                        .font(.subheadline)
+                }
+                .accessibilityIdentifier("favoriteMenu.empty")
             } else {
                 Menu {
                     ForEach(favorites) { favorite in
@@ -40,11 +49,21 @@ struct FavoriteMenuSection: View {
                         }
                         .accessibilityIdentifier("favoriteMenu.item.\(favorite.name)")
                     }
+                    Divider()
+                    Button {
+                        isManaging = true
+                    } label: {
+                        Label("Manage Favorites…", systemImage: "slider.horizontal.3")
+                    }
+                    .accessibilityIdentifier("favoriteMenu.manage")
                 } label: {
                     Label("Start from Favorite", systemImage: "star")
                 }
                 .accessibilityIdentifier("favoriteMenu.button")
             }
+        }
+        .sheet(isPresented: $isManaging) {
+            ManageFavoritesSheet(favorites: favorites)
         }
     }
 }
