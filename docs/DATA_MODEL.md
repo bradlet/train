@@ -12,7 +12,7 @@ Train uses **SwiftData**, Apple's ORM framework built on top of Core Data. If yo
 
 ## Entity-Relationship Diagram
 
-The persisted `@Model` entities are `Exercise`, `StrengthExercise`, `StrengthLift`, `StrengthRecord`, `UserLibraryExercise`, `UserMovementGroup`, `FavoriteWorkout`, and `AppConfiguration` (`ModelContainerFactory`'s schema). An aerobic recording does **not** get its own table: `Exercise.workout` is a `Workout` value struct JSON-encoded into a `Data?` column. Strength records do: each `StrengthRecord` is a row owned by a lift (via `liftKey`) rather than by a board card, so history survives removing a card (see [STRENGTH_TRAINING.md](STRENGTH_TRAINING.md)). An exercise with `workout == nil` is planned only; a non-nil `workout` means it was recorded.
+The persisted `@Model` entities are `Exercise`, `StrengthExercise`, `StrengthLift`, `StrengthRecord`, `UserLibraryExercise`, `UserMovementGroup`, `FavoriteWorkout`, `ImportBatch`, and `AppConfiguration` (`ModelContainerFactory`'s schema). An aerobic recording does **not** get its own table: `Exercise.workout` is a `Workout` value struct JSON-encoded into a `Data?` column. Strength records do: each `StrengthRecord` is a row owned by a lift (via `liftKey`) rather than by a board card, so history survives removing a card (see [STRENGTH_TRAINING.md](STRENGTH_TRAINING.md)). An exercise with `workout == nil` is planned only; a non-nil `workout` means it was recorded.
 
 ```mermaid
 erDiagram
@@ -78,6 +78,16 @@ erDiagram
         Double value "optional; nil = done"
         String metricRaw
         String measurementRaw "optional"
+        String externalID "optional; import dedupe"
+        UUID importBatchID "optional; import undo"
+    }
+    ImportBatch {
+        UUID id
+        Date date
+        String sourceRaw "ConnectionID"
+        Int cardioCount
+        Int strengthCount
+        Int duplicateCount
     }
     UserLibraryExercise {
         String id
@@ -122,6 +132,7 @@ An Exercise represents a **single training activity** — planned, recorded, or 
 | `date` | `Date` | `Date()` | The **single** date for this activity — the day it is planned and/or performed (renamed from the old `scheduledDate`). Preserves the full timestamp so Cardio → Progress can show time-of-day. **Not** normalized to midnight; day/week grouping flows through `Date+Week` helpers (`startOfDay`, `startOfWeek`, `isSameDay`), which compare calendar components. If an activity is performed on a different day than planned, it is treated as a separate `Exercise` — there is no plan-date / done-date split. |
 | `seriesID` | `UUID?` | `nil` | Shared by every exercise bulk-created as one recurring series; `nil` for a one-off. See [Recurring Series](#recurring-series). |
 | `isKeyWorkout` | `Bool` | `false` | The athlete marked it ⚡ key (#25). Starts from *Key workouts by default*, and is never inferred. |
+| `importBatchID` | `UUID?` | `nil` | The `ImportBatch` that created it (#21); "Undo last import" deletes exactly these rows. `nil` for anything entered in the app. |
 | `countsTowardTraining` | `Bool` | `true` | Stored as `countsTowardMileage` (CloudKit stores can't rename properties) and set from the type's default (#17). `false` keeps the activity (e.g. a casual walk) out of mileage aggregates — weekly totals, stat cards, charts. It renders as a hollow calendar dot and a dimmed History row with a "Not training" badge. |
 | `workout` | `Workout?` | `nil` | Recorded-instance data, present once the activity has been performed. `nil` means *planned only*. JSON-encoded into a private `workoutData: Data?` column on the same record — no second table. See [Workout](#workout) below. |
 | `isCompleted` | `Bool` (computed) | — | `workoutData != nil` (equivalent to `workout != nil`, without decoding). The single source of truth for "has this been recorded?". |
@@ -185,6 +196,14 @@ A saved aerobic workout preset. Picking one pre-fills the record (quick add) and
 | `createdAt` | `Date` | `Date()` | Creation timestamp. |
 
 Conversion to form state (display units, h/m/s) goes through `FavoriteFormValues`, and every mutation through `FavoriteWorkoutEditor` (`Services/Favorites/FavoriteWorkoutEditor.swift`).
+
+---
+
+### ImportBatch
+
+**File:** `Models/ImportBatch.swift`
+
+One entry in the import log (#21): where an import came from (`source`, a `ConnectionID`), when it ran, and how many cardio workouts and strength sessions it added or skipped as duplicates. Every `Exercise` and `StrengthRecord` the import created carries its `id` as `importBatchID`. Written and undone only through `TrainingImporter`; see [CONNECTIONS.md](CONNECTIONS.md#architecture-21).
 
 ---
 

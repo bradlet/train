@@ -1,10 +1,10 @@
 # Connections
 
-How the app talks to services outside the device. Today that means **Google Sheets Sync**. The planned rework of import, export and sync is in [planning/CONNECTIONS.md](planning/CONNECTIONS.md).
+How the app talks to services outside the device: Google Sheets sync, CSV export and import, and Apple Health import, all on one connections layer (see [Architecture](#architecture-21)). Design decisions are in [planning/CONNECTIONS.md](planning/CONNECTIONS.md).
 
 ## Google Sheets Sync
 
-Sheets Sync is opt-in. Once it's enabled in **Settings → Google Sheets**, the app overwrites the entire workout history to a Google Sheet on every add, edit or delete, debounced to 30 seconds. The app creates the sheet in the user's Google Drive the first time sync is enabled, and stores its ID in `AppConfiguration`.
+Sheets Sync is opt-in. Once it's enabled in **Settings → Google Sheets**, the app overwrites a Google Sheet's Cardio and Strength tabs with the whole history on every change, debounced to 10 seconds. The sheet is a read-only mirror: edits made in it are lost on the next sync. The app creates the sheet in the user's Google Drive the first time sync is enabled, and stores its ID in `AppConfiguration`.
 
 To sign in, the app needs an **iOS OAuth 2.0 client** registered for its bundle ID. The `GoogleSignIn-iOS` SDK keeps the tokens in the iOS Keychain. iOS OAuth clients are public clients that use PKCE, so there is no client secret.
 
@@ -85,11 +85,92 @@ The URL scheme is the client ID **reversed**: drop `.apps.googleusercontent.com`
 
 #### 5. Verify
 
-Build and run, then open **Settings (the gear on any tab) → Google Sheets → Sync to Google Sheets**. Sign in with any Google account and grant the scope. The app creates a spreadsheet in your Drive and writes the history to it.
+Build and run, then open **Settings (the gear on any tab) → Google Sheets → Mirror to Google Sheets**. Sign in with any Google account and grant the scope. The app creates a spreadsheet in your Drive with a Cardio and a Strength tab and writes the history to both.
 
 ### What the user sees in-app
 
-- **Disabled** (the default): Settings shows **Sync to Google Sheets**. Tapping it opens a confirmation explaining that sync is export-only, and confirming runs OAuth, creates the spreadsheet and does the first sync.
-- **Enabled, healthy**: Settings shows **Synced** and **Turn Off Google Sheets Sync**. Changes wait 30 s, then upload silently.
+- **Disabled** (the default): Settings shows **Mirror to Google Sheets**. Tapping it opens a confirmation saying plainly that sync is one-way and overwrites the sheet, so edits made in it are wiped on the next sync. Confirming runs OAuth, creates the spreadsheet (Cardio + Strength tabs) and does the first sync.
+- **Enabled, healthy**: Settings shows **Synced** and **Turn Off Google Sheets Sync**. Any save to cardio or strength (picked up from `ModelContext.didSave`) waits 10 s, then uploads both tabs silently. A spreadsheet from before the tabs existed is migrated on its first sync: `Sheet1` becomes Cardio and a Strength tab is added.
 - **Enabled, last sync failed** (a transient network or API error): a red dot appears on the Settings gear, and Settings shows **Retry Sync** with the reason.
 - **Enabled, but the token is missing or expired**: Settings shows **Sign in to Resume Sync** (and the gear gets a red dot). This happens on a fresh device or with the Testing-mode 7-day expiry. Signing in again (even over a stale cached session) re-syncs to the **same** spreadsheet; it never creates a new one.
+
+## Architecture (#21)
+
+Every import and export goes through one layer in `Train/Services/Connections/`.
+
+```mermaid
+flowchart LR
+    subgraph Store["SwiftData"]
+        Ex[Exercise + Workout]
+        St[StrengthLift + StrengthRecord]
+        IB[ImportBatch]
+    end
+    Store -- TrainingSnapshot.load --> Snap[TrainingSnapshot]
+    Snap --> CC[WorkoutCSV rows] & SC[StrengthCSV rows]
+    CC & SC --> Sheets[GoogleSheetsTarget<br/>Cardio + Strength tabs]
+    CC & SC --> Files[TrainingCSVBundle<br/>two files in a folder]
+    Engine[SyncEngine<br/>didSave → debounce → export] --> Sheets
+    Files2[Picked CSV files] -- header → kind --> Rec[TrainingRecord]
+    Health[AppleHealthTarget] --> Rec
+    Rec --> Imp[TrainingImporter<br/>dedupe by externalID · batch · undo]
+    Imp --> Store
+```
+
+| Piece | Role |
+|---|---|
+| `TrainingRecord` | The interchange model: `.cardio(Cardio)` or `.strength(Strength)`, in internal units, with an `externalID`. |
+| `TrainingSnapshot` | Everything an export writes, read once: recorded cardio, every strength record with its lift, the unit preference. |
+| `CSVTable` | RFC 4180 tokenizing and escaping, and a header that finds columns by name. |
+| `WorkoutCSV` / `StrengthCSV` | Pure codecs, record ↔ rows. Sheets tabs and CSV files use the same rows. |
+| `TrainingCSVBundle` | Manual export (two files in one folder) and multi-file import (kind detected per file). |
+| `TrainingImporter` | The only import write path: dedupe, `ImportBatch` stamping, Undo. |
+| `ConnectionTarget` | Identity and capabilities. `AutoExportTarget` (Sheets; CSV auto-export in #23) and `ImportSourceTarget` (Apple Health; Garmin in #22) refine it. |
+| `SyncEngine` | Debounces training saves and exports to every connected auto-export target, owning their `ConnectionStatus`. |
+
+**Rules**
+
+- **`externalID` dedupes imports, nothing else.** It is the source's ID (HealthKit UUID, later a Garmin activity ID), or the app's own UUID for records made here. An import skips any record whose anchor is already present (`Exercise.id`, `Workout.externalID`, `StrengthRecord.id` or `StrengthRecord.externalID`), and the Health picker shows those records as imported. Exports never merge by it: Sheets is overwrite-only.
+- **Every import goes through `TrainingImporter`** so it is logged and can be undone. The rows it creates carry `importBatchID`. Undo deletes exactly those rows, plus any lift the import created that is left with no records and no board card.
+- **Sync is driven by saves, not call sites.** `SyncEngine` listens for `ModelContext.didSave` touching `Exercise`, `StrengthRecord` or `StrengthLift`. Batch flows (imports, Undo, retry, connect) call `syncNow()` so the mirror updates at once. Keep the `syncNow()` / `performSync()` split: the debounce task calls `performSync()` directly, because routing it through `syncNow()` would cancel the in-flight upload.
+- **Apple Health import stays manual.** It never runs in the background.
+- **Status is one model.** `ConnectionStatus` is `disconnected`, `connected(lastSync)`, `syncing` or `needsAttention(reason, action)`, where the action is `signIn` or `retry`. The Settings gear's dot reads every auto-export target through `SettingsBadge.forConnections`.
+
+## CSV column reference
+
+Export writes `train-cardio-<date>.csv` and `train-strength-<date>.csv` into a `train-export-<date>` folder. The Sheets tabs carry the same columns. Import reads columns **by header name**, in any order, after trimming, lowercasing, and turning spaces into underscores. A missing column takes its default and an unknown one is ignored. A file whose header has a `lift` column is strength; anything else is cardio.
+
+### Cardio (`train-cardio-*.csv`, Cardio tab)
+
+| Column | Values | Default when missing |
+|---|---|---|
+| `date` | `M/D/YYYY`, `YYYY-MM-DD` or ISO 8601 (**required**) | none |
+| `name` | text | the type's name |
+| `type` | short key (`easy`, `long`, …) or display name | `other` |
+| `duration` | `1h 30m`, `40m`, `90s`, or plain seconds | 0 |
+| `distance` | number, in the unit chosen at import | 0 |
+| `notes` | text | blank |
+| `feeling` (alias `felt_rating`) | 1–5; blank or 0 = unrated | unrated |
+| `perceived_exertion` (alias `rpe`) | 1–10; blank or 0 = unrated | unrated |
+| `counts_toward_training` (alias `counts_toward_mileage`) | `true`/`false` | `true` |
+| `key_workout` | `true`/`false` | `false` |
+| `source` | `Manual`, `CSV`, `Apple Exercise App`, … | `CSV` |
+| `id` | dedupe anchor | none (no dedupe) |
+
+A cardio header **without** a `date` column is read positionally in the order above (legacy files).
+
+### Strength (`train-strength-*.csv`, Strength tab)
+
+| Column | Values | Default when missing |
+|---|---|---|
+| `date` | as cardio (**required**) | none |
+| `lift` | lift name (**required** unless `lift_id` is present) | name from `lift_id` |
+| `muscle_group` | `Chest`, `Quads`, `Full Body`, … | `Other` |
+| `metric` | `weight`, `reps`, `time`, `distance` | from `unit`, else `weight` |
+| `value` | number, or `m:ss` for time; blank = done with no number | done |
+| `unit` | `lb`, `kg`, `reps`, `s`, `yd`, `m` | the metric's imperial unit |
+| `measurement` | `max`, `average`, `firstSet`, `lastSet`, `min` (weight/reps only) | none |
+| `light` | `true`/`false`, a light-week session | `false` |
+| `notes` | text | blank |
+| `counts_toward_training` | `true`/`false`, the lift's opt-out (applied only to a lift the import creates) | `true` |
+| `lift_id` | the lift key: a library ID or `name:<name>` | from `lift` |
+| `id` | dedupe anchor | none (no dedupe) |

@@ -612,7 +612,7 @@ populates its form from it. The athlete saves through the normal path.
 ## 12. CoachChatStore
 
 `@MainActor @Observable`, created once in `TrainApp` and injected via
-`@Environment(\.coachChat)`. Like `GoogleSheetsSyncCoordinator`, it is app-scope state, **not a
+`@Environment(\.coachChat)`. Like `SyncEngine`, it is app-scope state, **not a
 ViewModel**: it owns no queries and makes no view decisions.
 
 | State | Meaning |
