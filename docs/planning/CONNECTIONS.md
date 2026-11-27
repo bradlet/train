@@ -1,6 +1,6 @@
 # Connections — Import, Export & Sync Rework (design draft)
 
-> Status: **design draft**, iteration 1 (2026-11-24).
+> Status: **decided** (2026-11-27); building in #21.
 
 ## Where we are today
 
@@ -80,8 +80,9 @@ IMPORT HISTORY   Nov 20 · 3 workouts from Health   [Undo]
 - **Needs attention:** a target in `needsAttention` shows a single, dismissible Home banner ("Google Sheets sync paused — sign in again"), plus a badge on the Settings entry. It never shows a modal alert.
 - **Manual one-offs:** CSV export and import stay available from the dashboard and from each Progress segment's share menu.
 
-## Open questions
+## Decisions (2026-11-27)
 
-1. Should Sheets sync stay **overwrite-only**, or should it append and update by `externalID` to preserve the athlete's own edits in the sheet?
-2. Should Apple Health import run **automatically in the background**, or stay a manual action?
-3. Should the CSV column format be **versioned** (a header comment) so future columns don't break older imports?
+1. **Sheets stays overwrite-only.** The app is the source of truth and the sheet is a mirror with one Cardio tab and one Strength tab. The set-up copy says plainly that edits made in the sheet are wiped on the next sync. `externalID` is never used to merge into the sheet. It exists only to stop the same activity being imported, or shown as importable, twice (Apple Health, Garmin, and re-imported CSVs).
+2. **Apple Health import stays manual** ("Import now"). It never runs in the background. Workouts already imported show as imported in the picker instead of offering themselves again.
+3. **CSV is two files read by header name.** Export writes `train-cardio-<date>.csv` and `train-strength-<date>.csv`. Import detects each file's kind from its header and reads columns by name, so a missing column takes its default and an unknown column is ignored. There is no version line. A cardio file whose header has no `date` column falls back to the legacy fixed column order.
+4. **#21 builds the full layer:** `TrainingRecord`, the codecs, the `ConnectionTarget` protocols, `SyncEngine` and the import log with Undo. CSV *auto*-export, as a second auto target, arrives with the dashboard (#23).
