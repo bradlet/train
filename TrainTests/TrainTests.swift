@@ -357,7 +357,7 @@ struct ModelContainerFactoryTests {
         let names = Set(ModelContainerFactory.modelTypes.map { String(describing: $0) })
         #expect(names == [
             "Exercise", "StrengthExercise", "StrengthLift", "StrengthRecord",
-            "UserLibraryExercise", "UserMovementGroup", "StrengthTargetChange", "FavoriteWorkout", "AppConfiguration",
+            "UserLibraryExercise", "UserMovementGroup", "StrengthTargetChange", "FavoriteWorkout", "ImportBatch", "AppConfiguration",
         ])
     }
 
@@ -4192,8 +4192,10 @@ struct WorkoutCSVRowsTests {
         #expect(rows.count == 2)
         #expect(rows[0] == WorkoutCSV.headerColumns)
         // date, name, type, duration, distance, notes, feeling,
-        // perceived_exertion, counts_toward_training, key_workout
-        #expect(rows[1].count == 10)
+        // perceived_exertion, counts_toward_training, key_workout, source, id
+        #expect(rows[1].count == 12)
+        #expect(rows[1][10] == WorkoutSource.manual.rawValue)
+        #expect(rows[1][11] == exercise.id.uuidString)
         #expect(rows[1][8] == "true")
         #expect(rows[1][9] == "false")
         #expect(rows[1][1] == "Easy Run")
@@ -4203,8 +4205,10 @@ struct WorkoutCSVRowsTests {
         #expect(rows[1][7] == "7")
     }
 
-    @Test func headerEndsWithRatingsThenTrainingAndKeyFlags() {
-        #expect(WorkoutCSV.headerColumns.suffix(4) == ["feeling", "perceived_exertion", "counts_toward_training", "key_workout"])
+    @Test func headerEndsWithRatingsThenFlagsThenProvenance() {
+        #expect(WorkoutCSV.headerColumns.suffix(6) == [
+            "feeling", "perceived_exertion", "counts_toward_training", "key_workout", "source", "id"
+        ])
     }
 
     @Test func unratedWorkoutEmitsBlankRatingColumns() {
@@ -4266,10 +4270,10 @@ struct WorkoutCSVRowsTests {
     }
 }
 
-// MARK: - GoogleSheetsSyncCoordinator Tests
+// MARK: - SyncEngine + GoogleSheetsTarget Tests
 
 @MainActor
-struct GoogleSheetsSyncCoordinatorTests {
+struct SyncEngineSheetsTests {
 
     private func makeContainerWithConfig(
         enabled: Bool = false,
@@ -4287,8 +4291,7 @@ struct GoogleSheetsSyncCoordinatorTests {
         return container
     }
 
-    /// Inserts a single completed exercise (planned + recorded inline) so the
-    /// sync emits exactly one data row.
+    /// Inserts a single completed exercise so the Cardio tab has one data row.
     private func insertWorkout(in container: ModelContainer, name: String = "Run") {
         let context = ModelContext(container)
         context.insert(Exercise(
@@ -4302,326 +4305,329 @@ struct GoogleSheetsSyncCoordinatorTests {
         try? context.save()
     }
 
-    @Test func attachReadsDisabledStateAsIdle() async {
+    /// Inserts one strength session so the Strength tab has one data row.
+    private func insertLift(in container: ModelContainer) {
+        let context = ModelContext(container)
+        context.insert(StrengthLift(liftKey: "name:squat", name: "Squat", muscleGroup: .quads, primaryMetric: .weight))
+        context.insert(StrengthRecord(liftKey: "name:squat", value: 225, metric: .weight, measurement: .max))
+        try? context.save()
+    }
+
+    /// A target + engine attached to `container`, not watching saves.
+    private func makeEngine(
+        _ container: ModelContainer,
+        api: StubGoogleSheetsAPI,
+        debounce: UInt64 = 1
+    ) async -> (SyncEngine, GoogleSheetsTarget) {
+        let target = GoogleSheetsTarget(api: api)
+        let engine = SyncEngine(targets: [target], debounceSeconds: debounce)
+        await engine.attach(modelContainer: container, observesSaves: false)
+        return (engine, target)
+    }
+
+    private func isConnectedWithSync(_ status: ConnectionStatus) -> Bool {
+        if case .connected(let lastSync) = status { return lastSync != nil }
+        return false
+    }
+
+    @Test func attachReadsDisabledStateAsDisconnected() async {
         let container = makeContainerWithConfig(enabled: false)
-        let api = StubGoogleSheetsAPI(isAuthorized: false)
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
+        let (_, target) = await makeEngine(container, api: StubGoogleSheetsAPI(isAuthorized: false))
 
-        await coordinator.attach(modelContainer: container)
-
-        #expect(coordinator.isEnabled == false)
-        #expect(coordinator.spreadsheetID == nil)
-        #expect(coordinator.status == .idle)
+        #expect(target.isConnected == false)
+        #expect(target.spreadsheetID == nil)
+        #expect(target.status == .disconnected)
     }
 
-    @Test func attachWithEnabledAndAuthorizedStaysIdle() async {
+    @Test func attachWithEnabledAndAuthorizedIsConnected() async {
         let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
-        let api = StubGoogleSheetsAPI(isAuthorized: true)
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
+        let (_, target) = await makeEngine(container, api: StubGoogleSheetsAPI(isAuthorized: true))
 
-        await coordinator.attach(modelContainer: container)
-
-        #expect(coordinator.isEnabled == true)
-        #expect(coordinator.spreadsheetID == "sheet-A")
-        #expect(coordinator.status == .idle)
+        #expect(target.isConnected == true)
+        #expect(target.spreadsheetID == "sheet-A")
+        #expect(target.status == .connected(lastSync: nil))
     }
 
-    @Test func attachWithEnabledButUnauthorizedSurfacesNeedsAuth() async {
+    @Test func attachWithEnabledButUnauthorizedNeedsSignIn() async {
         let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
-        let api = StubGoogleSheetsAPI(isAuthorized: false)
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
+        let (_, target) = await makeEngine(container, api: StubGoogleSheetsAPI(isAuthorized: false))
 
-        await coordinator.attach(modelContainer: container)
-
-        #expect(coordinator.status == .needsAuth)
+        #expect(target.status == .needsAttention(reason: GoogleSheetsTarget.signedOutReason, action: .signIn))
     }
 
-    @Test func enableCreatesSpreadsheetAndSyncsImmediately() async throws {
+    @Test func connectCreatesTabbedSpreadsheetAndSyncsBothTabs() async throws {
         let container = makeContainerWithConfig(enabled: false)
         insertWorkout(in: container, name: "Initial")
+        insertLift(in: container)
         let api = StubGoogleSheetsAPI(isAuthorized: false)
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-        await coordinator.attach(modelContainer: container)
+        let (engine, target) = await makeEngine(container, api: api)
 
-        try await coordinator.enable()
+        try await engine.connect(target)
 
-        #expect(coordinator.isEnabled == true)
-        #expect(coordinator.spreadsheetID != nil)
+        #expect(target.isConnected)
         #expect(api.createdSpreadsheetIDs.count == 1)
-        #expect(api.overwriteCount == 1)
-        // First row is header, second row is the inserted workout.
-        #expect(api.lastWrittenRows?.count == 2)
-        if case .success = coordinator.status {
-            // ok
-        } else {
-            Issue.record("expected status .success after enable, got \(coordinator.status)")
-        }
+        #expect(api.createdTabs.first == [GoogleSheetsTarget.cardioTab, GoogleSheetsTarget.strengthTab])
+        #expect(api.syncCount == 1)
+        #expect(api.rowsByTab["Cardio"]?.count == 2, "header + one workout")
+        #expect(api.rowsByTab["Cardio"]?.first == WorkoutCSV.headerColumns)
+        #expect(api.rowsByTab["Strength"]?.count == 2, "header + one session")
+        #expect(api.rowsByTab["Strength"]?.first == StrengthCSV.headerColumns)
+        #expect(api.prepareCount == 0, "a spreadsheet created with its tabs needs no preparing")
+        #expect(isConnectedWithSync(target.status))
 
-        // Persisted state should reflect enable so a fresh container/process
-        // restores correctly via `attach`.
         let context = ModelContext(container)
         let config = try context.fetch(FetchDescriptor<AppConfiguration>()).first
         #expect(config?.googleSheetsSyncEnabled == true)
-        #expect(config?.googleSheetsSpreadsheetID == coordinator.spreadsheetID)
+        #expect(config?.googleSheetsSpreadsheetID == target.spreadsheetID)
     }
 
-    @Test func reauthorizeRunsAuthorizeAndImmediateSync() async throws {
-        // Simulates a CloudKit-restored device: enabled=true and
-        // spreadsheetID set in AppConfiguration, but the API starts
-        // unauthorized (no Keychain token). The user taps the
-        // "Sign in to resume" menu item which calls `reauthorize`.
+    @Test func existingSpreadsheetIsPreparedOncePerSession() async {
+        let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-old")
+        insertWorkout(in: container)
+        let api = StubGoogleSheetsAPI(isAuthorized: true)
+        let (engine, _) = await makeEngine(container, api: api)
+
+        await engine.syncNow()
+        await engine.syncNow()
+
+        #expect(api.prepareCount == 1, "the tab check runs once, not on every sync")
+        #expect(api.syncCount == 2)
+    }
+
+    @Test func reauthorizeThenSyncReusesExistingSpreadsheet() async throws {
+        // A CloudKit-restored device: sync on and a spreadsheet ID, but no
+        // Google session here. "Sign in to resume" must reuse the sheet.
         let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-restored")
         insertWorkout(in: container)
         let api = StubGoogleSheetsAPI(isAuthorized: false)
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-        await coordinator.attach(modelContainer: container)
-        #expect(coordinator.status == .needsAuth)
+        let (engine, target) = await makeEngine(container, api: api)
+        #expect(target.status.needsAttention)
 
-        try await coordinator.reauthorize()
+        try await target.reauthorize()
+        await engine.syncNow()
 
         #expect(api.isAuthorized == true)
-        #expect(api.overwriteCount == 1)
-        #expect(api.lastSpreadsheetID == "sheet-restored",
-                "reauthorize must reuse the existing spreadsheet, not create a new one")
-        #expect(api.createdSpreadsheetIDs.isEmpty,
-                "reauthorize must not create a new spreadsheet")
-        if case .success = coordinator.status {
-            // ok
-        } else {
-            Issue.record("expected status .success after reauthorize, got \(coordinator.status)")
-        }
+        #expect(api.syncCount == 1)
+        #expect(api.lastSpreadsheetID == "sheet-restored")
+        #expect(api.createdSpreadsheetIDs.isEmpty, "reauthorize must not create a new spreadsheet")
+        #expect(isConnectedWithSync(target.status))
     }
 
-    @Test func reauthorizeThrowsWhenSyncNotEnabled() async {
+    @Test func reauthorizeThrowsWhenNotConnected() async {
         let container = makeContainerWithConfig(enabled: false)
-        let api = StubGoogleSheetsAPI(isAuthorized: false)
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-        await coordinator.attach(modelContainer: container)
+        let (_, target) = await makeEngine(container, api: StubGoogleSheetsAPI(isAuthorized: false))
 
-        do {
-            try await coordinator.reauthorize()
-            Issue.record("expected reauthorize to throw when not enabled")
-        } catch {
-            // expected
-        }
+        await #expect(throws: (any Error).self) { try await target.reauthorize() }
     }
 
-    @Test func disableClearsStateAndSignsOut() async throws {
+    @Test func reauthorizeForcesInteractiveEvenWhenSessionLooksAuthorized() async throws {
+        // A server-side revoke can still look authorized locally; reconnect
+        // must force a fresh interactive sign-in.
         let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
         let api = StubGoogleSheetsAPI(isAuthorized: true)
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-        await coordinator.attach(modelContainer: container)
+        let (_, target) = await makeEngine(container, api: api)
 
-        coordinator.disable()
+        try await target.reauthorize()
 
-        #expect(coordinator.isEnabled == false)
-        #expect(coordinator.spreadsheetID == nil)
-        #expect(coordinator.status == .idle)
+        #expect(api.reauthorizeInteractivelyCount == 1)
+        #expect(api.createdSpreadsheetIDs.isEmpty)
+    }
+
+    @Test func disconnectClearsStateAndSignsOut() async throws {
+        let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
+        let api = StubGoogleSheetsAPI(isAuthorized: true)
+        let (_, target) = await makeEngine(container, api: api)
+
+        target.disconnect()
+
+        #expect(target.isConnected == false)
+        #expect(target.spreadsheetID == nil)
+        #expect(target.status == .disconnected)
         #expect(api.isAuthorized == false)
-
-        // Persisted state cleared.
-        let context = ModelContext(container)
-        let config = try context.fetch(FetchDescriptor<AppConfiguration>()).first
+        let config = try ModelContext(container).fetch(FetchDescriptor<AppConfiguration>()).first
         #expect(config?.googleSheetsSyncEnabled == false)
         #expect(config?.googleSheetsSpreadsheetID == "")
     }
 
-    @Test func requestSyncIsNoOpWhenDisabled() async {
+    @Test func requestSyncIsNoOpWhenNothingIsConnected() async {
         let container = makeContainerWithConfig(enabled: false)
         let api = StubGoogleSheetsAPI(isAuthorized: true)
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-        await coordinator.attach(modelContainer: container)
+        let (engine, target) = await makeEngine(container, api: api)
 
-        coordinator.requestSync()
+        engine.requestSync()
         try? await Task.sleep(nanoseconds: 1_500_000_000)
 
         #expect(api.overwriteCount == 0)
+        #expect(target.status == .disconnected)
     }
 
-    @Test func requestSyncSetsSyncingImmediately() async throws {
+    @Test func requestSyncShowsSyncingImmediatelyThenConnected() async {
         let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
         insertWorkout(in: container)
         let api = StubGoogleSheetsAPI(isAuthorized: true)
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-        await coordinator.attach(modelContainer: container)
+        let (engine, target) = await makeEngine(container, api: api)
 
-        coordinator.requestSync()
-
-        // Pending state should be visible immediately, before the debounce
-        // sleep elapses, so the History tab can render the yellow dot +
-        // "syncing…" indicator during the wait.
-        #expect(coordinator.status == .syncing)
+        engine.requestSync()
+        #expect(target.status == .syncing, "pending state shows during the debounce")
 
         try? await Task.sleep(nanoseconds: 1_400_000_000)
-
-        if case .success = coordinator.status {
-            // ok
-        } else {
-            Issue.record("expected status .success after debounce + upload, got \(coordinator.status)")
-        }
-        #expect(api.overwriteCount == 1)
+        #expect(isConnectedWithSync(target.status))
+        #expect(api.syncCount == 1)
     }
 
-    @Test func multipleRequestSyncCallsCollapseToOneSync() async throws {
+    @Test func multipleRequestsCollapseToOneSync() async {
         let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
         insertWorkout(in: container)
         let api = StubGoogleSheetsAPI(isAuthorized: true)
-        // Use a 1-second debounce so the test runs in ~1.5 seconds rather than 30.
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-        await coordinator.attach(modelContainer: container)
+        let (engine, _) = await makeEngine(container, api: api)
 
-        coordinator.requestSync()
-        coordinator.requestSync()
-        coordinator.requestSync()
-        // Wait past the debounce window plus a small safety margin.
+        engine.requestSync()
+        engine.requestSync()
+        engine.requestSync()
         try? await Task.sleep(nanoseconds: 1_400_000_000)
 
-        #expect(api.overwriteCount == 1, "3 rapid requestSync calls should produce 1 upload")
+        #expect(api.syncCount == 1, "3 rapid requests should produce 1 sync")
     }
 
-    @Test func syncNowBypassesDebounce() async throws {
+    @Test func syncNowBypassesDebounce() async {
         let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
         insertWorkout(in: container)
         let api = StubGoogleSheetsAPI(isAuthorized: true)
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 30)
-        await coordinator.attach(modelContainer: container)
+        let (engine, target) = await makeEngine(container, api: api, debounce: 30)
 
-        await coordinator.syncNow()
+        await engine.syncNow()
 
-        #expect(api.overwriteCount == 1)
-        if case .success = coordinator.status {
-            // ok
-        } else {
-            Issue.record("expected status .success after syncNow")
-        }
+        #expect(api.syncCount == 1)
+        #expect(isConnectedWithSync(target.status))
     }
 
-    @Test func syncNowFailureSurfacesAsFailedStatus() async throws {
+    @Test func failureNeedsAttentionWithRetry() async {
         let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
         insertWorkout(in: container)
         let api = StubGoogleSheetsAPI(isAuthorized: true)
         api.nextOverwriteError = GoogleSheetsSyncError.invalidResponse("test failure")
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-        await coordinator.attach(modelContainer: container)
+        let (engine, target) = await makeEngine(container, api: api)
 
-        await coordinator.syncNow()
+        await engine.syncNow()
 
-        if case .failed = coordinator.status {
-            // ok
-        } else {
-            Issue.record("expected .failed status after API error, got \(coordinator.status)")
+        guard case .needsAttention(_, .retry) = target.status else {
+            Issue.record("expected a retryable failure, got \(target.status)")
+            return
         }
     }
 
-    @Test func syncNowSurfacesNeedsAuthWhenAPIDeauthorized() async {
+    @Test func signedOutDeviceNeedsSignInWithoutUploading() async {
         let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
         let api = StubGoogleSheetsAPI(isAuthorized: false)
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-        await coordinator.attach(modelContainer: container)
+        let (engine, target) = await makeEngine(container, api: api)
 
-        await coordinator.syncNow()
+        await engine.syncNow()
 
-        #expect(coordinator.status == .needsAuth)
+        #expect(target.status == .needsAttention(reason: GoogleSheetsTarget.signedOutReason, action: .signIn))
         #expect(api.overwriteCount == 0)
     }
 
-    @Test func syncNowMapsNotAuthorizedMidSyncToNeedsAuth() async {
-        // Token expired *after* `isAuthorized` passed (the API layer's refresh
-        // attempt throws `.notAuthorized` from inside `overwriteSheet`). This
-        // must surface as `.needsAuth` so the menu offers "Sign in to resume",
-        // not a "Retry" that would just fail again.
+    @Test func notAuthorizedMidSyncNeedsSignIn() async {
+        // The token expired after `isAuthorized` passed: a retry would fail
+        // again, so it must ask for a sign-in.
         let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
         insertWorkout(in: container)
         let api = StubGoogleSheetsAPI(isAuthorized: true)
         api.nextOverwriteError = GoogleSheetsSyncError.notAuthorized
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-        await coordinator.attach(modelContainer: container)
+        let (engine, target) = await makeEngine(container, api: api)
 
-        await coordinator.syncNow()
+        await engine.syncNow()
 
-        #expect(coordinator.status == .needsAuth)
+        #expect(target.status == .needsAttention(reason: GoogleSheetsTarget.signedOutReason, action: .signIn))
     }
 
-    @Test func syncNowMaps401And403ToNeedsAuth() async {
+    @Test func http401And403NeedSignInButServerErrorsRetry() {
+        let target = GoogleSheetsTarget(api: StubGoogleSheetsAPI())
         for status in [401, 403] {
-            let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
-            insertWorkout(in: container)
-            let api = StubGoogleSheetsAPI(isAuthorized: true)
-            api.nextOverwriteError = GoogleSheetsSyncError.httpError(status: status, body: "unauthorized")
-            let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-            await coordinator.attach(modelContainer: container)
-
-            await coordinator.syncNow()
-
-            #expect(coordinator.status == .needsAuth, "HTTP \(status) should map to .needsAuth")
+            let error = GoogleSheetsSyncError.httpError(status: status, body: "unauthorized")
+            #expect(target.status(afterFailure: error).needsAttention)
+            guard case .needsAttention(_, .signIn) = target.status(afterFailure: error) else {
+                Issue.record("HTTP \(status) should need sign-in")
+                continue
+            }
         }
-    }
-
-    @Test func syncNowKeepsNonAuthHttpErrorAsFailed() async {
-        // A server-side 500 is transient, not an auth problem — it must stay
-        // `.failed` so the menu offers "Retry", not a pointless re-sign-in.
-        let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
-        insertWorkout(in: container)
-        let api = StubGoogleSheetsAPI(isAuthorized: true)
-        api.nextOverwriteError = GoogleSheetsSyncError.httpError(status: 500, body: "server error")
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-        await coordinator.attach(modelContainer: container)
-
-        await coordinator.syncNow()
-
-        if case .failed = coordinator.status {
-            // ok
-        } else {
-            Issue.record("expected .failed for HTTP 500, got \(coordinator.status)")
+        guard case .needsAttention(_, .retry) = target.status(afterFailure: GoogleSheetsSyncError.httpError(status: 500, body: "")) else {
+            Issue.record("HTTP 500 should be retryable")
+            return
         }
-    }
-
-    @Test func reauthorizeForcesInteractiveEvenWhenSessionLooksAuthorized() async throws {
-        // Simulates a server-side revoke where the local session still *looks*
-        // authorized (isAuthorized == true) because the access token hasn't
-        // expired yet. Reconnect must force a fresh interactive sign-in, not
-        // silently trust the cached session (which would 401 and loop back to
-        // .needsAuth without ever prompting).
-        let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
-        insertWorkout(in: container)
-        let api = StubGoogleSheetsAPI(isAuthorized: true)
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-        await coordinator.attach(modelContainer: container)
-
-        try await coordinator.reauthorize()
-
-        #expect(api.reauthorizeInteractivelyCount == 1,
-                "reconnect must force interactive sign-in, not reuse the cached session")
-        #expect(api.lastSpreadsheetID == "sheet-A")
-        #expect(api.createdSpreadsheetIDs.isEmpty)
     }
 
     @Test func reconnectAfterMidSyncExpiryReusesExistingSheet() async throws {
-        // Full reconnect flow: a sync fails mid-flight with an expired token
-        // (→ .needsAuth), then the user re-auths via `reauthorize`, which must
-        // resume syncing to the *existing* spreadsheet rather than create a
-        // new one (the original duplicate-file bug).
         let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-existing")
         insertWorkout(in: container)
         let api = StubGoogleSheetsAPI(isAuthorized: true)
         api.nextOverwriteError = GoogleSheetsSyncError.notAuthorized
-        let coordinator = GoogleSheetsSyncCoordinator(api: api, debounceSeconds: 1)
-        await coordinator.attach(modelContainer: container)
+        let (engine, target) = await makeEngine(container, api: api)
 
-        await coordinator.syncNow()
-        #expect(coordinator.status == .needsAuth)
+        await engine.syncNow()
+        #expect(target.status.needsAttention)
 
-        try await coordinator.reauthorize()
+        try await target.reauthorize()
+        await engine.syncNow()
 
-        #expect(api.lastSpreadsheetID == "sheet-existing",
-                "reconnect must reuse the existing spreadsheet, not create a new one")
-        #expect(api.createdSpreadsheetIDs.isEmpty,
-                "reconnect must not create a new spreadsheet")
-        if case .success = coordinator.status {
-            // ok
-        } else {
-            Issue.record("expected .success after reconnect, got \(coordinator.status)")
-        }
+        #expect(api.lastSpreadsheetID == "sheet-existing")
+        #expect(api.createdSpreadsheetIDs.isEmpty)
+        #expect(isConnectedWithSync(target.status))
+    }
+
+    @Test func savingTrainingThroughAContextTriggersADebouncedSync() async {
+        let container = makeContainerWithConfig(enabled: true, spreadsheetID: "sheet-A")
+        let api = StubGoogleSheetsAPI(isAuthorized: true)
+        let target = GoogleSheetsTarget(api: api)
+        let engine = SyncEngine(targets: [target], debounceSeconds: 1)
+        await engine.attach(modelContainer: container)
+
+        insertLift(in: container)
+        try? await Task.sleep(nanoseconds: 1_600_000_000)
+
+        #expect(api.syncCount == 1, "a strength save syncs with no hook at the call site")
+    }
+
+    @Test func touchesTrainingIgnoresEmptyPayloads() {
+        #expect(SyncEngine.touchesTraining(nil) == false)
+        #expect(SyncEngine.touchesTraining([:]) == false)
+        #expect(SyncEngine.trainingEntityNames == ["Exercise", "StrengthRecord", "StrengthLift"])
+    }
+
+    @Test func connectionStatusFlags() {
+        #expect(ConnectionStatus.syncing.isSyncing)
+        #expect(!ConnectionStatus.syncing.needsAttention)
+        #expect(ConnectionStatus.needsAttention(reason: "x", action: .retry).needsAttention)
+        #expect(!ConnectionStatus.connected(lastSync: nil).needsAttention)
+        #expect(!ConnectionStatus.disconnected.isSyncing)
+    }
+
+    @Test func googleSheetsTargetIdentity() {
+        let target = GoogleSheetsTarget(api: StubGoogleSheetsAPI())
+        #expect(target.id == .googleSheets)
+        #expect(target.displayName == "Google Sheets")
+        #expect(target.capabilities == [.export, .autoExport])
+        #expect(!target.capabilities.contains(.import))
+    }
+}
+
+// MARK: - Google Sheets tab plan
+
+struct GoogleSheetsTabPlanTests {
+
+    @Test func nothingToDoWhenEveryTabExists() {
+        let steps = GoogleSheetsTabPlan.steps(existing: [(0, "Cardio"), (7, "Strength")], wanted: ["Cardio", "Strength"])
+        #expect(steps.isEmpty)
+    }
+
+    @Test func legacySheet1BecomesCardioAndStrengthIsAdded() {
+        let steps = GoogleSheetsTabPlan.steps(existing: [(0, "Sheet1")], wanted: ["Cardio", "Strength"])
+        #expect(steps == [.rename(sheetID: 0, to: "Cardio"), .add("Strength")])
+    }
+
+    @Test func onlyMissingTabsAreAdded() {
+        let steps = GoogleSheetsTabPlan.steps(existing: [(3, "Cardio"), (4, "Notes")], wanted: ["Cardio", "Strength"])
+        #expect(steps == [.add("Strength")])
     }
 }
 
@@ -4757,23 +4763,22 @@ struct TrainingSegmentTests {
 
 struct SettingsBadgeTests {
 
-    @Test func noBadgeWhenSheetsSyncIsOff() {
-        #expect(SettingsBadge.forSheetsSync(.failed("x"), isEnabled: false) == nil)
-        #expect(SettingsBadge.forSheetsSync(.syncing, isEnabled: false) == nil)
+    @Test func nothingWhenEveryTargetIsQuiet() {
+        #expect(SettingsBadge.forConnections([]) == nil)
+        #expect(SettingsBadge.forConnections([.disconnected, .connected(lastSync: Date())]) == nil)
     }
 
-    @Test func syncingShowsTheSyncingBadge() {
-        #expect(SettingsBadge.forSheetsSync(.syncing, isEnabled: true) == .syncing)
+    @Test func syncingShowsTheSyncingDot() {
+        #expect(SettingsBadge.forConnections([.syncing]) == .syncing)
     }
 
-    @Test func failuresAndSignOutNeedAttention() {
-        #expect(SettingsBadge.forSheetsSync(.failed("offline"), isEnabled: true) == .attention)
-        #expect(SettingsBadge.forSheetsSync(.needsAuth, isEnabled: true) == .attention)
+    @Test func anyAttentionShowsTheAttentionDot() {
+        #expect(SettingsBadge.forConnections([.needsAttention(reason: "offline", action: .retry)]) == .attention)
+        #expect(SettingsBadge.forConnections([.needsAttention(reason: "signed out", action: .signIn)]) == .attention)
     }
 
-    @Test func healthyStatesShowNoBadge() {
-        #expect(SettingsBadge.forSheetsSync(.idle, isEnabled: true) == nil)
-        #expect(SettingsBadge.forSheetsSync(.success(Date()), isEnabled: true) == nil)
+    @Test func attentionOutranksSyncing() {
+        #expect(SettingsBadge.forConnections([.syncing, .needsAttention(reason: "x", action: .retry)]) == .attention)
     }
 }
 
@@ -6406,7 +6411,8 @@ struct WorkoutCSVTrainingColumnTests {
         let excluded = Exercise(name: "Walk", type: .walk, durationSeconds: 1800, distanceMiles: 2, date: Date(),
                                 countsTowardTraining: false, workout: Workout(durationSeconds: 1800, distanceMiles: 2))
         #expect(WorkoutCSV.headerColumns.contains("counts_toward_training"))
-        #expect(WorkoutCSV.encodeRow(exercise: excluded, unit: .miles).hasSuffix(",false,false"), "not training, not key")
+        #expect(WorkoutCSV.encodeRow(exercise: excluded, unit: .miles)
+            .hasSuffix(",false,false,Manual,\(excluded.id.uuidString)"), "not training, not key, then provenance")
     }
 
     @Test func roundTripKeepsTheFlag() throws {
@@ -6603,7 +6609,7 @@ struct KeyWorkoutTests {
         let key = Exercise(name: "Long", type: .longRun, durationSeconds: 3600, distanceMiles: 10, date: Date(),
                            isKeyWorkout: true, workout: Workout(durationSeconds: 3600, distanceMiles: 10))
         let csv = WorkoutCSV.encode(exercises: [key], unit: .miles)
-        #expect(WorkoutCSV.headerColumns.last == "key_workout")
+        #expect(WorkoutCSV.headerColumns.contains("key_workout"))
         #expect(try WorkoutCSV.parse(csv).rows.first?.isKeyWorkout == true)
         #expect(try WorkoutCSV.parse("h\n1/2/2026,Run,run,30m,3\n").rows.first?.isKeyWorkout == false)
     }
@@ -10143,5 +10149,604 @@ struct DurationPresetTests {
 
     @Test func idIsTheMinutes() {
         #expect(DurationPreset(minutes: 30).id == 30)
+    }
+}
+
+// MARK: - CSVTable
+
+struct CSVTableTests {
+
+    @Test func headerFindsColumnsByNormalizedName() {
+        let header = CSVTable.Header([" Date ", "Perceived Exertion", "NAME", "date"])
+        #expect(header.contains("date"))
+        #expect(header.contains("perceived_exertion"))
+        #expect(header.index(of: ["missing", "name"]) == 2, "falls through to an alias")
+        #expect(header.index(of: ["date"]) == 0, "the first occurrence wins")
+        #expect(header.value(["name"], in: ["1/1/2026", "", "Run"]) == "Run")
+        #expect(header.value(["name"], in: ["1/1/2026"]) == "", "short row reads blank")
+        #expect(header.value(["nope"], in: ["x"]) == nil, "absent column reads nil")
+    }
+
+    @Test func tokenizeHandlesQuotesNewlinesAndBOM() {
+        let records = CSVTable.tokenize("\u{FEFF}a,b\n\"x, y\",\"say \"\"hi\"\"\nthere\"\n")
+        #expect(records.count == 2)
+        #expect(records[0].fields == ["a", "b"])
+        #expect(records[1].fields == ["x, y", "say \"hi\"\nthere"])
+        #expect(records[1].startLine == 2)
+    }
+
+    @Test func escapeAndDocumentRoundTrip() {
+        #expect(CSVTable.escape("plain") == "plain")
+        #expect(CSVTable.escape("a,b") == "\"a,b\"")
+        #expect(CSVTable.escape("q\"") == "\"q\"\"\"")
+        let doc = CSVTable.document([["h1", "h2"], ["a,b", "c"]])
+        #expect(doc == "h1,h2\n\"a,b\",c\n")
+        #expect(CSVTable.tokenize(doc).map(\.fields) == [["h1", "h2"], ["a,b", "c"]])
+    }
+
+    @Test func blankRecordIsDetected() {
+        #expect(CSVTable.Record(fields: [" "], startLine: 1).isBlank)
+        #expect(!CSVTable.Record(fields: ["", ""], startLine: 1).isBlank)
+    }
+
+    @Test func lenientBoolAndNonEmpty() {
+        #expect(CSVTable.bool("YES", default: false))
+        #expect(!CSVTable.bool("0", default: true))
+        #expect(CSVTable.bool(nil, default: true))
+        #expect(CSVTable.bool("maybe", default: false) == false)
+        #expect(CSVTable.nonEmpty("  x ") == "x")
+        #expect(CSVTable.nonEmpty("  ") == nil)
+        #expect(CSVTable.nonEmpty(nil) == nil)
+    }
+}
+
+// MARK: - Cardio CSV by header name
+
+struct WorkoutCSVHeaderNameTests {
+
+    @Test func reorderedColumnsAreReadByName() throws {
+        let csv = "distance,type,date,duration,name\n3.1,Run,2026-01-02,30m,Morning\n"
+        let row = try #require(try WorkoutCSV.parse(csv).rows.first)
+        #expect(row.name == "Morning")
+        #expect(row.type == .run)
+        #expect(row.durationSeconds == 1800)
+        #expect(row.distance == 3.1)
+    }
+
+    @Test func missingOptionalColumnsTakeDefaultsAndUnknownOnesAreIgnored() throws {
+        let csv = "date,type,shoe\n2026-01-02,Run,Pegasus\n"
+        let row = try #require(try WorkoutCSV.parse(csv).rows.first)
+        #expect(row.durationSeconds == 0)
+        #expect(row.distance == 0)
+        #expect(row.name == ExerciseType.run.rawValue, "a blank name takes the type's")
+        #expect(row.countsTowardTraining)
+        #expect(!row.isKeyWorkout)
+        #expect(row.source == nil)
+        #expect(row.id == nil)
+    }
+
+    @Test func legacyHeaderWithoutDateFallsBackToFixedOrder() throws {
+        let csv = "when,what,kind,time,miles\n1/2/2026,Run,run,30m,3\n"
+        let row = try #require(try WorkoutCSV.parse(csv).rows.first)
+        #expect(row.name == "Run")
+        #expect(row.distance == 3)
+    }
+
+    @Test func legacyFeltRatingAliasFeedsFeeling() throws {
+        let csv = "date,name,type,duration,distance,felt_rating\n1/2/2026,Run,run,30m,3,9\n"
+        #expect(try WorkoutCSV.parse(csv).rows.first?.feeling == 5, "clamped into 1–5")
+    }
+
+    @Test func sourceAndIDRoundTripThroughExport() throws {
+        let exercise = Exercise(
+            name: "Watch Run", type: .run, durationSeconds: 1800, distanceMiles: 3, date: Date(),
+            workout: Workout(durationSeconds: 1800, distanceMiles: 3, source: WorkoutSource.appleHealth.rawValue, externalID: "HK-1")
+        )
+        let row = try #require(try WorkoutCSV.parse(WorkoutCSV.encode(exercises: [exercise], unit: .miles)).rows.first)
+        #expect(row.source == WorkoutSource.appleHealth.rawValue)
+        #expect(row.id == "HK-1")
+        let record = WorkoutCSV.toRecord(row, unit: .miles)
+        #expect(record.externalID == "HK-1")
+        #expect(record.source == WorkoutSource.appleHealth.rawValue)
+    }
+
+    @Test func rowWithoutSourceImportsAsCSV() throws {
+        let row = try #require(try WorkoutCSV.parse("date,type\n2026-01-02,Run\n").rows.first)
+        #expect(WorkoutCSV.toRecord(row, unit: .miles).source == WorkoutSource.csv.rawValue)
+        #expect(WorkoutCSV.toExercise(row, unit: .miles).workout?.source == WorkoutSource.csv.rawValue)
+    }
+
+    @Test func plannedOnlyExerciseEncodesNoRow() {
+        let planned = Exercise(name: "Plan", type: .run, durationSeconds: 1800, distanceMiles: 3, date: Date())
+        #expect(WorkoutCSV.encodeRow(exercise: planned, unit: .miles) == "")
+    }
+}
+
+// MARK: - Strength CSV
+
+struct StrengthCSVTests {
+
+    private func session(
+        value: Double? = 225, metric: LiftMetric = .weight, measurement: LiftMeasurement? = .max,
+        date: Date = Date(timeIntervalSince1970: 1_767_000_000)
+    ) -> TrainingRecord.Strength {
+        TrainingRecord.Strength(
+            externalID: "rec-1", date: date, liftKey: "name:back squat", liftName: "Back Squat",
+            muscleGroup: .quads, metric: metric, value: value, measurement: measurement,
+            isLight: true, notes: "felt, good", countsTowardTraining: false
+        )
+    }
+
+    @Test func rowsCarryEveryColumnInOrder() {
+        let rows = StrengthCSV.rows(strength: [session()], metric: false)
+        #expect(rows[0] == StrengthCSV.headerColumns)
+        #expect(rows[1][1] == "Back Squat")
+        #expect(rows[1][2] == "Quads")
+        #expect(rows[1][3] == "weight")
+        #expect(rows[1][4] == "225")
+        #expect(rows[1][5] == "lb")
+        #expect(rows[1][6] == "max")
+        #expect(rows[1][7] == "true")
+        #expect(rows[1][9] == "false")
+        #expect(rows[1][10] == "name:back squat")
+        #expect(rows[1][11] == "rec-1")
+    }
+
+    @Test func metricWritesKilograms() {
+        let rows = StrengthCSV.rows(strength: [session(value: 220.462)], metric: true)
+        #expect(rows[1][5] == "kg")
+        #expect(rows[1][4] == "100")
+    }
+
+    @Test func rowsAreOldestFirst() {
+        let later = session(date: Date(timeIntervalSince1970: 1_768_000_000))
+        var earlier = session()
+        earlier.liftName = "Early"
+        let rows = StrengthCSV.rows(strength: [later, earlier], metric: false)
+        #expect(rows[1][1] == "Early")
+    }
+
+    @Test func roundTripsEveryField() throws {
+        for metric in [false, true] {
+            let original = session()
+            let parsed = try StrengthCSV.parse(StrengthCSV.encode(strength: [original], metric: metric))
+            let back = try #require(parsed.records.first)
+            #expect(back.liftKey == original.liftKey)
+            #expect(back.liftName == original.liftName)
+            #expect(back.muscleGroup == .quads)
+            #expect(back.metric == .weight)
+            #expect(abs((back.value ?? 0) - 225) < 0.05, "metric: \(metric)")
+            #expect(back.measurement == .max)
+            #expect(back.isLight)
+            #expect(back.notes == "felt, good")
+            #expect(!back.countsTowardTraining)
+            #expect(back.externalID == "rec-1")
+            #expect(Calendar.current.isDate(back.date, inSameDayAs: original.date))
+        }
+    }
+
+    @Test func doneSessionRoundTripsAsNoValue() throws {
+        let parsed = try StrengthCSV.parse(StrengthCSV.encode(strength: [session(value: nil, measurement: nil)], metric: false))
+        #expect(parsed.records.first?.value == nil)
+    }
+
+    @Test func timeAndDistanceUnits() throws {
+        let csv = """
+        date,lift,metric,value,unit
+        2026-01-02,Plank,time,1:30,s
+        2026-01-02,Sled Push,distance,100,m
+        2026-01-02,Farmer Carry,,50,yd
+        """
+        let records = try StrengthCSV.parse(csv).records
+        #expect(records[0].value == 90)
+        #expect(records[0].measurement == nil, "time has no measurement")
+        #expect(abs((records[1].value ?? 0) - 100 / LiftMetric.metersPerMile) < 0.0001)
+        #expect(records[2].metric == .distance, "a blank metric follows the unit")
+    }
+
+    @Test func handMadeFileUsesDefaults() throws {
+        let record = try #require(try StrengthCSV.parse("Date,Lift,Value\n1/2/2026,Deadlift,315\n").records.first)
+        #expect(record.liftKey == StrengthLiftKey.make(libraryID: nil, name: "Deadlift"))
+        #expect(record.metric == .weight)
+        #expect(record.value == 315, "a missing unit reads as lb")
+        #expect(record.muscleGroup == .other)
+        #expect(record.countsTowardTraining)
+        #expect(record.externalID == nil)
+    }
+
+    @Test func invalidRowsAreSkippedWithReasons() throws {
+        let csv = "date,lift,value\nsoon,Squat,100\n1/2/2026,,100\n1/2/2026,Squat,heavy\n1/2/2026,Squat,100\n"
+        let result = try StrengthCSV.parse(csv)
+        #expect(result.records.count == 1)
+        #expect(result.skipped.map(\.line) == [2, 3, 4])
+        #expect(result.skipped[0].reason.contains("date"))
+        #expect(result.skipped[1].reason.contains("lift"))
+        #expect(result.skipped[2].reason.contains("value"))
+    }
+
+    @Test func wholeFileErrors() {
+        #expect(throws: WorkoutCSVError.empty) { try StrengthCSV.parse("  \n") }
+        #expect(throws: WorkoutCSVError.missingHeader) { try StrengthCSV.parse("date,name\n1/2/2026,Run\n") }
+    }
+
+    @Test func parsingHelpers() {
+        #expect(StrengthCSV.parseMeasurement("Last Set") == .lastSet)
+        #expect(StrengthCSV.parseMeasurement("AVERAGE") == .average)
+        #expect(StrengthCSV.parseMeasurement("best") == nil)
+        #expect(StrengthCSV.parseMuscleGroup("full body") == .fullBody)
+        #expect(StrengthCSV.parseValue("1:02:03") == 3723)
+        #expect(StrengthCSV.parseValue("x:1") == nil)
+        #expect(StrengthCSV.parseUnit("kgs")?.isMetric == true)
+        #expect(StrengthCSV.parseUnit("furlong") == nil)
+        #expect(StrengthCSV.formatNumber(61.25) == "61.25")
+        #expect(StrengthCSV.formatNumber(61.5) == "61.5")
+        #expect(StrengthCSV.unit(for: .reps, metric: true) == "reps")
+    }
+
+    @Test func kindDetectionReadsTheHeader() {
+        #expect(TrainingCSVKind.detect("date,lift,value\n") == .strength)
+        #expect(TrainingCSVKind.detect("date,name,type\n") == .cardio)
+        #expect(TrainingCSVKind.detect("when,what\n") == .cardio, "legacy files are cardio")
+        #expect(TrainingCSVKind.detect("\n\n") == nil)
+    }
+}
+
+// MARK: - TrainingRecord
+
+struct TrainingRecordTests {
+
+    @Test func cardioReadsRecordedActualsAndAnchors() throws {
+        let exercise = Exercise(
+            name: "Tempo", type: .tempoRun, durationSeconds: 2000, distanceMiles: 5, date: Date(),
+            countsTowardTraining: false, isKeyWorkout: true,
+            workout: Workout(durationSeconds: 1900, distanceMiles: 4.8, notes: "n", feeling: 4, perceivedExertion: 8)
+        )
+        let record = try #require(TrainingRecord.Cardio(exercise: exercise))
+        #expect(record.externalID == exercise.id.uuidString, "the app's own ID when there's no source ID")
+        #expect(record.durationSeconds == 1900)
+        #expect(record.distanceMiles == 4.8)
+        #expect(record.feeling == 4)
+        #expect(record.perceivedExertion == 8)
+        #expect(!record.countsTowardTraining)
+        #expect(record.isKeyWorkout)
+        #expect(TrainingRecord.cardio(record).externalID == exercise.id.uuidString)
+        #expect(TrainingRecord.cardio(record).date == exercise.date)
+    }
+
+    @Test func plannedExerciseIsNoRecord() {
+        #expect(TrainingRecord.Cardio(exercise: Exercise(name: "P", type: .run, durationSeconds: 0, distanceMiles: 1, date: Date())) == nil)
+    }
+
+    @Test func makeExerciseMirrorsActualsAndStampsTheBatch() {
+        let batch = UUID()
+        let record = TrainingRecord.Cardio(externalID: "X", source: "CSV", date: Date(), name: "Run", type: .run,
+                                           durationSeconds: 600, distanceMiles: 1, feeling: 3)
+        let exercise = record.makeExercise(importBatchID: batch)
+        #expect(exercise.importBatchID == batch)
+        #expect(exercise.durationSeconds == 600)
+        #expect(exercise.workout?.externalID == "X")
+        #expect(exercise.workout?.source == "CSV")
+        #expect(exercise.workout?.feeling == 3)
+    }
+
+    @Test func strengthReadsTheLiftOrFallsBackToTheKey() {
+        let record = StrengthRecord(liftKey: "name:row", value: 100, metric: .weight, measurement: .average, notes: "x")
+        record.isLight = true
+        let lift = StrengthLift(liftKey: "name:row", name: "Barbell Row", muscleGroup: .back, primaryMetric: .weight)
+        lift.countsTowardTraining = false
+        let read = TrainingRecord.Strength(record: record, lift: lift)
+        #expect(read.liftName == "Barbell Row")
+        #expect(read.muscleGroup == .back)
+        #expect(read.externalID == record.id.uuidString)
+        #expect(read.isLight)
+        #expect(!read.countsTowardTraining)
+        #expect(TrainingRecord.Strength(record: record, lift: nil).liftName == "row")
+
+        record.externalID = "src-9"
+        #expect(TrainingRecord.Strength(record: record, lift: lift).externalID == "src-9")
+    }
+
+    @Test func snapshotReadsCompletedCardioAndAllStrength() throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        context.insert(AppConfiguration(useMetricUnits: true))
+        context.insert(Exercise(name: "Done", type: .run, durationSeconds: 1, distanceMiles: 1, date: Date(), workout: Workout()))
+        context.insert(Exercise(name: "Planned", type: .run, durationSeconds: 1, distanceMiles: 1, date: Date()))
+        context.insert(StrengthLift(liftKey: "name:squat", name: "Squat", muscleGroup: .quads, primaryMetric: .weight))
+        context.insert(StrengthRecord(liftKey: "name:squat", value: 200))
+        try context.save()
+
+        let snapshot = try TrainingSnapshot.load(from: context)
+        #expect(snapshot.useMetricUnits)
+        #expect(snapshot.cardio.map(\.name) == ["Done"])
+        #expect(snapshot.strength.map(\.liftName) == ["Squat"])
+    }
+}
+
+// MARK: - Import fields on the models
+
+struct ImportFieldTests {
+
+    @Test func defaultsAreNil() {
+        #expect(Exercise(name: "R", type: .run, durationSeconds: 0, distanceMiles: 0, date: Date()).importBatchID == nil)
+        let record = StrengthRecord(liftKey: "k")
+        #expect(record.externalID == nil)
+        #expect(record.importBatchID == nil)
+    }
+
+    @Test func fieldsPersist() throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        let batch = UUID()
+        let exercise = Exercise(name: "R", type: .run, durationSeconds: 0, distanceMiles: 0, date: Date())
+        exercise.importBatchID = batch
+        let record = StrengthRecord(liftKey: "k")
+        record.externalID = "ext"
+        record.importBatchID = batch
+        context.insert(exercise)
+        context.insert(record)
+        try context.save()
+
+        let reread = ModelContext(container)
+        #expect(try reread.fetch(FetchDescriptor<Exercise>()).first?.importBatchID == batch)
+        let fetched = try reread.fetch(FetchDescriptor<StrengthRecord>()).first
+        #expect(fetched?.externalID == "ext")
+        #expect(fetched?.importBatchID == batch)
+    }
+
+    @Test func importBatchDefaultsSummaryAndPersistence() throws {
+        let batch = ImportBatch(source: .appleHealth, cardioCount: 3, strengthCount: 0, duplicateCount: 1)
+        #expect(batch.addedCount == 3)
+        #expect(batch.summary == "3 cardio from Apple Health")
+        #expect(ImportBatch(source: .csvFile, cardioCount: 1, strengthCount: 2).summary == "1 cardio, 2 strength from CSV")
+        #expect(ImportBatch(source: .garmin).summary == "Nothing from Garmin")
+
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        context.insert(batch)
+        try context.save()
+        let fetched = try ModelContext(container).fetch(FetchDescriptor<ImportBatch>()).first
+        #expect(fetched?.source == .appleHealth)
+        #expect(fetched?.duplicateCount == 1)
+    }
+
+    @Test func connectionIDsHaveNamesAndSymbols() {
+        for id in ConnectionID.allCases {
+            #expect(!id.displayName.isEmpty)
+            #expect(!id.systemImage.isEmpty)
+        }
+    }
+}
+
+// MARK: - TrainingImporter
+
+struct TrainingImporterTests {
+
+    private func cardio(_ id: String?, name: String = "Run") -> TrainingRecord {
+        .cardio(TrainingRecord.Cardio(externalID: id, source: "CSV", date: Date(), name: name, type: .run, durationSeconds: 60))
+    }
+
+    private func strength(_ id: String?, key: String = "name:squat", counts: Bool = true) -> TrainingRecord {
+        .strength(TrainingRecord.Strength(externalID: id, date: Date(), liftKey: key, liftName: "Squat",
+                                          muscleGroup: .quads, metric: .weight, value: 200, measurement: .max,
+                                          isLight: true, countsTowardTraining: counts))
+    }
+
+    @Test func importsAndLogsABatch() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let outcome = try TrainingImporter.importRecords([cardio("a"), strength("b")], from: .csvFile, into: context)
+
+        #expect(outcome.cardioAdded == 1)
+        #expect(outcome.strengthAdded == 1)
+        #expect(outcome.duplicates == 0)
+        #expect(outcome.added == 2)
+        let batch = try #require(TrainingImporter.batches(in: context).first)
+        #expect(batch.id == outcome.batchID)
+        #expect(batch.cardioCount == 1)
+        #expect(batch.strengthCount == 1)
+        #expect(try context.fetch(FetchDescriptor<Exercise>()).first?.importBatchID == batch.id)
+        let record = try #require(try context.fetch(FetchDescriptor<StrengthRecord>()).first)
+        #expect(record.importBatchID == batch.id)
+        #expect(record.externalID == "b")
+        #expect(record.isLight)
+        #expect(record.measurement == .max)
+    }
+
+    @Test func createsAnUnknownLiftWithTheRecordsSettings() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        try TrainingImporter.importRecords([strength("b", counts: false)], from: .csvFile, into: context)
+        let lift = try #require(try context.fetch(FetchDescriptor<StrengthLift>()).first)
+        #expect(lift.name == "Squat")
+        #expect(lift.muscleGroup == .quads)
+        #expect(lift.libraryExerciseID == nil)
+        #expect(!lift.countsTowardTraining)
+        #expect(lift.defaultMeasurement == .max)
+    }
+
+    @Test func libraryKeyedLiftKeepsItsLibraryID() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        try TrainingImporter.importRecords([strength("b", key: "back-squat")], from: .csvFile, into: context)
+        #expect(try context.fetch(FetchDescriptor<StrengthLift>()).first?.libraryExerciseID == "back-squat")
+    }
+
+    @Test func existingLiftIsReusedUnchanged() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let lift = StrengthLift(liftKey: "name:squat", name: "My Squat", muscleGroup: .glutes, primaryMetric: .reps)
+        context.insert(lift)
+        try context.save()
+        try TrainingImporter.importRecords([strength("b", counts: false)], from: .csvFile, into: context)
+        let lifts = try context.fetch(FetchDescriptor<StrengthLift>())
+        #expect(lifts.count == 1)
+        #expect(lifts[0].name == "My Squat")
+        #expect(lifts[0].primaryMetric == .reps)
+        #expect(lifts[0].countsTowardTraining)
+    }
+
+    @Test func skipsRecordsAlreadyPresentOrRepeated() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let own = Exercise(name: "Mine", type: .run, durationSeconds: 1, distanceMiles: 1, date: Date(), workout: Workout())
+        let health = Exercise(name: "HK", type: .run, durationSeconds: 1, distanceMiles: 1, date: Date(),
+                              workout: Workout(externalID: "HK-1"))
+        context.insert(own)
+        context.insert(health)
+        try context.save()
+
+        let outcome = try TrainingImporter.importRecords(
+            [cardio(own.id.uuidString), cardio("HK-1"), cardio("new"), cardio("new"), cardio(nil)],
+            from: .csvFile, into: context
+        )
+        #expect(outcome.cardioAdded == 2, "one new anchor plus one with no anchor")
+        #expect(outcome.duplicates == 3)
+        #expect(TrainingImporter.batches(in: context).first?.duplicateCount == 3)
+    }
+
+    @Test func nothingNewLogsNoBatch() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        try TrainingImporter.importRecords([cardio("a")], from: .csvFile, into: context)
+        let second = try TrainingImporter.importRecords([cardio("a")], from: .csvFile, into: context)
+        #expect(second.batchID == nil)
+        #expect(second.added == 0)
+        #expect(TrainingImporter.batches(in: context).count == 1)
+        #expect(try TrainingImporter.importRecords([], from: .csvFile, into: context).batchID == nil)
+    }
+
+    @Test func knownIDsCoverEveryAnchor() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let exercise = Exercise(name: "R", type: .run, durationSeconds: 1, distanceMiles: 1, date: Date(), workout: Workout(externalID: "HK"))
+        let record = StrengthRecord(liftKey: "k")
+        record.externalID = "EXT"
+        context.insert(exercise)
+        context.insert(record)
+        try context.save()
+        #expect(TrainingImporter.knownIDs(in: context) == [exercise.id.uuidString, "HK", record.id.uuidString, "EXT"])
+        #expect(TrainingImporter.isNew(cardio(nil), known: ["x"]))
+        #expect(!TrainingImporter.isNew(cardio("x"), known: ["x"]))
+    }
+
+    @Test func batchesAreNewestFirst() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        try TrainingImporter.importRecords([cardio("a")], from: .csvFile, into: context, now: Date(timeIntervalSince1970: 100))
+        try TrainingImporter.importRecords([cardio("b")], from: .appleHealth, into: context, now: Date(timeIntervalSince1970: 200))
+        #expect(TrainingImporter.batches(in: context).map(\.source) == [.appleHealth, .csvFile])
+    }
+
+    @Test func undoRemovesOnlyThatBatchAndItsNewLifts() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let mine = Exercise(name: "Mine", type: .run, durationSeconds: 1, distanceMiles: 1, date: Date(), workout: Workout())
+        context.insert(mine)
+        try context.save()
+        try TrainingImporter.importRecords([cardio("a"), strength("b")], from: .csvFile, into: context)
+        let batch = try #require(TrainingImporter.batches(in: context).first)
+
+        let removed = try TrainingImporter.undo(batch, in: context)
+
+        #expect(removed.cardio == 1)
+        #expect(removed.strength == 1)
+        #expect(try context.fetch(FetchDescriptor<Exercise>()).map(\.name) == ["Mine"])
+        #expect(try context.fetch(FetchDescriptor<StrengthRecord>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<StrengthLift>()).isEmpty, "the lift the import made goes too")
+        #expect(TrainingImporter.batches(in: context).isEmpty)
+    }
+
+    @Test func undoKeepsALiftStillOnTheBoard() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        try TrainingImporter.importRecords([strength("b")], from: .csvFile, into: context)
+        context.insert(StrengthExercise(name: "squat", muscleGroup: .quads))
+        try context.save()
+        let batch = try #require(TrainingImporter.batches(in: context).first)
+
+        try TrainingImporter.undo(batch, in: context)
+
+        #expect(try context.fetch(FetchDescriptor<StrengthLift>()).count == 1)
+    }
+
+    @Test func undoKeepsALiftWithOtherRecords() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        try TrainingImporter.importRecords([strength("b")], from: .csvFile, into: context)
+        context.insert(StrengthRecord(liftKey: "name:squat", value: 1))
+        try context.save()
+        let batch = try #require(TrainingImporter.batches(in: context).first)
+
+        try TrainingImporter.undo(batch, in: context)
+
+        #expect(try context.fetch(FetchDescriptor<StrengthLift>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<StrengthRecord>()).count == 1)
+    }
+}
+
+// MARK: - CSV bundle (manual export/import)
+
+struct TrainingCSVBundleTests {
+
+    private let day = Date(timeIntervalSince1970: 1_767_225_600) // 2026-01-01
+
+    @Test func exportWritesBothFilesWithHeadersEvenWhenEmpty() {
+        let files = TrainingCSVBundle.files(for: TrainingSnapshot(cardio: [], strength: [], useMetricUnits: false), on: day)
+        #expect(files.map(\.name).allSatisfy { $0.hasSuffix(".csv") })
+        #expect(files[0].name.hasPrefix("train-cardio-"))
+        #expect(files[1].name.hasPrefix("train-strength-"))
+        #expect(files[0].text == WorkoutCSV.header + "\n")
+        #expect(files[1].text == StrengthCSV.headerColumns.joined(separator: ",") + "\n")
+        #expect(TrainingCSVBundle.folderName(on: day).hasPrefix("train-export-"))
+    }
+
+    @Test func exportRoundTripsThroughParse() {
+        let snapshot = TrainingSnapshot(
+            cardio: [TrainingRecord.Cardio(externalID: "c1", date: day, name: "Run", type: .run, durationSeconds: 1800, distanceMiles: 3)],
+            strength: [TrainingRecord.Strength(externalID: "s1", date: day, liftKey: "name:squat", liftName: "Squat", value: 100)],
+            useMetricUnits: true
+        )
+        let parsed = TrainingCSVBundle.parse(TrainingCSVBundle.files(for: snapshot, on: day))
+        #expect(parsed.fileNames.count == 2)
+        #expect(parsed.failures.isEmpty)
+        let records = parsed.records(cardioUnit: .kilometers)
+        #expect(records.map(\.externalID) == ["c1", "s1"])
+        if case .cardio(let cardio) = records[0] {
+            #expect(abs(cardio.distanceMiles - 3) < 0.01)
+        }
+        #expect(parsed.duplicateCount(known: ["s1"]) == 1)
+        #expect(!parsed.isEmpty)
+    }
+
+    @Test func parseReportsUnreadableFilesAndSkippedRows() {
+        let parsed = TrainingCSVBundle.parse([
+            .init(name: "blank.csv", text: "\n"),
+            .init(name: "lifts.csv", text: "date,lift\nnope,Squat\n"),
+            .init(name: "bad.csv", text: "date,lift_id\n")
+        ])
+        #expect(parsed.failures == ["blank.csv is empty."])
+        #expect(parsed.skippedCount == 1)
+        #expect(parsed.isEmpty)
+    }
+
+    @Test func exportDocumentWritesAFolderOfFiles() throws {
+        let doc = TrainingExportDocument(files: [.init(name: "a.csv", text: "x"), .init(name: "b.csv", text: "y")])
+        #expect(TrainingExportDocument.writableContentTypes == [.folder])
+        #expect(doc.files.count == 2)
+    }
+}
+
+// MARK: - Apple Health records
+
+struct HealthKitRecordTests {
+
+    @Test func toRecordKeysByHealthUUIDAndAppliesDefaults() {
+        let dto = HealthKitWorkout(id: "HK-9", activityType: .walking, startDate: Date(), duration: 1200, distanceMiles: 1)
+        let record = HealthKitWorkoutMapper.toRecord(dto, excludedTypes: [.walk], keyTypes: [.walk])
+        #expect(record.externalID == "HK-9")
+        #expect(record.source == WorkoutSource.appleHealth.rawValue)
+        #expect(record.type == .walk)
+        #expect(!record.countsTowardTraining)
+        #expect(record.isKeyWorkout)
+        #expect(record.feeling == nil)
+        #expect(record.durationSeconds == 1200)
+    }
+
+    @Test @MainActor func targetFetchesRecords() async throws {
+        let target = AppleHealthTarget(service: StubHealthKitImportService())
+        #expect(target.id == .appleHealth)
+        #expect(target.capabilities == [.import])
+        let records = try await target.fetchImports(since: .distantPast, defaults: ImportDefaults())
+        #expect(records.allSatisfy { if case .cardio = $0 { return true } else { return false } })
     }
 }
