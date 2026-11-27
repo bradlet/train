@@ -20,8 +20,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var configurations: [AppConfiguration]
     @Query private var allExercises: [Exercise]
-    /// The import log, newest first; the Data section offers Undo on the first.
-    @Query(sort: \ImportBatch.date, order: .reverse) private var importBatches: [ImportBatch]
+    @Environment(\.syncEngine) private var syncEngine
 
     /// A type's inclusion change waiting on "apply to past workouts?".
     @State private var pendingInclusion: PendingInclusion?
@@ -53,7 +52,24 @@ struct SettingsView: View {
                     trainingSection(config)
                     keyWorkoutSection(config)
                 }
-                WorkoutDataSection(latestImport: importBatches.first)
+                Section {
+                    NavigationLink {
+                        ConnectionsView()
+                    } label: {
+                        HStack {
+                            Label("Connections", systemImage: "arrow.triangle.2.circlepath")
+                            Spacer()
+                            if let badge = SettingsBadge.forConnections(syncEngine.targets.map(\.status)) {
+                                Circle().fill(badge.color).frame(width: 7, height: 7)
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("settings.connections")
+                } header: {
+                    Text("Data")
+                } footer: {
+                    Text("Your training is yours: export it, import it, or mirror it to Google Sheets or a folder of CSV files.")
+                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)

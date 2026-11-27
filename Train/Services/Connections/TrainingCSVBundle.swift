@@ -31,12 +31,24 @@ enum TrainingCSVBundle {
     ///   - snapshot: What to write.
     ///   - date: Stamped into the file names.
     static func files(for snapshot: TrainingSnapshot, on date: Date) -> [File] {
+        [file(.cardio, for: snapshot, on: date), file(.strength, for: snapshot, on: date)]
+    }
+
+    /// One kind's file, e.g. `train-strength-<date>.csv`, for the export in
+    /// that discipline's Progress segment.
+    /// - Parameters:
+    ///   - kind: Cardio or strength.
+    ///   - snapshot: What to write.
+    ///   - date: Stamped into the file name.
+    static func file(_ kind: TrainingCSVKind, for snapshot: TrainingSnapshot, on date: Date) -> File {
         let day = dayFormatter.string(from: date)
-        let unit: WorkoutCSVDistanceUnit = snapshot.useMetricUnits ? .kilometers : .miles
-        return [
-            File(name: "train-cardio-\(day).csv", text: WorkoutCSV.encode(cardio: snapshot.cardio, unit: unit)),
-            File(name: "train-strength-\(day).csv", text: StrengthCSV.encode(strength: snapshot.strength, metric: snapshot.useMetricUnits))
-        ]
+        switch kind {
+        case .cardio:
+            let unit: WorkoutCSVDistanceUnit = snapshot.useMetricUnits ? .kilometers : .miles
+            return File(name: "train-cardio-\(day).csv", text: WorkoutCSV.encode(cardio: snapshot.cardio, unit: unit))
+        case .strength:
+            return File(name: "train-strength-\(day).csv", text: StrengthCSV.encode(strength: snapshot.strength, metric: snapshot.useMetricUnits))
+        }
     }
 
     /// Parsed files waiting for the athlete to confirm.

@@ -52,6 +52,7 @@ struct HistoryView: View {
             }
             .padding(.vertical)
         }
+        .progressCSVExport(.cardio)
     }
 
     /// Section header and workout list.

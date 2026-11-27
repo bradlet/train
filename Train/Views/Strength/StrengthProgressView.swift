@@ -91,6 +91,7 @@ struct StrengthProgressView: View {
         }
         .searchable(text: $searchText, prompt: "Search lifts")
         .accessibilityIdentifier("strengthProgress.list")
+        .progressCSVExport(.strength)
     }
 
     /// Built-in and athlete groups.
