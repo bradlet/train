@@ -38,6 +38,8 @@ struct TrainApp: App {
     @State private var csvAutoExport: CSVAutoExportTarget
     /// Keeps every auto-export target current.
     @State private var syncEngine: SyncEngine
+    /// FIT files shared into the app ("Open in Train"), waiting for review.
+    @State private var sharedFITImport: FITImportRequest?
 
     /// The coach conversation for this app session. App-scope so the transcript
     /// survives tab switches and navigation pops; deliberately not persisted,
@@ -95,7 +97,15 @@ struct TrainApp: App {
                     // a cached Google session) and start syncing on saves.
                     await syncEngine.attach(modelContainer: sharedModelContainer)
                 }
+                .sheet(item: $sharedFITImport) { request in
+                    ImportFITSheet(request: request)
+                }
                 .onOpenURL { url in
+                    // A FIT activity shared or opened from Files (#22).
+                    if url.isFileURL {
+                        sharedFITImport = FITImportRequest.reading([url]).request
+                        return
+                    }
                     // The widget's `com.bradlet.train://coach…` links open
                     // the coach chat.
                     if let entry = CoachLaunchRoute.entry(from: url) {

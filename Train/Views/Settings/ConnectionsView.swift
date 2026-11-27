@@ -41,6 +41,11 @@ struct ConnectionsView: View {
 
     @State private var isHealthKitImporterPresented = false
 
+    // MARK: Garmin state
+
+    @State private var isFITPickerPresented = false
+    @State private var fitImport: FITImportRequest?
+
     // MARK: Sheets state
 
     @State private var isSheetsSyncConfirmationPresented = false
@@ -256,16 +261,46 @@ struct ConnectionsView: View {
 
     // MARK: - Garmin
 
-    /// The route that works today: Garmin Connect writes to Apple Health.
+    /// FIT file import (#22), plus the zero-effort Apple Health route.
     private var garminSection: some View {
-        Section {
-            ConnectionHeaderRow(id: .garmin, status: nil, detail: "Via Apple Health")
-            DisclosureGroup("How to bring in Garmin activities") {
-                Text("1. In the Garmin Connect app, open **More → Settings → Connected Apps → Apple Health** and turn on **Workouts**.")
-                Text("2. Here, tap **Import from Apple Health** after a session. Activities already imported are skipped.")
+        let last = importBatches.first { $0.source == .garmin }
+        return Section {
+            ConnectionHeaderRow(
+                id: .garmin,
+                status: nil,
+                detail: last.map { "Last import \($0.date.formatted(date: .abbreviated, time: .omitted))" } ?? "FIT files, or via Apple Health"
+            )
+            Button {
+                isFITPickerPresented = true
+            } label: {
+                Label("Import FIT Files…", systemImage: "square.and.arrow.down.on.square")
+            }
+            .accessibilityIdentifier("connections.garmin.importFIT")
+            DisclosureGroup("Other ways to bring in Garmin activities") {
+                Text("**Share a FIT file:** in Garmin Connect on the web, open an activity, choose ⚙︎ → **Export Original**, then open the file with Train.")
+                Text("**Through Apple Health:** in the Garmin Connect app, open **More → Settings → Connected Apps → Apple Health** and turn on **Workouts**, then use **Import from Apple Health** here.")
             }
             .font(.subheadline)
             .accessibilityIdentifier("connections.garmin.how")
+        } footer: {
+            Text("Activities already in Train are marked and skipped. Strength sessions stay out: log lifts in Strength.")
+        }
+        .background(
+            Color.clear.fileImporter(
+                isPresented: $isFITPickerPresented,
+                allowedContentTypes: [GarminFITTarget.fitType],
+                allowsMultipleSelection: true
+            ) { result in
+                switch result {
+                case .failure(let error):
+                    errorMessage = "Couldn't open the files: \(error.localizedDescription)"
+                case .success(let urls):
+                    fitImport = FITImportRequest.reading(urls).request
+                }
+            }
+        )
+        .sheet(item: $fitImport) { request in
+            ImportFITSheet(request: request)
         }
     }
 
