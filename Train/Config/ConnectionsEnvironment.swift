@@ -3,7 +3,7 @@
 //  Train
 //
 //  Environment keys for the connections layer (#21): the app's `SyncEngine`
-//  and its Google Sheets target. Defaults are stub-backed so previews and
+//  and its auto-export targets (Google Sheets, CSV auto-export). Defaults are stub-backed so previews and
 //  tests never trigger real OAuth or hit the network; the app root injects
 //  the live pair.
 //
@@ -16,10 +16,17 @@ private struct GoogleSheetsKey: EnvironmentKey {
     static let defaultValue = GoogleSheetsTarget(api: StubGoogleSheetsAPI(isAuthorized: false))
 }
 
+/// Environment key for the shared CSV auto-export target. The default keeps
+/// its bookmark in a throwaway suite so previews never touch the app's.
+private struct CSVAutoExportKey: EnvironmentKey {
+    @MainActor
+    static let defaultValue = CSVAutoExportTarget(defaults: UserDefaults(suiteName: "preview.csvAutoExport") ?? .standard)
+}
+
 /// Environment key for the shared sync engine.
 private struct SyncEngineKey: EnvironmentKey {
     @MainActor
-    static let defaultValue = SyncEngine(targets: [GoogleSheetsKey.defaultValue])
+    static let defaultValue = SyncEngine(targets: [GoogleSheetsKey.defaultValue, CSVAutoExportKey.defaultValue])
 }
 
 extension EnvironmentValues {
@@ -28,6 +35,12 @@ extension EnvironmentValues {
     var googleSheets: GoogleSheetsTarget {
         get { self[GoogleSheetsKey.self] }
         set { self[GoogleSheetsKey.self] = newValue }
+    }
+
+    /// The CSV auto-export target (#23). Defaults to a preview instance.
+    var csvAutoExport: CSVAutoExportTarget {
+        get { self[CSVAutoExportKey.self] }
+        set { self[CSVAutoExportKey.self] = newValue }
     }
 
     /// The engine that keeps every auto-export target current. Defaults to

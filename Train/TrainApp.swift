@@ -34,7 +34,9 @@ struct TrainApp: App {
     /// installed, the live API is a throwing stub and connecting surfaces
     /// `.notImplemented`.
     @State private var googleSheets: GoogleSheetsTarget
-    /// Keeps every auto-export target (Google Sheets today) current.
+    /// Keeps a CSV copy in a folder the athlete picks (#23).
+    @State private var csvAutoExport: CSVAutoExportTarget
+    /// Keeps every auto-export target current.
     @State private var syncEngine: SyncEngine
 
     /// The coach conversation for this app session. App-scope so the transcript
@@ -55,7 +57,15 @@ struct TrainApp: App {
     init() {
         let sheets = GoogleSheetsTarget(api: LiveGoogleSheetsAPI())
         _googleSheets = State(initialValue: sheets)
-        _syncEngine = State(initialValue: SyncEngine(targets: [sheets]))
+        // UI tests get a throwaway bookmark store so a folder picked on the
+        // simulator never leaks into a test run.
+        let csv = CSVAutoExportTarget(
+            defaults: CommandLine.arguments.contains("-uiTestSeed")
+                ? UserDefaults(suiteName: "uiTest.csvAutoExport") ?? .standard
+                : .standard
+        )
+        _csvAutoExport = State(initialValue: csv)
+        _syncEngine = State(initialValue: SyncEngine(targets: [sheets, csv]))
 
         // When launched by the UI test harness with `-uiTestSeed`, replace any
         // existing workouts in the container with a deterministic fixture set.
@@ -75,6 +85,7 @@ struct TrainApp: App {
                 .environment(\.aiCoach, aiCoach)
                 .environment(\.healthKitImport, healthKitImport)
                 .environment(\.googleSheets, googleSheets)
+                .environment(\.csvAutoExport, csvAutoExport)
                 .environment(\.syncEngine, syncEngine)
                 .environment(\.coachChat, coachChat)
                 .environment(\.coachSpeech, coachSpeech)

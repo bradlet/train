@@ -64,6 +64,8 @@ enum ConnectionAttention: Equatable, Sendable {
     case signIn
     /// A transient failure; trying again may.
     case retry
+    /// A chosen folder can no longer be reached; pick it again.
+    case chooseFolder
 }
 
 /// A target's state, read the same way for every target.
