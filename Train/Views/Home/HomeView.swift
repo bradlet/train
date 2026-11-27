@@ -24,6 +24,11 @@ struct HomeView: View {
     @Query private var allLifts: [StrengthLift]
     /// Hybrid hints dismissed this week (#19).
     @AppStorage("hybridHintsDismissed") private var dismissedHintsRaw = ""
+    /// The connection alert the athlete dismissed (`ConnectionAlert.key`).
+    @AppStorage("connections.dismissedAlert") private var dismissedConnectionAlert = ""
+    @Environment(\.syncEngine) private var syncEngine
+    /// Whether Connections is open from the attention banner.
+    @State private var isConnectionsPresented = false
     @Environment(\.coachChat) private var coachChat
     @Environment(\.aiCoach) private var coach
     @Environment(\.coachLauncher) private var coachLauncher
@@ -112,10 +117,26 @@ struct HomeView: View {
         PlannedDayLogger.pending(todayStrength, on: Date(), records: allStrengthRecords)
     }
 
+    /// The paused connection to surface, unless dismissed (#23).
+    private var connectionAlert: ConnectionAlert? {
+        ConnectionAlert.current(
+            syncEngine.targets.map { (id: $0.id, status: $0.status) },
+            dismissedKey: dismissedConnectionAlert
+        )
+    }
+
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(spacing: 20) {
+                    if let alert = connectionAlert {
+                        ConnectionAlertBanner(
+                            alert: alert,
+                            onFix: { isConnectionsPresented = true },
+                            onDismiss: { dismissedConnectionAlert = alert.key }
+                        )
+                    }
+
                     VStack(spacing: 8) {
                         HStack(spacing: 12) {
                             NavigationLink(value: HomeDestination.chat(.standard)) {
@@ -221,6 +242,16 @@ struct HomeView: View {
             .onChange(of: coachLauncher.pending, initial: true) { _, pending in
                 guard pending != nil, let entry = coachLauncher.consume() else { return }
                 Task { await openExternalEntry(entry) }
+            }
+            .sheet(isPresented: $isConnectionsPresented) {
+                NavigationStack {
+                    ConnectionsView()
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { isConnectionsPresented = false }
+                            }
+                        }
+                }
             }
             .sheet(item: $quickAddRequest) { request in
                 RecordWorkoutSheet(
