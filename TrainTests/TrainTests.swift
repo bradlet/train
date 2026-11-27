@@ -10113,3 +10113,35 @@ struct CoachIntentTests {
         #expect(TalkToCoachIntent.openAppWhenRun)
     }
 }
+
+// MARK: - Duration presets
+
+/// The 30 / 45 / 60 minute pills above every cardio duration editor.
+struct DurationPresetTests {
+
+    @Test func commonPresetsAreThirtyFortyFiveSixtyInOrder() {
+        #expect(DurationPreset.common.map(\.minutes) == [30, 45, 60])
+    }
+
+    @Test func labelsReadInMinutes() {
+        #expect(DurationPreset.common.map(\.label) == ["30m", "45m", "60m"])
+    }
+
+    @Test func componentsSplitIntoWheelValues() {
+        #expect(DurationPreset(minutes: 45).components == (0, 45, 0))
+        #expect(DurationPreset(minutes: 60).components == (1, 0, 0))
+        #expect(DurationPreset(minutes: 90).components == (1, 30, 0))
+    }
+
+    @Test func matchesOnlyTheExactTotal() {
+        let hour = DurationPreset(minutes: 60)
+        #expect(hour.matches(hours: 1, minutes: 0, seconds: 0))
+        #expect(hour.matches(hours: 0, minutes: 60, seconds: 0))
+        #expect(!hour.matches(hours: 1, minutes: 0, seconds: 1))
+        #expect(!hour.matches(hours: 0, minutes: 0, seconds: 0))
+    }
+
+    @Test func idIsTheMinutes() {
+        #expect(DurationPreset(minutes: 30).id == 30)
+    }
+}

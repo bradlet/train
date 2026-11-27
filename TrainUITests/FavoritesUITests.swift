@@ -2,9 +2,10 @@
 //  FavoritesUITests.swift
 //  TrainUITests
 //
-//  Functional UI tests for favorite workouts: quick-recording from a Home
-//  chip, managing favorites from the card's Edit button, and starting a quick
-//  add from the in-sheet "Start from Favorite" menu.
+//  Functional UI tests for favorite cardio sessions. Favorites live only in
+//  the cardio record and schedule sheets (never on Home): starting a quick add
+//  from the "Start from Favorite" menu, and managing favorites from that
+//  menu's "Manage Favorites…" entry. Also covers the duration preset pills.
 //
 //  These tests launch with `-uiTestSeed`, which seeds a single favorite —
 //  "Test Favorite Run" (Tempo Run, 4 mi, 32:00) — see `UITestFixtures.swift`.
@@ -34,15 +35,15 @@ final class FavoritesUITests: XCTestCase {
         return app
     }
 
-    /// Returns a Home element, scrolling down once if it starts off-screen
-    /// (the favorites card sits below today's training and Quick Record).
+    /// Opens Home's Quick Record "log workout" sheet.
     @MainActor
-    private func homeElement(_ element: XCUIElement, in app: XCUIApplication) -> XCUIElement {
-        if !element.waitForExistence(timeout: 3) || !element.isHittable {
+    private func openQuickAdd(in app: XCUIApplication) {
+        let button = app.buttons["home.logWorkout"]
+        if !button.waitForExistence(timeout: 3) || !button.isHittable {
             app.swipeUp()
         }
-        XCTAssertTrue(element.waitForExistence(timeout: 5), "\(element) should exist on Home")
-        return element
+        XCTAssertTrue(button.waitForExistence(timeout: 5), "Quick Record should be on Home")
+        button.tap()
     }
 
     /// Asserts the record form shows the seeded favorite's name and distance.
@@ -57,27 +58,41 @@ final class FavoritesUITests: XCTestCase {
     // MARK: - Tests
 
     @MainActor
-    func testFavoriteChipQuickRecordsForToday() {
+    func testHomeHasNoFavoritesCard() {
         let app = launchApp()
-
-        homeElement(app.buttons["home.favorites.chip.\(seededFavorite)"], in: app).tap()
-        assertRecordFormShowsSeededFavorite(in: app)
-
-        app.navigationBars["Record Workout"].buttons["Save"].tap()
-
-        app.tabBars.buttons["Cardio"].tap()
-        app.segmentedControls["cardio.segment"].buttons["Progress"].tap()
-        XCTAssertTrue(
-            app.staticTexts[seededFavorite].waitForExistence(timeout: 5),
-            "the recorded favorite should appear in History"
-        )
+        XCTAssertTrue(app.buttons["home.logWorkout"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["home.favorites.edit"].exists, "favorites no longer live on Home")
+        XCTAssertFalse(app.staticTexts["Favorites"].exists, "favorites no longer live on Home")
     }
 
     @MainActor
-    func testEditAddsFavoriteThatAppearsAsChip() {
+    func testQuickAddStartsFromFavoriteMenu() {
         let app = launchApp()
 
-        homeElement(app.buttons["home.favorites.edit"], in: app).tap()
+        openQuickAdd(in: app)
+        let menu = app.buttons["favoriteMenu.button"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5), "favorite menu should head a quick add")
+        menu.tap()
+
+        let item = app.buttons["favoriteMenu.item.\(seededFavorite)"]
+        XCTAssertTrue(item.waitForExistence(timeout: 5), "seeded favorite should be in the menu")
+        item.tap()
+
+        assertRecordFormShowsSeededFavorite(in: app)
+    }
+
+    @MainActor
+    func testManageFromMenuAddsFavoriteThatAppearsInMenu() {
+        let app = launchApp()
+
+        openQuickAdd(in: app)
+        let menu = app.buttons["favoriteMenu.button"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        let manage = app.buttons["favoriteMenu.manage"]
+        XCTAssertTrue(manage.waitForExistence(timeout: 5), "menu should offer Manage Favorites")
+        manage.tap()
+
         XCTAssertTrue(
             app.buttons["manageFavorites.row.\(seededFavorite)"].waitForExistence(timeout: 5),
             "the seeded favorite should be listed"
@@ -99,25 +114,23 @@ final class FavoritesUITests: XCTestCase {
         )
         app.buttons["manageFavorites.done"].tap()
 
+        menu.tap()
         XCTAssertTrue(
-            app.buttons["home.favorites.chip.Pool Swim"].waitForExistence(timeout: 5),
-            "the new favorite should appear as a chip"
+            app.buttons["favoriteMenu.item.Pool Swim"].waitForExistence(timeout: 5),
+            "the new favorite should appear in the sheet's menu"
         )
     }
 
     @MainActor
-    func testQuickAddStartsFromFavoriteMenu() {
+    func testDurationPillSetsWheels() {
         let app = launchApp()
 
-        homeElement(app.buttons["home.logWorkout"], in: app).tap()
-        let menu = app.buttons["favoriteMenu.button"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 5), "favorite menu should head a quick add")
-        menu.tap()
+        openQuickAdd(in: app)
+        let pill = app.buttons["duration.preset.45"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 5), "duration pills should head the wheels")
+        pill.tap()
 
-        let item = app.buttons["favoriteMenu.item.\(seededFavorite)"]
-        XCTAssertTrue(item.waitForExistence(timeout: 5), "seeded favorite should be in the menu")
-        item.tap()
-
-        assertRecordFormShowsSeededFavorite(in: app)
+        XCTAssertTrue(pill.isSelected, "the tapped pill should show as selected")
+        XCTAssertEqual(app.pickerWheels.element(boundBy: 1).value as? String, "45m")
     }
 }
