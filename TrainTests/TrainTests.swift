@@ -10750,3 +10750,160 @@ struct HealthKitRecordTests {
         #expect(records.allSatisfy { if case .cardio = $0 { return true } else { return false } })
     }
 }
+
+// MARK: - Connection alert (Home banner)
+
+struct ConnectionAlertTests {
+
+    @Test func noAlertWhenNothingNeedsAttention() {
+        #expect(ConnectionAlert.current([(.googleSheets, .connected(lastSync: nil)), (.csvFile, .syncing)], dismissedKey: "") == nil)
+    }
+
+    @Test func firstPausedTargetIsShown() {
+        let alert = ConnectionAlert.current(
+            [(.googleSheets, .needsAttention(reason: "Signed out", action: .signIn)),
+             (.csvFile, .needsAttention(reason: "Gone", action: .chooseFolder))],
+            dismissedKey: ""
+        )
+        #expect(alert?.id == .googleSheets)
+        #expect(alert?.message == "Google Sheets sync paused: Signed out")
+        #expect(alert?.actionTitle == "Sign In")
+        #expect(alert?.key == "googleSheets|Signed out")
+    }
+
+    @Test func dismissedAlertGivesWayToTheNextUntilTheReasonChanges() {
+        let statuses: [(id: ConnectionID, status: ConnectionStatus)] = [
+            (.googleSheets, .needsAttention(reason: "Signed out", action: .signIn)),
+            (.csvFile, .needsAttention(reason: "Gone", action: .chooseFolder))
+        ]
+        let next = ConnectionAlert.current(statuses, dismissedKey: "googleSheets|Signed out")
+        #expect(next?.id == .csvFile)
+        #expect(next?.actionTitle == "Choose Folder")
+        let changed = ConnectionAlert.current(
+            [(.googleSheets, .needsAttention(reason: "Quota", action: .retry))],
+            dismissedKey: "googleSheets|Signed out"
+        )
+        #expect(changed?.actionTitle == "Retry", "a new reason shows again")
+    }
+}
+
+// MARK: - CSV auto-export
+
+@MainActor
+struct CSVAutoExportTargetTests {
+
+    private func makeDefaults() -> UserDefaults {
+        let name = "test.csvAutoExport.\(UUID().uuidString)"
+        return UserDefaults(suiteName: name)!
+    }
+
+    private func makeFolder() throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("csv-auto-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    @Test func identityAndDefaults() async {
+        let target = CSVAutoExportTarget(defaults: makeDefaults())
+        #expect(target.id == .csvFile)
+        #expect(target.capabilities == [.import, .export, .autoExport])
+        await target.restore(from: ModelContainerFactory.makePreviewContainer())
+        #expect(!target.isConnected)
+        #expect(target.status == .disconnected)
+    }
+
+    @Test func connectWithoutAFolderThrows() async {
+        let target = CSVAutoExportTarget(defaults: makeDefaults())
+        await #expect(throws: CSVAutoExportError.noFolder) { try await target.connect() }
+    }
+
+    @Test func connectRemembersTheFolderAcrossRestores() async throws {
+        let defaults = makeDefaults()
+        let folder = try makeFolder()
+        let target = CSVAutoExportTarget(defaults: defaults)
+        target.choose(folder: folder)
+        try await target.connect()
+        #expect(target.isConnected)
+        #expect(target.folderName == folder.lastPathComponent)
+        #expect(target.readinessProblem() == nil)
+
+        let restored = CSVAutoExportTarget(defaults: defaults)
+        await restored.restore(from: ModelContainerFactory.makePreviewContainer())
+        #expect(restored.folderName == folder.lastPathComponent)
+        #expect(restored.status == .connected(lastSync: nil))
+    }
+
+    @Test func engineWritesBothFilesIntoTheFolder() async throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        context.insert(Exercise(name: "Run", type: .run, durationSeconds: 60, distanceMiles: 1, date: Date(), workout: Workout()))
+        context.insert(StrengthRecord(liftKey: "name:squat", value: 100))
+        try context.save()
+        let folder = try makeFolder()
+        let target = CSVAutoExportTarget(defaults: makeDefaults())
+        let engine = SyncEngine(targets: [target], debounceSeconds: 30)
+        await engine.attach(modelContainer: container, observesSaves: false)
+        target.choose(folder: folder)
+
+        try await engine.connect(target)
+
+        let cardio = try String(contentsOf: folder.appendingPathComponent(CSVAutoExportTarget.cardioFileName), encoding: .utf8)
+        let strength = try String(contentsOf: folder.appendingPathComponent(CSVAutoExportTarget.strengthFileName), encoding: .utf8)
+        #expect(try WorkoutCSV.parse(cardio).rows.count == 1)
+        #expect(try StrengthCSV.parse(strength).records.count == 1)
+        if case .connected(let lastSync) = target.status { #expect(lastSync != nil) } else { Issue.record("expected connected") }
+    }
+
+    @Test func lostFolderNeedsChoosingAgain() async throws {
+        let defaults = makeDefaults()
+        let folder = try makeFolder()
+        let target = CSVAutoExportTarget(defaults: defaults)
+        target.choose(folder: folder)
+        try await target.connect()
+        try FileManager.default.removeItem(at: folder)
+
+        #expect(target.status(afterFailure: CSVAutoExportError.folderUnavailable)
+                == .needsAttention(reason: CSVAutoExportTarget.folderLostReason, action: .chooseFolder))
+        guard case .needsAttention(_, .retry) = target.status(afterFailure: CocoaError(.fileWriteNoPermission)) else {
+            Issue.record("other failures retry")
+            return
+        }
+    }
+
+    @Test func disconnectForgetsTheFolder() async throws {
+        let defaults = makeDefaults()
+        let target = CSVAutoExportTarget(defaults: defaults)
+        target.choose(folder: try makeFolder())
+        try await target.connect()
+        target.disconnect()
+        #expect(!target.isConnected)
+        #expect(target.status == .disconnected)
+        #expect(defaults.data(forKey: CSVAutoExportTarget.bookmarkKey) == nil)
+    }
+
+    @Test func filesHaveFixedNames() {
+        let files = CSVAutoExportTarget.files(for: TrainingSnapshot(cardio: [], strength: [], useMetricUnits: false))
+        #expect(files.map(\.name) == ["train-cardio.csv", "train-strength.csv"])
+    }
+}
+
+// MARK: - Single-kind CSV (Progress export)
+
+struct TrainingCSVSingleFileTests {
+
+    @Test func eachKindWritesItsOwnFile() {
+        let day = Date(timeIntervalSince1970: 1_767_225_600)
+        let snapshot = TrainingSnapshot(
+            cardio: [TrainingRecord.Cardio(externalID: "c", date: day, name: "Run", type: .run)],
+            strength: [TrainingRecord.Strength(externalID: "s", date: day, liftKey: "name:squat", liftName: "Squat")],
+            useMetricUnits: false
+        )
+        let cardio = TrainingCSVBundle.file(.cardio, for: snapshot, on: day)
+        let strength = TrainingCSVBundle.file(.strength, for: snapshot, on: day)
+        #expect(cardio.name.hasPrefix("train-cardio-"))
+        #expect(TrainingCSVKind.detect(cardio.text) == .cardio)
+        #expect(strength.name.hasPrefix("train-strength-"))
+        #expect(TrainingCSVKind.detect(strength.text) == .strength)
+        #expect(TrainingCSVBundle.files(for: snapshot, on: day) == [cardio, strength])
+    }
+}

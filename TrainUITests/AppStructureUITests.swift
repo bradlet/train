@@ -67,7 +67,7 @@ final class AppStructureUITests: XCTestCase {
     /// Every tab has the Settings gear, and Settings holds the data actions
     /// that used to sit in History's toolbar menu.
     @MainActor
-    func testSettingsGearOnEveryTabOpensDataSection() {
+    func testSettingsGearOnEveryTabLinksToConnections() {
         let app = launch()
         for tab in ["Home", "Cardio", "Strength"] {
             app.tabBars.buttons[tab].tap()
@@ -80,9 +80,10 @@ final class AppStructureUITests: XCTestCase {
                 "Gear on \(tab) should open Settings"
             )
             app.swipeUp()
-            for id in ["settings.exportWorkouts", "settings.importWorkouts", "settings.importHealth"] {
-                XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 3), "\(id) should be in Settings → Data")
-            }
+            XCTAssertTrue(
+                app.buttons["settings.connections"].waitForExistence(timeout: 3),
+                "Settings → Data should link to Connections"
+            )
             app.buttons["settings.doneButton"].tap()
         }
     }
