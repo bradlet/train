@@ -50,6 +50,10 @@ final class Exercise {
     /// hints read only this flag.
     var isKeyWorkout: Bool = false
 
+    /// The import that created this exercise (#21), so "Undo last import"
+    /// can remove exactly that batch. `nil` for anything entered in the app.
+    var importBatchID: UUID? = nil
+
     /// Stored backing for `countsTowardTraining`. Keeps its original name on
     /// purpose: a CloudKit-backed store refuses to migrate a renamed
     /// property, even with `@Attribute(originalName:)` (it fails to load).

@@ -39,6 +39,12 @@ final class StrengthRecord {
     /// Whether it was logged during a light week (#20), so trends can tell
     /// a planned dip from a regression.
     var isLight: Bool = false
+    /// The source's own ID when the record was imported (#21), so a
+    /// re-import is recognised. `nil` for records logged in the app, whose
+    /// interchange ID is `id`.
+    var externalID: String? = nil
+    /// The import that created this record (#21), for "Undo last import".
+    var importBatchID: UUID? = nil
 
     /// The metric the value was recorded in. Stored per record so a later
     /// change to the lift's metric never reinterprets old values. Unknown

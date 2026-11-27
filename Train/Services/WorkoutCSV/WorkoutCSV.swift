@@ -2,10 +2,13 @@
 //  WorkoutCSV.swift
 //  Train
 //
-//  Pure CSV encoding and parsing for recorded exercises (Exercise + nested
-//  Workout). Deliberately has no SwiftData or SwiftUI dependencies so it is
-//  fully unit-testable. The schema is fixed (see `header`) and column order is
-//  never inferred from headers on import.
+//  The cardio CSV codec (#21): `TrainingRecord.Cardio` ↔ rows. Shared by CSV
+//  export/import and the Google Sheets Cardio tab. Pure; no SwiftData or
+//  SwiftUI, so it is fully unit-testable.
+//
+//  Import reads columns by header name, so a missing column takes its
+//  default and an unknown one is ignored. A header without a `date` column
+//  falls back to the legacy fixed order (`headerColumns`' order).
 //
 
 import Foundation
@@ -62,6 +65,11 @@ struct WorkoutCSVRow: Equatable {
     var countsTowardTraining: Bool = true
     /// Whether the athlete marked it key (#25); `false` when missing.
     var isKeyWorkout: Bool = false
+    /// Provenance (`WorkoutSource` raw value); `nil` when the column is
+    /// missing or blank, which imports as CSV.
+    var source: String? = nil
+    /// Dedupe anchor (#21); `nil` when missing or blank.
+    var id: String? = nil
 }
 
 /// Errors raised only for whole-file failures. Per-row problems are
@@ -89,11 +97,12 @@ struct WorkoutCSVParseResult: Equatable {
 /// Stateless CSV codec for `Workout` history.
 enum WorkoutCSV {
 
-    /// Fixed schema column names. Column order is authoritative; header names
-    /// are written on export but ignored on import (the schema is fixed).
+    /// Column names, in export order. Import finds them by name; a header
+    /// without `date` is read positionally in this order (legacy files).
     static let headerColumns = [
         "date", "name", "type", "duration", "distance", "notes",
-        "feeling", "perceived_exertion", "counts_toward_training", "key_workout"
+        "feeling", "perceived_exertion", "counts_toward_training", "key_workout",
+        "source", "id"
     ]
 
     /// CSV header line (joined `headerColumns`).
@@ -101,64 +110,59 @@ enum WorkoutCSV {
 
     // MARK: - Encoding
 
-    /// Encodes recorded exercises as a 2D matrix with the fixed schema. The
-    /// first row is the header. Only completed exercises (those with a
-    /// `workout`) are emitted. Distance values are converted from internal
-    /// miles to `unit`. Rows are sorted oldest-first to match the natural row
-    /// order in a spreadsheet.
-    ///
-    /// Used by both CSV export (after escape+join) and the Google Sheets
-    /// sync (which sends raw rows to the API).
-    static func rows(exercises: [Exercise], unit: WorkoutCSVDistanceUnit) -> [[String]] {
-        var output: [[String]] = [headerColumns]
-        let sorted = exercises.filter(\.isCompleted).sorted { $0.date < $1.date }
-        for exercise in sorted {
-            output.append(rowColumns(exercise: exercise, unit: unit))
-        }
-        return output
+    /// Encodes cardio records as a 2D matrix, header first, oldest first.
+    /// Distance is converted from internal miles to `unit`. Used by both CSV
+    /// export (after escape + join) and the Sheets Cardio tab (raw rows).
+    static func rows(cardio: [TrainingRecord.Cardio], unit: WorkoutCSVDistanceUnit) -> [[String]] {
+        [headerColumns] + cardio.sorted { $0.date < $1.date }.map { rowColumns($0, unit: unit) }
     }
 
-    /// Encodes recorded exercises to a CSV string with the fixed schema.
-    /// - Returns: A full CSV document ending with a trailing newline.
+    /// Encodes recorded exercises (planned-only ones are skipped) as a 2D
+    /// matrix, header first, oldest first.
+    static func rows(exercises: [Exercise], unit: WorkoutCSVDistanceUnit) -> [[String]] {
+        rows(cardio: exercises.compactMap(TrainingRecord.Cardio.init(exercise:)), unit: unit)
+    }
+
+    /// Encodes recorded exercises to a CSV document ending with a newline.
     static func encode(exercises: [Exercise], unit: WorkoutCSVDistanceUnit) -> String {
-        rows(exercises: exercises, unit: unit)
-            .map { $0.map(escape).joined(separator: ",") }
-            .joined(separator: "\n") + "\n"
+        CSVTable.document(rows(exercises: exercises, unit: unit))
+    }
+
+    /// Encodes cardio records to a CSV document ending with a newline.
+    static func encode(cardio: [TrainingRecord.Cardio], unit: WorkoutCSVDistanceUnit) -> String {
+        CSVTable.document(rows(cardio: cardio, unit: unit))
     }
 
     /// Serializes a single recorded exercise as one CSV row (no trailing
-    /// newline). The exercise must be completed (`workout != nil`).
+    /// newline). Returns `""` for a planned exercise that was never recorded.
     static func encodeRow(exercise: Exercise, unit: WorkoutCSVDistanceUnit) -> String {
-        rowColumns(exercise: exercise, unit: unit).map(escape).joined(separator: ",")
+        guard let record = TrainingRecord.Cardio(exercise: exercise) else { return "" }
+        return rowColumns(record, unit: unit).map(CSVTable.escape).joined(separator: ",")
     }
 
-    /// Raw column values for a single recorded exercise, in schema order, with
-    /// no escaping. The date/name/type come from the exercise; the recorded
-    /// metrics come from its nested `workout` (falling back to planned values
-    /// if absent).
-    private static func rowColumns(exercise: Exercise, unit: WorkoutCSVDistanceUnit) -> [String] {
-        let workout = exercise.workout
-        let date = mdyyyyFormatter.string(from: exercise.date)
-        let distanceMiles = workout?.distanceMiles ?? exercise.distanceMiles
-        let distance = unit.fromMiles(distanceMiles)
-        return [
-            date,
-            exercise.name,
-            exercise.type.rawValue,
-            formatDuration(workout?.durationSeconds ?? exercise.durationSeconds),
-            formatDistance(distance),
-            workout?.notes ?? exercise.notes,
-            workout?.feeling.map(String.init) ?? "",
-            workout?.perceivedExertion.map(String.init) ?? "",
-            exercise.countsTowardTraining ? "true" : "false",
-            exercise.isKeyWorkout ? "true" : "false"
+    /// Raw column values for one record, in `headerColumns` order.
+    private static func rowColumns(_ record: TrainingRecord.Cardio, unit: WorkoutCSVDistanceUnit) -> [String] {
+        [
+            mdyyyyFormatter.string(from: record.date),
+            record.name,
+            record.type.rawValue,
+            formatDuration(record.durationSeconds),
+            formatDistance(unit.fromMiles(record.distanceMiles)),
+            record.notes,
+            record.feeling.map(String.init) ?? "",
+            record.perceivedExertion.map(String.init) ?? "",
+            record.countsTowardTraining ? "true" : "false",
+            record.isKeyWorkout ? "true" : "false",
+            record.source,
+            record.externalID ?? ""
         ]
     }
 
     // MARK: - Decoding
 
-    /// Parses a CSV document into rows. The first non-empty line is
-    /// assumed to be the header and discarded without validation.
+    /// Parses a CSV document into rows. The first line is the header: its
+    /// names locate the columns, or, without a `date` column, the rows are
+    /// read in the legacy fixed order.
     /// - Parameter csv: Full CSV document text.
     /// - Throws: `WorkoutCSVError.empty` if the document is empty or whitespace only.
     ///           `WorkoutCSVError.missingHeader` if no header line can be found.
@@ -167,10 +171,10 @@ enum WorkoutCSV {
         let trimmed = csv.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw WorkoutCSVError.empty }
 
-        let records = tokenize(csv)
-        guard !records.isEmpty else { throw WorkoutCSVError.missingHeader }
-
-        // First record is the header — discard without validation (schema is fixed).
+        let records = CSVTable.tokenize(csv)
+        guard let headerRecord = records.first else { throw WorkoutCSVError.missingHeader }
+        let header = CSVTable.Header(headerRecord.fields)
+        let layout: Layout = header.contains("date") ? .named(header) : .legacy
         let dataRecords = records.dropFirst()
 
         var rows: [WorkoutCSVRow] = []
@@ -178,9 +182,9 @@ enum WorkoutCSV {
 
         for record in dataRecords {
             // Skip fully blank lines silently.
-            if record.fields.count == 1 && record.fields[0].isEmpty { continue }
+            if record.isBlank { continue }
 
-            let outcome = decodeRow(record.fields)
+            let outcome = decodeRow(record.fields, layout: layout)
             switch outcome {
             case .row(let row):
                 rows.append(row)
@@ -192,31 +196,30 @@ enum WorkoutCSV {
         return WorkoutCSVParseResult(rows: rows, skipped: skipped)
     }
 
-    /// Converts a parsed CSV row into a single completed `Exercise`, applying
-    /// the distance unit conversion to produce the internal miles storage
-    /// value. The row's metrics populate both the planned targets and the
-    /// nested `workout` actuals; the workout is tagged with
-    /// `source = WorkoutSource.csv` for provenance (no `externalID`).
-    static func toExercise(_ row: WorkoutCSVRow, unit: WorkoutCSVDistanceUnit) -> Exercise {
-        let miles = unit.toMiles(row.distance)
-        return Exercise(
+    /// Converts a parsed row to the interchange record, applying the
+    /// distance unit to get internal miles. A row without a source imports
+    /// as CSV; its `id` becomes the record's dedupe anchor.
+    static func toRecord(_ row: WorkoutCSVRow, unit: WorkoutCSVDistanceUnit) -> TrainingRecord.Cardio {
+        TrainingRecord.Cardio(
+            externalID: row.id,
+            source: row.source ?? WorkoutSource.csv.rawValue,
+            date: row.date,
             name: row.name,
             type: row.type,
             durationSeconds: row.durationSeconds,
-            distanceMiles: miles,
+            distanceMiles: unit.toMiles(row.distance),
             notes: row.notes,
-            date: row.date,
+            feeling: row.feeling,
+            perceivedExertion: row.perceivedExertion,
             countsTowardTraining: row.countsTowardTraining,
-            isKeyWorkout: row.isKeyWorkout,
-            workout: Workout(
-                durationSeconds: row.durationSeconds,
-                distanceMiles: miles,
-                notes: row.notes,
-                feeling: row.feeling,
-                perceivedExertion: row.perceivedExertion,
-                source: WorkoutSource.csv.rawValue
-            )
+            isKeyWorkout: row.isKeyWorkout
         )
+    }
+
+    /// Converts a parsed CSV row into a single completed `Exercise` whose
+    /// planned targets and recorded actuals both carry the row's metrics.
+    static func toExercise(_ row: WorkoutCSVRow, unit: WorkoutCSVDistanceUnit) -> Exercise {
+        toRecord(row, unit: unit).makeExercise()
     }
 
     // MARK: - Duration Parsing
@@ -291,13 +294,6 @@ enum WorkoutCSV {
 
     // MARK: - Internals
 
-    /// A single logical CSV record after field splitting. `startLine` is
-    /// the 1-based line number in the source text (handles embedded newlines).
-    private struct Record {
-        var fields: [String]
-        var startLine: Int
-    }
-
     /// ISO8601 formatter with internet date-time format.
     private static let iso8601Formatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
@@ -324,92 +320,17 @@ enum WorkoutCSV {
 
     /// DateFormatter for `M/d/yyyy` format (handles single- and double-digit month/day).
     /// Uses the user's local timezone so plain dates land on the correct calendar day.
-    private static let mdyyyyFormatter: DateFormatter = {
+    static let mdyyyyFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "M/d/yyyy"
         f.locale = Locale(identifier: "en_US_POSIX")
         return f
     }()
 
-    /// RFC 4180 field escape: wrap in quotes if the field contains a comma,
-    /// quote, or newline; double any embedded quotes.
-    private static func escape(_ field: String) -> String {
-        let needsQuoting = field.contains(",") || field.contains("\"") || field.contains("\n") || field.contains("\r")
-        guard needsQuoting else { return field }
-        let escaped = field.replacingOccurrences(of: "\"", with: "\"\"")
-        return "\"\(escaped)\""
-    }
-
     /// Formats distance with fixed 2-decimal precision using the POSIX locale
     /// so the decimal separator is always a period.
     private static func formatDistance(_ value: Double) -> String {
         String(format: "%.2f", value)
-    }
-
-    /// Tokenizes a CSV document into records, handling RFC 4180 quoted
-    /// fields with embedded commas, quotes, and newlines.
-    private static func tokenize(_ csv: String) -> [Record] {
-        var records: [Record] = []
-        var currentFields: [String] = []
-        var currentField = ""
-        var inQuotes = false
-        var line = 1
-        var recordStartLine = 1
-
-        let chars = Array(csv)
-        var i = 0
-        while i < chars.count {
-            let c = chars[i]
-
-            if inQuotes {
-                if c == "\"" {
-                    // Doubled quote inside a quoted field → literal quote.
-                    if i + 1 < chars.count && chars[i + 1] == "\"" {
-                        currentField.append("\"")
-                        i += 2
-                        continue
-                    }
-                    inQuotes = false
-                    i += 1
-                    continue
-                }
-                if c == "\n" || c == "\r\n" { line += 1 }
-                currentField.append(c)
-                i += 1
-                continue
-            }
-
-            switch c {
-            case "\"":
-                inQuotes = true
-                i += 1
-            case ",":
-                currentFields.append(currentField)
-                currentField = ""
-                i += 1
-            case "\r\n", "\r", "\n":
-                // Swift treats \r\n as a single Character (grapheme cluster),
-                // so it must be its own case alongside standalone \r and \n.
-                currentFields.append(currentField)
-                records.append(Record(fields: currentFields, startLine: recordStartLine))
-                currentFields = []
-                currentField = ""
-                line += 1
-                recordStartLine = line
-                i += 1
-            default:
-                currentField.append(c)
-                i += 1
-            }
-        }
-
-        // Flush trailing field/record (file may not end with a newline).
-        if !currentField.isEmpty || !currentFields.isEmpty {
-            currentFields.append(currentField)
-            records.append(Record(fields: currentFields, startLine: recordStartLine))
-        }
-
-        return records
     }
 
     /// Outcome of decoding a single tokenized row.
@@ -418,26 +339,49 @@ enum WorkoutCSV {
         case skip(String)
     }
 
+    /// Where a row's columns are: by header name, or the legacy fixed order.
+    private enum Layout {
+        case named(CSVTable.Header)
+        case legacy
+
+        /// A field's raw text, `nil` when the column is absent.
+        /// - Parameters:
+        ///   - names: The column's name, then any legacy aliases.
+        ///   - fields: The row's fields.
+        func value(_ names: [String], in fields: [String]) -> String? {
+            switch self {
+            case .named(let header):
+                return header.value(names, in: fields)
+            case .legacy:
+                guard let index = WorkoutCSV.headerColumns.firstIndex(of: names[0]) else { return nil }
+                return index < fields.count ? fields[index] : nil
+            }
+        }
+    }
+
     /// Decodes a tokenized row's fields into a `WorkoutCSVRow`.
     /// Returns `.skip` with a short human-readable reason on failure.
-    /// Minimum 5 fields required (date, name, type, duration, distance).
-    /// Notes (field 6) defaults to "", both rating columns (fields 7 and
-    /// 8) default to `nil`, and counts-toward-training (field 9) to `true`.
-    private static func decodeRow(_ fields: [String]) -> DecodeOutcome {
-        guard fields.count >= 5 else {
+    /// A legacy row needs at least 5 fields (date, name, type, duration,
+    /// distance); a named row needs a date, and a missing duration or
+    /// distance column reads as 0. Notes default to "", both ratings to
+    /// `nil`, counts-toward-training to `true` and key to `false`.
+    private static func decodeRow(_ fields: [String], layout: Layout) -> DecodeOutcome {
+        if case .legacy = layout, fields.count < 5 {
             return .skip("expected at least 5 fields, got \(fields.count)")
         }
 
-        let dateString = fields[0]
-        let name = fields[1]
-        let typeString = fields[2]
-        let durationString = fields[3]
-        let distanceString = fields[4]
-        let notes = fields.count > 5 ? fields[5] : ""
-        let feelingString = fields.count > 6 ? fields[6] : ""
-        let exertionString = fields.count > 7 ? fields[7] : ""
-        let countsString = fields.count > 8 ? fields[8] : ""
-        let keyString = fields.count > 9 ? fields[9] : ""
+        let dateString = layout.value(["date"], in: fields) ?? ""
+        let name = layout.value(["name"], in: fields) ?? ""
+        let typeString = layout.value(["type"], in: fields) ?? ""
+        let durationString = layout.value(["duration", "duration_seconds"], in: fields) ?? "0"
+        let distanceString = layout.value(["distance"], in: fields) ?? "0"
+        let notes = layout.value(["notes"], in: fields) ?? ""
+        let feelingString = layout.value(["feeling", "felt_rating"], in: fields) ?? ""
+        let exertionString = layout.value(["perceived_exertion", "rpe"], in: fields) ?? ""
+        let countsString = layout.value(["counts_toward_training", "counts_toward_mileage"], in: fields) ?? ""
+        let keyString = layout.value(["key_workout"], in: fields)
+        let source = CSVTable.nonEmpty(layout.value(["source"], in: fields))
+        let id = CSVTable.nonEmpty(layout.value(["id"], in: fields))
 
         guard let date = parseDate(dateString) else {
             return .skip("invalid date '\(dateString)'")
@@ -475,7 +419,9 @@ enum WorkoutCSV {
             feeling: feeling,
             perceivedExertion: exertion,
             countsTowardTraining: parseCounts(countsString),
-            isKeyWorkout: ["true", "yes", "1"].contains(keyString.trimmingCharacters(in: .whitespaces).lowercased())
+            isKeyWorkout: CSVTable.bool(keyString, default: false),
+            source: source,
+            id: id
         ))
     }
 
@@ -535,7 +481,7 @@ enum WorkoutCSV {
     /// user's local timezone. CSV dates represent calendar days, so
     /// `2025-08-04T00:00:00Z` should land on August 4th regardless of the
     /// user's timezone offset from UTC.
-    private static func parseDate(_ string: String) -> Date? {
+    static func parseDate(_ string: String) -> Date? {
         let trimmed = string.trimmingCharacters(in: .whitespaces)
 
         // ISO8601 dates include timezone info (the Z suffix), so we must
