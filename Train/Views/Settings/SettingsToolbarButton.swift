@@ -3,7 +3,7 @@
 //  Train
 //
 //  The gear that opens Settings, present on every tab. It also carries the
-//  Google Sheets sync status dot, since sync controls live in Settings.
+//  connections status dot (#21), since sync controls live in Settings.
 //
 
 import SwiftUI
@@ -15,18 +15,13 @@ enum SettingsBadge: Equatable {
     /// The last sync failed or needs sign-in.
     case attention
 
-    /// The badge for a Sheets sync status, or `nil` when nothing needs
-    /// showing.
-    /// - Parameters:
-    ///   - status: The coordinator's current status.
-    ///   - isEnabled: Whether Sheets sync is turned on.
-    static func forSheetsSync(_ status: GoogleSheetsSyncStatus, isEnabled: Bool) -> SettingsBadge? {
-        guard isEnabled else { return nil }
-        switch status {
-        case .syncing: return .syncing
-        case .failed, .needsAuth: return .attention
-        default: return nil
-        }
+    /// The badge for the connections' statuses, or `nil` when nothing
+    /// needs showing. Attention outranks syncing.
+    /// - Parameter statuses: Every auto-export target's status.
+    static func forConnections(_ statuses: [ConnectionStatus]) -> SettingsBadge? {
+        if statuses.contains(where: \.needsAttention) { return .attention }
+        if statuses.contains(where: \.isSyncing) { return .syncing }
+        return nil
     }
 
     /// Dot colour: yellow while syncing, red when it needs attention.
@@ -41,7 +36,7 @@ enum SettingsBadge: Equatable {
 /// Adds the Settings gear to the leading edge of a navigation bar and
 /// presents `SettingsView` from it.
 private struct SettingsToolbarModifier: ViewModifier {
-    @Environment(\.googleSheetsSync) private var sheetsSync
+    @Environment(\.syncEngine) private var syncEngine
     @State private var isPresented = false
 
     func body(content: Content) -> some View {
@@ -53,7 +48,7 @@ private struct SettingsToolbarModifier: ViewModifier {
                     } label: {
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: "gearshape")
-                            if let badge = SettingsBadge.forSheetsSync(sheetsSync.status, isEnabled: sheetsSync.isEnabled) {
+                            if let badge = SettingsBadge.forConnections(syncEngine.targets.map(\.status)) {
                                 Circle()
                                     .fill(badge.color)
                                     .frame(width: 7, height: 7)

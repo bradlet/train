@@ -2,7 +2,8 @@
 //  CSVImportHelpView.swift
 //  Train
 //
-//  Help page explaining the expected CSV format for workout imports.
+//  Help page explaining the CSV formats for imports: the cardio file in
+//  detail, and the strength file's columns (#21).
 //  Exercise type values are generated dynamically from ExerciseType.allCases
 //  so the list stays in sync as new types are added.
 //
@@ -24,6 +25,7 @@ struct CSVImportHelpView: View {
                 distanceSection
                 optionalFieldsSection
                 exampleSection
+                strengthSection
             }
             .navigationTitle("CSV Format")
             .navigationBarTitleDisplayMode(.inline)
@@ -39,14 +41,14 @@ struct CSVImportHelpView: View {
 
     private var columnOrderSection: some View {
         Section {
-            Text("date, name, type, duration, distance, notes, feeling, perceived_exertion")
+            Text(WorkoutCSV.headerColumns.joined(separator: ", "))
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(.primary)
-            Text("The first row of your CSV must be a header. Column order is fixed and must match the order above.")
+            Text("The first row must be a header. Columns are matched by name, in any order; only date is required, missing columns take their defaults, and extra columns are ignored. A header without a date column is read in the order above.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } header: {
-            Text("Column Order")
+            Text("Cardio Columns")
         }
     }
 
@@ -134,7 +136,7 @@ struct CSVImportHelpView: View {
         } header: {
             Text("Optional Fields")
         } footer: {
-            Text("All three can be left empty, and a rating of 0 is read as unrated. You can also omit them entirely by having only 5, 6, or 7 columns per row.")
+            Text("All three can be left empty, and a rating of 0 is read as unrated. counts_toward_training and key_workout take true/false; source and id are written by Train's own export so a re-import skips what's already here.")
         }
     }
 
@@ -151,6 +153,18 @@ struct CSVImportHelpView: View {
             Text("Example")
         } footer: {
             Text("The third row has no name \u{2014} it will be imported as \"Long Run\" based on the type \u{2014} and no ratings.")
+        }
+    }
+
+    private var strengthSection: some View {
+        Section {
+            Text(StrengthCSV.headerColumns.joined(separator: ", "))
+                .font(.system(.caption, design: .monospaced))
+            Text("A file with a **lift** column is read as strength: one row per session of one lift. Only date and lift are required. value is the session's number (blank means done, no number), unit says what it's in (lb, kg, reps, s, yd or m), and measurement is max, average, firstSet, lastSet or min for weight and reps.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } header: {
+            Text("Strength Columns")
         }
     }
 

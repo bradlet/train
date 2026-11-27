@@ -19,7 +19,6 @@ struct WorkoutDetailSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.useMetricUnits) private var useMetricUnits
-    @Environment(\.googleSheetsSync) private var sheetsSync
 
     /// The recorded exercise being edited. Mutated in-place on save.
     let exercise: Exercise
@@ -249,10 +248,9 @@ struct WorkoutDetailSheet: View {
             isKeyWorkout: isKeyWorkout
         )
         WorkoutEditor.apply(edits, to: exercise)
-        // Explicit save so the Google Sheets sync trigger sees the edit
-        // immediately when it fetches via a fresh ModelContext.
+        // Explicit save: the sync engine picks the edit up from the save,
+        // and reads it via a fresh ModelContext.
         try? modelContext.save()
-        sheetsSync.requestSync()
         dismiss()
     }
 
@@ -262,7 +260,6 @@ struct WorkoutDetailSheet: View {
     private func performRemoveRecording() {
         WorkoutEditor.removeRecording(from: exercise)
         try? modelContext.save()
-        sheetsSync.requestSync()
         dismiss()
     }
 
@@ -273,7 +270,6 @@ struct WorkoutDetailSheet: View {
     private func performDelete() {
         modelContext.delete(exercise)
         try? modelContext.save()
-        sheetsSync.requestSync()
         dismiss()
     }
 }

@@ -8,7 +8,7 @@
 //  Deliberately ephemeral. The store lives in App scope and is exposed via
 //  `@Environment(\.coachChat)`, so a conversation survives tab switches and
 //  navigation pops but is gone on relaunch. This is the same shape as
-//  `GoogleSheetsSyncCoordinator` — app-scope observable state, not a ViewModel:
+//  `SyncEngine` — app-scope observable state, not a ViewModel:
 //  it owns no SwiftData queries and makes no view decisions.
 //
 

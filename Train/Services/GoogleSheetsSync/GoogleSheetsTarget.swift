@@ -1,238 +1,157 @@
 //
-//  GoogleSheetsSyncCoordinator.swift
+//  GoogleSheetsTarget.swift
 //  Train
 //
-//  Orchestrates the Google Sheets sync feature: owns the user-facing
-//  enable/disable state, debounces mutation-triggered syncs, and bridges
-//  SwiftData (to read workouts + AppConfiguration) to the network-only
-//  `GoogleSheetsAPI` layer.
+//  Google Sheets as an `AutoExportTarget` (#21). Owns the sign-in, the
+//  spreadsheet it writes to, and the persisted on/off state; `SyncEngine`
+//  decides when to export. The sheet is a one-way mirror with a Cardio tab
+//  and a Strength tab, both overwritten from the app on every sync: edits
+//  made in the sheet never survive, and set-up says so.
 //
-//  Single coordinator instance lives in App scope and is exposed via
-//  `@Environment(\.googleSheetsSync)`. Views never touch the API directly.
+//  One instance lives in App scope, exposed via `@Environment(\.googleSheets)`.
+//  Views never touch `GoogleSheetsAPI` directly.
 //
 
 import Foundation
 import Observation
 import SwiftData
 
-/// Lifecycle state for the Google Sheets sync feature, surfaced to the
-/// History tab toolbar so it can show a status indicator.
-enum GoogleSheetsSyncStatus: Equatable {
-    /// No sync in flight; either disabled, or last sync succeeded long enough
-    /// ago that we don't surface a visible state.
-    case idle
-    /// A sync is currently uploading.
-    case syncing
-    /// The last sync completed successfully at the given time.
-    case success(Date)
-    /// The last sync failed with the given user-facing reason. Mutation hooks
-    /// will retry on next change.
-    case failed(String)
-    /// Sync is enabled in `AppConfiguration` but no OAuth token exists on
-    /// this device (e.g. the user enabled on another device). The user must
-    /// sign in via the menu before syncs can run.
-    case needsAuth
-}
-
-/// Debounce + state coordinator for Google Sheets sync. `@Observable` so the
-/// History tab toolbar can react to status changes for the failure indicator.
+/// The Google Sheets mirror of the athlete's training.
 @MainActor
 @Observable
-final class GoogleSheetsSyncCoordinator {
+final class GoogleSheetsTarget: AutoExportTarget {
 
-    // MARK: - Public state
+    let id: ConnectionID = .googleSheets
+    let capabilities: ConnectionCapabilities = [.export, .autoExport]
 
-    /// Latest sync lifecycle state. Drives the History tab status indicator.
-    private(set) var status: GoogleSheetsSyncStatus = .idle
+    /// Current state; `SyncEngine` writes it around each export.
+    var status: ConnectionStatus = .disconnected
 
-    /// Whether the user has enabled sync. Mirrors
-    /// `AppConfiguration.googleSheetsSyncEnabled`. Updated by `attach`,
-    /// `enable`, and `disable`.
-    private(set) var isEnabled: Bool = false
+    /// Whether the athlete turned sync on. Mirrors
+    /// `AppConfiguration.googleSheetsSyncEnabled`.
+    private(set) var isEnabled = false
 
-    /// The spreadsheet ID written to. `nil` until the first `enable` succeeds.
+    /// The spreadsheet written to; `nil` until the first connect.
     private(set) var spreadsheetID: String?
 
-    // MARK: - Dependencies
+    var isConnected: Bool { isEnabled && spreadsheetID != nil }
 
-    private let api: GoogleSheetsAPI
-    private weak var modelContainer: ModelContainer?
-    private var debounceTask: Task<Void, Never>?
+    /// Tab names, in order.
+    static let cardioTab = "Cardio"
+    static let strengthTab = "Strength"
 
-    /// Title used when creating a new spreadsheet on first enable.
-    private static let spreadsheetTitle = "Train"
+    /// Title of a newly created spreadsheet.
+    static let spreadsheetTitle = "Train"
 
-    /// Debounce window for mutation-triggered syncs. Mutation hooks call
-    /// `requestSync()`; the actual upload fires this many seconds after the
-    /// most recent call. Tunable in tests.
-    let debounceSeconds: UInt64
+    /// What the status shows while signed out on this device.
+    static let signedOutReason = "Signed out on this device"
 
-    // MARK: - Init
+    @ObservationIgnored private let api: GoogleSheetsAPI
+    @ObservationIgnored private weak var modelContainer: ModelContainer?
+    /// The spreadsheet whose tabs were checked this session, so the check
+    /// runs once rather than on every sync.
+    @ObservationIgnored private var preparedSpreadsheetID: String?
 
-    init(api: GoogleSheetsAPI, debounceSeconds: UInt64 = 10) {
+    /// Creates the target.
+    /// - Parameter api: The OAuth + Sheets REST layer.
+    init(api: GoogleSheetsAPI) {
         self.api = api
-        self.debounceSeconds = debounceSeconds
     }
 
-    // MARK: - Lifecycle
+    // MARK: - AutoExportTarget
 
-    /// Wires the coordinator to the app's model container and restores
-    /// state from `AppConfiguration`. Attempts a silent OAuth restore so
-    /// the next mutation can sync without prompting.
-    /// Must be called once during app startup before any view consumes
-    /// the coordinator's published state.
-    func attach(modelContainer: ModelContainer) async {
-        self.modelContainer = modelContainer
-        readPersistedState(from: modelContainer)
-        if isEnabled {
-            let restored = await api.restoreAuthorizationIfPossible()
-            status = restored ? .idle : .needsAuth
-        } else {
-            status = .idle
+    /// Restores on/off state from `AppConfiguration` and silently restores
+    /// the Google session, so the next change can sync without a prompt.
+    func restore(from container: ModelContainer) async {
+        modelContainer = container
+        let context = ModelContext(container)
+        if let config = try? context.fetch(FetchDescriptor<AppConfiguration>()).first {
+            isEnabled = config.googleSheetsSyncEnabled
+            spreadsheetID = config.googleSheetsSpreadsheetID.isEmpty ? nil : config.googleSheetsSpreadsheetID
         }
+        guard isConnected else {
+            status = .disconnected
+            return
+        }
+        let restored = await api.restoreAuthorizationIfPossible()
+        status = restored ? .connected(lastSync: nil) : .needsAttention(reason: Self.signedOutReason, action: .signIn)
     }
 
-    // MARK: - User-driven actions
-
-    /// Confirmed enable flow: present OAuth, request scope, create a fresh
-    /// spreadsheet, persist state, and run an initial full sync.
-    /// Throws on cancellation, denied scope, or API failure. Caller is
-    /// responsible for showing an error to the user; status is also
-    /// updated for the status indicator.
-    func enable() async throws {
+    /// Signs in, creates a fresh spreadsheet with both tabs, and persists
+    /// the on state. `SyncEngine.connect(_:)` then runs the first export.
+    func connect() async throws {
         guard let modelContainer else { throw GoogleSheetsSyncError.notAttached }
-        status = .syncing
-        do {
-            try await api.authorize()
-            let id = try await api.createSpreadsheet(title: Self.spreadsheetTitle)
-
-            persistSyncState(enabled: true, spreadsheetID: id, in: modelContainer)
-            isEnabled = true
-            spreadsheetID = id
-
-            let rows = try fetchAndEncodeRows(container: modelContainer)
-            try await api.overwriteSheet(spreadsheetId: id, rows: rows)
-            status = .success(Date())
-        } catch {
-            status = .failed(error.localizedDescription)
-            throw error
-        }
+        try await api.authorize()
+        let id = try await api.createSpreadsheet(title: Self.spreadsheetTitle, tabs: [Self.cardioTab, Self.strengthTab])
+        persist(enabled: true, spreadsheetID: id, in: modelContainer)
+        isEnabled = true
+        spreadsheetID = id
+        preparedSpreadsheetID = id
+        status = .connected(lastSync: nil)
     }
 
-    /// Re-authorize on a device where sync is already enabled in
-    /// `AppConfiguration` (e.g. CloudKit-synced from another device) but no
-    /// OAuth token exists locally. Presents OAuth, then runs an immediate
-    /// sync to the existing spreadsheet. Throws on auth failure.
+    /// Forces a fresh interactive sign-in for the existing spreadsheet, on a
+    /// device where sync is on but the session expired, was revoked, or was
+    /// never made here. Call `SyncEngine.syncNow()` after it.
     func reauthorize() async throws {
-        guard isEnabled, spreadsheetID != nil else {
-            throw GoogleSheetsSyncError.notAuthorized
-        }
-        status = .syncing
-        do {
-            // Force a fresh interactive sign-in rather than `authorize()`: a
-            // revoked/expired grant can still look valid locally (the access
-            // token outlives the revoke by up to ~1h), so a silent refresh
-            // would no-op and loop the user straight back to `.needsAuth`.
-            try await api.reauthorizeInteractively()
-            await syncNow()
-        } catch {
-            status = .failed(error.localizedDescription)
-            throw error
-        }
+        guard isConnected else { throw GoogleSheetsSyncError.notAuthorized }
+        // Never trust a cached session here: a revoked grant still looks
+        // valid locally until its access token expires (~1h), so a silent
+        // refresh would loop straight back to "needs sign-in".
+        try await api.reauthorizeInteractively()
+        status = .connected(lastSync: nil)
     }
 
-    /// Disable flow: cancel any pending debounced sync, sign out, clear
-    /// `AppConfiguration` fields. The Google sheet itself is left alone in
-    /// the user's Drive — disabling is local-only.
-    func disable() {
-        debounceTask?.cancel()
-        debounceTask = nil
+    /// Signs out and clears the persisted state. The sheet stays in the
+    /// athlete's Drive.
+    func disconnect() {
         api.signOut()
         if let modelContainer {
-            persistSyncState(enabled: false, spreadsheetID: "", in: modelContainer)
+            persist(enabled: false, spreadsheetID: "", in: modelContainer)
         }
         isEnabled = false
         spreadsheetID = nil
-        status = .idle
+        preparedSpreadsheetID = nil
+        status = .disconnected
     }
 
-    // MARK: - Mutation hooks
+    func readinessProblem() -> ConnectionStatus? {
+        api.isAuthorized ? nil : .needsAttention(reason: Self.signedOutReason, action: .signIn)
+    }
 
-    /// Call from every workout add/edit/delete site. Schedules a sync for
-    /// `debounceSeconds` from now. Repeated calls within the window collapse
-    /// into a single upload.
-    func requestSync() {
-        guard isEnabled, spreadsheetID != nil else { return }
-        debounceTask?.cancel()
-        // Surface the pending state immediately so the History tab can show
-        // the yellow toolbar dot + "syncing…" indicator during the debounce
-        // window, not just once the upload starts.
-        status = .syncing
-        debounceTask = Task { [weak self] in
-            guard let self else { return }
-            let nanos = self.debounceSeconds * 1_000_000_000
-            try? await Task.sleep(nanoseconds: nanos)
-            if Task.isCancelled { return }
-            // Drop the self-reference *before* the upload: a subsequent
-            // `requestSync()` from a mutation site during the upload must
-            // not cancel this task (URLSession would throw CancellationError
-            // mid-flight). It can schedule a fresh debounce instead.
-            self.debounceTask = nil
-            await self.performSync()
+    /// Overwrites both tabs from the snapshot. A spreadsheet made before
+    /// the tabs existed gets them first (its `Sheet1` becomes Cardio).
+    func export(_ snapshot: TrainingSnapshot) async throws {
+        guard let spreadsheetID else { throw GoogleSheetsSyncError.notAttached }
+        if preparedSpreadsheetID != spreadsheetID {
+            try await api.prepareTabs(spreadsheetId: spreadsheetID, tabs: [Self.cardioTab, Self.strengthTab])
+            preparedSpreadsheetID = spreadsheetID
         }
+        let unit: WorkoutCSVDistanceUnit = snapshot.useMetricUnits ? .kilometers : .miles
+        try await api.overwriteSheet(
+            spreadsheetId: spreadsheetID,
+            tab: Self.cardioTab,
+            rows: WorkoutCSV.rows(cardio: snapshot.cardio, unit: unit)
+        )
+        try await api.overwriteSheet(
+            spreadsheetId: spreadsheetID,
+            tab: Self.strengthTab,
+            rows: StrengthCSV.rows(strength: snapshot.strength, metric: snapshot.useMetricUnits)
+        )
     }
 
-    /// Sync immediately, bypassing debounce. Used by batch-import flows
-    /// (CSV / HealthKit) that already group their inserts and want a single
-    /// post-batch upload. Also used to flush a pending debounce on app
-    /// backgrounding or retry.
-    func syncNow() async {
-        // Cancelling here only meaningfully affects *direct* callers (batch
-        // imports, retry button). The debounce task clears its own
-        // `debounceTask` reference before invoking `performSync`, so a
-        // debounce-fired sync never cancels itself here.
-        debounceTask?.cancel()
-        debounceTask = nil
-        await performSync()
+    /// An expired or revoked sign-in (`.notAuthorized`, HTTP 401/403) needs
+    /// a sign-in, since a retry would fail again; anything else is retryable.
+    func status(afterFailure error: Error) -> ConnectionStatus {
+        Self.isAuthError(error)
+            ? .needsAttention(reason: Self.signedOutReason, action: .signIn)
+            : .needsAttention(reason: error.localizedDescription, action: .retry)
     }
 
-    /// Shared upload path used by both the debounce task and direct
-    /// `syncNow()` callers. Does not touch `debounceTask` so it's safe to
-    /// invoke from inside the debounce task without self-cancelling.
-    private func performSync() async {
-        guard isEnabled, let id = spreadsheetID, let modelContainer else { return }
-        guard api.isAuthorized else {
-            status = .needsAuth
-            return
-        }
-        status = .syncing
-        do {
-            let rows = try fetchAndEncodeRows(container: modelContainer)
-            try await api.overwriteSheet(spreadsheetId: id, rows: rows)
-            // Re-check enablement after the network await: `disable()` may
-            // have flipped the flag while the upload was in flight, in
-            // which case overwriting `.idle` with `.success` would surface
-            // a confusing post-disable success indicator.
-            guard isEnabled else { return }
-            status = .success(Date())
-        } catch {
-            guard isEnabled else { return }
-            // An expired/revoked token surfaces as `.notAuthorized` (from the
-            // API layer's refresh attempt) or a 401/403 from the REST call.
-            // Route these to `.needsAuth` so the menu offers "Sign in to
-            // resume" (which re-auths and reuses the existing sheet) instead
-            // of a "Retry" that would just fail again.
-            if Self.isAuthError(error) {
-                status = .needsAuth
-            } else {
-                status = .failed(error.localizedDescription)
-            }
-        }
-    }
+    // MARK: - Internals
 
-    /// Whether `error` indicates the OAuth session is no longer valid and the
-    /// user must re-authenticate, as opposed to a transient network/API error.
-    private static func isAuthError(_ error: Error) -> Bool {
+    /// Whether `error` means the Google session is no longer valid.
+    static func isAuthError(_ error: Error) -> Bool {
         switch error {
         case GoogleSheetsSyncError.notAuthorized:
             return true
@@ -243,33 +162,8 @@ final class GoogleSheetsSyncCoordinator {
         }
     }
 
-    // MARK: - Internals
-
-    /// Reads recorded exercises + unit preference from SwiftData and produces
-    /// the row matrix for the Sheets API. Pure read; never mutates the context.
-    /// `WorkoutCSV.rows` filters to completed exercises and sorts by date.
-    private func fetchAndEncodeRows(container: ModelContainer) throws -> [[String]] {
-        let context = ModelContext(container)
-        let configDescriptor = FetchDescriptor<AppConfiguration>()
-        let useMetric = (try? context.fetch(configDescriptor).first?.useMetricUnits) ?? false
-        let exerciseDescriptor = FetchDescriptor<Exercise>(sortBy: [SortDescriptor(\.date)])
-        let exercises = try context.fetch(exerciseDescriptor)
-        let unit: WorkoutCSVDistanceUnit = useMetric ? .kilometers : .miles
-        return WorkoutCSV.rows(exercises: exercises, unit: unit)
-    }
-
-    /// Pulls `googleSheetsSyncEnabled` and `googleSheetsSpreadsheetID` from
-    /// the singleton `AppConfiguration` into local state.
-    private func readPersistedState(from container: ModelContainer) {
-        let context = ModelContext(container)
-        let descriptor = FetchDescriptor<AppConfiguration>()
-        guard let config = try? context.fetch(descriptor).first else { return }
-        isEnabled = config.googleSheetsSyncEnabled
-        let storedID = config.googleSheetsSpreadsheetID
-        spreadsheetID = storedID.isEmpty ? nil : storedID
-    }
-
-    private func persistSyncState(enabled: Bool, spreadsheetID: String, in container: ModelContainer) {
+    /// Writes the on/off state and spreadsheet ID to `AppConfiguration`.
+    private func persist(enabled: Bool, spreadsheetID: String, in container: ModelContainer) {
         let context = ModelContext(container)
         let config = AppConfiguration.current(in: context)
         config.googleSheetsSyncEnabled = enabled

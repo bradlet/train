@@ -40,46 +40,50 @@ enum HealthKitWorkoutMapper {
         }
     }
 
-    /// Converts a `HealthKitWorkout` DTO into a new completed `Exercise`
-    /// instance ready for insertion into SwiftData. The exercise's date/type
-    /// and planned metrics mirror the imported activity; its nested `workout`
-    /// records the actuals with `source = "Apple Exercise App"` and
-    /// `externalID` seeded from the HealthKit UUID so repeat imports can be
-    /// deduplicated.
+    /// Converts a `HealthKitWorkout` DTO into an interchange record whose
+    /// `externalID` is the HealthKit UUID, so a repeat import is recognised.
     /// - Parameters:
     ///   - dto: The HealthKit workout DTO to transform.
     ///   - excludedTypes: Types that don't count toward training (#17), so
     ///     an imported walk is tracked but not counted by default.
-    /// - Returns: A new unsaved completed `Exercise` instance.
     ///   - keyTypes: Types the athlete marks key by default (#25).
+    static func toRecord(
+        _ dto: HealthKitWorkout,
+        excludedTypes: Set<ExerciseType> = TrainingInclusion.defaultExcluded,
+        keyTypes: Set<ExerciseType> = []
+    ) -> TrainingRecord.Cardio {
+        let type = exerciseType(for: dto.activityType)
+        return TrainingRecord.Cardio(
+            externalID: dto.id,
+            source: WorkoutSource.appleHealth.rawValue,
+            date: dto.startDate,
+            name: type.rawValue,
+            type: type,
+            durationSeconds: Int(dto.duration),
+            distanceMiles: dto.distanceMiles ?? 0.0,
+            notes: "",
+            // Health has no subjective ratings; both stay unrecorded
+            // until the athlete rates the workout in the app.
+            feeling: nil,
+            perceivedExertion: nil,
+            countsTowardTraining: TrainingInclusion.counts(type, excluded: excludedTypes),
+            isKeyWorkout: KeyWorkoutDefaults.isKey(type, keyTypes: keyTypes)
+        )
+    }
+
+    /// Converts a `HealthKitWorkout` DTO into a new completed `Exercise`
+    /// (see `toRecord`): source "Apple Exercise App", `externalID` the
+    /// HealthKit UUID.
+    /// - Parameters:
+    ///   - dto: The HealthKit workout DTO to transform.
+    ///   - excludedTypes: Types that don't count toward training (#17).
+    ///   - keyTypes: Types the athlete marks key by default (#25).
+    /// - Returns: A new unsaved completed `Exercise` instance.
     static func toExercise(
         _ dto: HealthKitWorkout,
         excludedTypes: Set<ExerciseType> = TrainingInclusion.defaultExcluded,
         keyTypes: Set<ExerciseType> = []
     ) -> Exercise {
-        let type = exerciseType(for: dto.activityType)
-        let seconds = Int(dto.duration)
-        let miles = dto.distanceMiles ?? 0.0
-        return Exercise(
-            name: type.rawValue,
-            type: type,
-            durationSeconds: seconds,
-            distanceMiles: miles,
-            notes: "",
-            date: dto.startDate,
-            countsTowardTraining: TrainingInclusion.counts(type, excluded: excludedTypes),
-            isKeyWorkout: KeyWorkoutDefaults.isKey(type, keyTypes: keyTypes),
-            workout: Workout(
-                durationSeconds: seconds,
-                distanceMiles: miles,
-                notes: "",
-                // Health has no subjective ratings; both stay unrecorded
-                // until the athlete rates the workout in the app.
-                feeling: nil,
-                perceivedExertion: nil,
-                source: WorkoutSource.appleHealth.rawValue,
-                externalID: dto.id
-            )
-        )
+        toRecord(dto, excludedTypes: excludedTypes, keyTypes: keyTypes).makeExercise()
     }
 }

@@ -20,12 +20,8 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var configurations: [AppConfiguration]
     @Query private var allExercises: [Exercise]
-
-    /// Recorded exercises, most recent first, for CSV export. `workout !=
-    /// nil` can't be a `#Predicate`, so this filters in memory.
-    private var completedExercises: [Exercise] {
-        allExercises.filter(\.isCompleted).sorted { $0.date > $1.date }
-    }
+    /// The import log, newest first; the Data section offers Undo on the first.
+    @Query(sort: \ImportBatch.date, order: .reverse) private var importBatches: [ImportBatch]
 
     /// A type's inclusion change waiting on "apply to past workouts?".
     @State private var pendingInclusion: PendingInclusion?
@@ -57,7 +53,7 @@ struct SettingsView: View {
                     trainingSection(config)
                     keyWorkoutSection(config)
                 }
-                WorkoutDataSection(completedExercises: completedExercises)
+                WorkoutDataSection(latestImport: importBatches.first)
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)

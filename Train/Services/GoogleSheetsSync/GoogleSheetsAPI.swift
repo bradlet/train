@@ -3,7 +3,7 @@
 //  Train
 //
 //  Thin abstraction over Google's OAuth + Sheets REST surface used by
-//  `GoogleSheetsSyncCoordinator`. Two implementations:
+//  `GoogleSheetsTarget`. Two implementations:
 //    - `LiveGoogleSheetsAPI` — production; uses `GoogleSignIn-iOS` for OAuth
 //      and `URLSession` for Sheets v4 REST calls. Gated behind
 //      `#if canImport(GoogleSignIn)` so the app compiles when the SPM
@@ -48,13 +48,52 @@ protocol GoogleSheetsAPI: AnyObject {
     /// Forgets the current user, clearing tokens from Keychain.
     func signOut()
 
-    /// Creates a new Google Sheets spreadsheet with the given title in the
-    /// signed-in user's Drive and returns its ID.
-    func createSpreadsheet(title: String) async throws -> String
+    /// Creates a new Google Sheets spreadsheet with the given title and
+    /// tabs in the signed-in user's Drive and returns its ID.
+    func createSpreadsheet(title: String, tabs: [String]) async throws -> String
 
-    /// Clears the first sheet of the spreadsheet and writes `rows`
-    /// starting at A1. The first row should be the header.
-    func overwriteSheet(spreadsheetId: String, rows: [[String]]) async throws
+    /// Makes sure the spreadsheet has every tab in `tabs`. A spreadsheet
+    /// from before tabs existed has only `Sheet1`, which is renamed to the
+    /// first tab; any other missing tab is added.
+    func prepareTabs(spreadsheetId: String, tabs: [String]) async throws
+
+    /// Clears one tab and writes `rows` starting at A1. The first row should
+    /// be the header.
+    func overwriteSheet(spreadsheetId: String, tab: String, rows: [[String]]) async throws
+}
+
+/// Which batch-update requests bring a spreadsheet's tabs in line: pure, so
+/// the migration from the single-`Sheet1` layout is unit-testable.
+enum GoogleSheetsTabPlan {
+    /// The requests needed.
+    enum Step: Equatable {
+        /// Rename the sheet with this ID.
+        case rename(sheetID: Int, to: String)
+        /// Add a tab with this title.
+        case add(String)
+    }
+
+    /// The steps that give a spreadsheet every wanted tab.
+    /// - Parameters:
+    ///   - existing: The spreadsheet's current tabs, as (sheet ID, title).
+    ///   - wanted: The tabs it should have, in order.
+    /// - Returns: No steps when every tab is already there.
+    static func steps(existing: [(id: Int, title: String)], wanted: [String]) -> [Step] {
+        let titles = Set(existing.map(\.title))
+        let missing = wanted.filter { !titles.contains($0) }
+        guard !missing.isEmpty else { return [] }
+        var steps: [Step] = []
+        var toAdd = missing[...]
+        // Reuse the default tab for the first missing one, so an old
+        // spreadsheet doesn't keep a stale "Sheet1" of cardio rows.
+        if let legacy = existing.first(where: { $0.title == "Sheet1" }), !wanted.contains("Sheet1"),
+           let first = toAdd.first {
+            steps.append(.rename(sheetID: legacy.id, to: first))
+            toAdd = toAdd.dropFirst()
+        }
+        steps += toAdd.map(Step.add)
+        return steps
+    }
 }
 
 // MARK: - Live implementation
@@ -144,10 +183,13 @@ final class LiveGoogleSheetsAPI: GoogleSheetsAPI {
         GIDSignIn.sharedInstance.signOut()
     }
 
-    func createSpreadsheet(title: String) async throws -> String {
+    func createSpreadsheet(title: String, tabs: [String]) async throws -> String {
         let token = try await accessToken()
         let url = URL(string: "https://sheets.googleapis.com/v4/spreadsheets")!
-        let body: [String: Any] = ["properties": ["title": title]]
+        let body: [String: Any] = [
+            "properties": ["title": title],
+            "sheets": tabs.map { ["properties": ["title": $0]] }
+        ]
         let data = try JSONSerialization.data(withJSONObject: body)
         let response = try await sendJSON(method: "POST", url: url, token: token, body: data)
         guard let json = try JSONSerialization.jsonObject(with: response) as? [String: Any],
@@ -157,21 +199,59 @@ final class LiveGoogleSheetsAPI: GoogleSheetsAPI {
         return id
     }
 
-    func overwriteSheet(spreadsheetId: String, rows: [[String]]) async throws {
+    func prepareTabs(spreadsheetId: String, tabs: [String]) async throws {
         let token = try await accessToken()
         let base = "https://sheets.googleapis.com/v4/spreadsheets/\(spreadsheetId)"
-        // Clear the entire default sheet by name. "Sheet1" is the default
-        // tab name Google Sheets gives a spreadsheet created via
-        // `createSpreadsheet`. Using the sheet name instead of an A1 range
-        // covers any number of columns/rows the user may have manually
-        // expanded the sheet to.
-        let clearURL = URL(string: "\(base)/values/Sheet1:clear")!
+        let metaURL = URL(string: "\(base)?fields=sheets.properties(sheetId,title)")!
+        let meta = try await send(method: "GET", url: metaURL, token: token, body: nil)
+        guard let json = try JSONSerialization.jsonObject(with: meta) as? [String: Any],
+              let sheets = json["sheets"] as? [[String: Any]] else {
+            throw GoogleSheetsSyncError.invalidResponse("missing sheets")
+        }
+        let existing: [(id: Int, title: String)] = sheets.compactMap { sheet in
+            guard let properties = sheet["properties"] as? [String: Any],
+                  let id = properties["sheetId"] as? Int,
+                  let title = properties["title"] as? String else { return nil }
+            return (id, title)
+        }
+        let steps = GoogleSheetsTabPlan.steps(existing: existing, wanted: tabs)
+        guard !steps.isEmpty else { return }
+        let requests: [[String: Any]] = steps.map { step in
+            switch step {
+            case .rename(let sheetID, let title):
+                return ["updateSheetProperties": [
+                    "properties": ["sheetId": sheetID, "title": title],
+                    "fields": "title"
+                ]]
+            case .add(let title):
+                return ["addSheet": ["properties": ["title": title]]]
+            }
+        }
+        let body = try JSONSerialization.data(withJSONObject: ["requests": requests])
+        _ = try await sendJSON(method: "POST", url: URL(string: "\(base):batchUpdate")!, token: token, body: body)
+    }
+
+    func overwriteSheet(spreadsheetId: String, tab: String, rows: [[String]]) async throws {
+        let token = try await accessToken()
+        let base = "https://sheets.googleapis.com/v4/spreadsheets/\(spreadsheetId)"
+        // Clear the whole tab by name rather than an A1 range, so every
+        // row and column the athlete may have expanded it to is covered.
+        let range = Self.encodedRange("'\(tab)'")
+        let clearURL = URL(string: "\(base)/values/\(range):clear")!
         _ = try await sendJSON(method: "POST", url: clearURL, token: token, body: Data("{}".utf8))
         // Write fresh rows starting at A1, RAW so dates/numbers stay verbatim.
-        let writeBody: [String: Any] = ["range": "Sheet1!A1", "values": rows]
+        let start = Self.encodedRange("'\(tab)'!A1")
+        let writeBody: [String: Any] = ["range": "'\(tab)'!A1", "values": rows]
         let writeData = try JSONSerialization.data(withJSONObject: writeBody)
-        let writeURL = URL(string: "\(base)/values/Sheet1!A1?valueInputOption=RAW")!
+        let writeURL = URL(string: "\(base)/values/\(start)?valueInputOption=RAW")!
         _ = try await sendJSON(method: "PUT", url: writeURL, token: token, body: writeData)
+    }
+
+    /// Percent-encodes an A1 range for a URL path segment.
+    private static func encodedRange(_ range: String) -> String {
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/?#'!")
+        return range.addingPercentEncoding(withAllowedCharacters: allowed) ?? range
     }
 
     // MARK: - Helpers
@@ -193,11 +273,18 @@ final class LiveGoogleSheetsAPI: GoogleSheetsAPI {
     }
 
     private func sendJSON(method: String, url: URL, token: String, body: Data) async throws -> Data {
+        try await send(method: method, url: url, token: token, body: body)
+    }
+
+    /// Sends an authorized request; a JSON body when `body` is non-nil.
+    private func send(method: String, url: URL, token: String, body: Data?) async throws -> Data {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = body
+        if let body {
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = body
+        }
         let (data, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse else {
             throw GoogleSheetsSyncError.invalidResponse("not an HTTP response")
@@ -236,8 +323,9 @@ final class LiveGoogleSheetsAPI: GoogleSheetsAPI {
     func authorize() async throws { throw GoogleSheetsSyncError.notImplemented }
     func reauthorizeInteractively() async throws { throw GoogleSheetsSyncError.notImplemented }
     func signOut() {}
-    func createSpreadsheet(title: String) async throws -> String { throw GoogleSheetsSyncError.notImplemented }
-    func overwriteSheet(spreadsheetId: String, rows: [[String]]) async throws { throw GoogleSheetsSyncError.notImplemented }
+    func createSpreadsheet(title: String, tabs: [String]) async throws -> String { throw GoogleSheetsSyncError.notImplemented }
+    func prepareTabs(spreadsheetId: String, tabs: [String]) async throws { throw GoogleSheetsSyncError.notImplemented }
+    func overwriteSheet(spreadsheetId: String, tab: String, rows: [[String]]) async throws { throw GoogleSheetsSyncError.notImplemented }
 }
 
 #endif
@@ -252,14 +340,20 @@ final class StubGoogleSheetsAPI: GoogleSheetsAPI {
     /// Toggle between "user is signed in" and "needs auth" states for tests.
     var isAuthorized: Bool
 
-    /// Most recent rows written via `overwriteSheet`, for test assertions.
-    private(set) var lastWrittenRows: [[String]]?
+    /// Most recent rows written to each tab, for test assertions.
+    private(set) var rowsByTab: [String: [[String]]] = [:]
     /// Most recent spreadsheet ID written via `overwriteSheet`.
     private(set) var lastSpreadsheetID: String?
     /// IDs returned from `createSpreadsheet`, in the order they were created.
     private(set) var createdSpreadsheetIDs: [String] = []
-    /// Total `overwriteSheet` calls. Used to assert debounce behavior.
+    /// Tabs each created spreadsheet started with.
+    private(set) var createdTabs: [[String]] = []
+    /// `prepareTabs` calls, for asserting the once-per-session check.
+    private(set) var prepareCount: Int = 0
+    /// Total `overwriteSheet` calls (one per tab per sync).
     private(set) var overwriteCount: Int = 0
+    /// Completed syncs: each writes the Cardio and the Strength tab.
+    var syncCount: Int { overwriteCount / 2 }
     /// When non-nil, `overwriteSheet` throws this error on the next call.
     var nextOverwriteError: Error?
 
@@ -282,17 +376,22 @@ final class StubGoogleSheetsAPI: GoogleSheetsAPI {
 
     func signOut() {
         isAuthorized = false
-        lastWrittenRows = nil
+        rowsByTab = [:]
         lastSpreadsheetID = nil
     }
 
-    func createSpreadsheet(title: String) async throws -> String {
+    func createSpreadsheet(title: String, tabs: [String]) async throws -> String {
         let id = "stub-sheet-\(createdSpreadsheetIDs.count + 1)"
         createdSpreadsheetIDs.append(id)
+        createdTabs.append(tabs)
         return id
     }
 
-    func overwriteSheet(spreadsheetId: String, rows: [[String]]) async throws {
+    func prepareTabs(spreadsheetId: String, tabs: [String]) async throws {
+        prepareCount += 1
+    }
+
+    func overwriteSheet(spreadsheetId: String, tab: String, rows: [[String]]) async throws {
         if let error = nextOverwriteError {
             nextOverwriteError = nil
             throw error
@@ -302,7 +401,7 @@ final class StubGoogleSheetsAPI: GoogleSheetsAPI {
         // the coordinator accidentally cancels its own in-flight sync.
         try Task.checkCancellation()
         overwriteCount += 1
-        lastWrittenRows = rows
+        rowsByTab[tab] = rows
         lastSpreadsheetID = spreadsheetId
     }
 }

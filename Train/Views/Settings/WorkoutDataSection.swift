@@ -2,10 +2,10 @@
 //  WorkoutDataSection.swift
 //  Train
 //
-//  Settings → Data: CSV export and import, Apple Health import, and Google
-//  Sheets sync. Moved here from the old History tab's toolbar menu when
-//  History became Cardio → Progress (#12); an interim home until the
-//  Connections dashboard (#23).
+//  Settings → Data: CSV export and import (cardio and strength, #21), Apple
+//  Health import, the import log's Undo, and Google Sheets sync. An interim
+//  home until the Connections dashboard (#23). Every import goes through
+//  `TrainingImporter`; sync goes through `SyncEngine`.
 //
 
 import SwiftUI
@@ -14,22 +14,24 @@ import UniformTypeIdentifiers
 
 /// The Data section of Settings: every import, export and sync action.
 struct WorkoutDataSection: View {
-    /// Recorded exercises, most recent first — what export writes.
-    let completedExercises: [Exercise]
+    /// The newest import-log entry, offered for Undo.
+    let latestImport: ImportBatch?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.useMetricUnits) private var useMetricUnits
-    @Environment(\.googleSheetsSync) private var sheetsSync
+    @Environment(\.googleSheets) private var googleSheets
+    @Environment(\.syncEngine) private var syncEngine
 
     // MARK: CSV Import/Export state
 
-    @State private var exportDocument: WorkoutCSVDocument?
+    @State private var exportDocument: TrainingExportDocument?
     @State private var isExporterPresented = false
     @State private var isImporterPresented = false
     @State private var isPreImportSheetPresented = false
     @State private var pendingImport: PendingImport?
     @State private var importUnit: WorkoutCSVDistanceUnit = .miles
     @State private var errorMessage: String?
+    @State private var isUndoConfirmationPresented = false
 
     // MARK: HealthKit Import state
 
@@ -47,13 +49,13 @@ struct WorkoutDataSection: View {
             Button {
                 startExport()
             } label: {
-                Label("Export Workouts (CSV)", systemImage: "square.and.arrow.up")
+                Label("Export Training (CSV)", systemImage: "square.and.arrow.up")
             }
             .accessibilityIdentifier("settings.exportWorkouts")
             Button {
                 isPreImportSheetPresented = true
             } label: {
-                Label("Import Workouts (CSV)", systemImage: "square.and.arrow.down")
+                Label("Import Training (CSV)", systemImage: "square.and.arrow.down")
             }
             .accessibilityIdentifier("settings.importWorkouts")
             Button {
@@ -62,16 +64,19 @@ struct WorkoutDataSection: View {
                 Label("Import from Apple Health", systemImage: "heart.text.square")
             }
             .accessibilityIdentifier("settings.importHealth")
+            if let latestImport {
+                lastImportRow(latestImport)
+            }
         } header: {
             Text("Data")
         } footer: {
-            Text("Your training is yours: export it any time, or bring in history from elsewhere.")
+            Text("Your training is yours: export cardio and strength any time, or bring in history from elsewhere. Anything already in Train is skipped.")
         }
         .fileExporter(
             isPresented: $isExporterPresented,
             document: exportDocument,
-            contentType: .commaSeparatedText,
-            defaultFilename: defaultExportFilename()
+            contentType: .folder,
+            defaultFilename: TrainingCSVBundle.folderName(on: Date())
         ) { result in
             if case .failure(let error) = result {
                 errorMessage = "Export failed: \(error.localizedDescription)"
@@ -92,21 +97,33 @@ struct WorkoutDataSection: View {
         }
         .fileImporter(
             isPresented: $isImporterPresented,
-            allowedContentTypes: [.commaSeparatedText]
+            allowedContentTypes: [.commaSeparatedText, .plainText],
+            allowsMultipleSelection: true
         ) { result in
             handleFileImporterResult(result)
         }
         .sheet(item: $pendingImport) { pending in
             ImportCSVConfirmationSheet(
-                filename: pending.filename,
-                parseResult: pending.result,
+                parsed: pending.parsed,
+                duplicateCount: pending.duplicateCount,
                 unit: $importUnit,
                 onCancel: { pendingImport = nil },
-                onConfirm: { commitImport(pending.result) }
+                onConfirm: { commitImport(pending.parsed) }
             )
         }
         .sheet(isPresented: $isHealthKitImporterPresented) {
             ImportHealthKitSheet()
+        }
+        .confirmationDialog(
+            "Undo the last import?",
+            isPresented: $isUndoConfirmationPresented,
+            titleVisibility: .visible,
+            presenting: latestImport
+        ) { batch in
+            Button("Remove \(batch.addedCount) imported", role: .destructive) { undo(batch) }
+            Button("Cancel", role: .cancel) {}
+        } message: { batch in
+            Text("Removes the \(batch.summary.lowercased(with: nil)) added on \(batch.date.formatted(date: .abbreviated, time: .shortened)). Anything you logged yourself stays.")
         }
 
         sheetsSyncSection
@@ -123,13 +140,13 @@ struct WorkoutDataSection: View {
                 Text(message)
             }
             .alert(
-                "Enable Google Sheets Sync?",
+                "Mirror to Google Sheets?",
                 isPresented: $isSheetsSyncConfirmationPresented
             ) {
                 Button("Cancel", role: .cancel) { }
-                Button("Enable") { startEnableSheetsSync() }
+                Button("Turn On") { startEnableSheetsSync() }
             } message: {
-                Text("This will create a new Google Sheet and overwrite it every time you add or edit a workout. Sync is one-way: any edits you make in Google Sheets will be wiped on the next save. You can turn sync off any time in Settings.")
+                Text(Self.sheetsOverwriteNotice)
             }
             .alert(
                 "Sync failed",
@@ -142,40 +159,63 @@ struct WorkoutDataSection: View {
                 Button("Cancel", role: .cancel) { pendingFailureRetry = nil }
                 Button("Retry") {
                     pendingFailureRetry = nil
-                    Task { await sheetsSync.syncNow() }
+                    Task { await syncEngine.syncNow() }
                 }
             } message: { reason in
                 Text("Error reason: \(reason)")
             }
     }
 
+    /// What turning Sheets sync on means, said before it happens: the sheet
+    /// is a mirror that Train overwrites, never a place to edit.
+    static let sheetsOverwriteNotice = "Train creates a new Google Sheet with a Cardio tab and a Strength tab, and overwrites both after every change. Sync is one-way: anything you type into the sheet is replaced on the next sync. You can turn it off any time."
+
+    /// The newest import and its Undo button.
+    private func lastImportRow(_ batch: ImportBatch) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Last import")
+                    .font(.subheadline)
+                Text("\(batch.summary) · \(batch.date.formatted(date: .abbreviated, time: .omitted))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Undo", role: .destructive) {
+                isUndoConfirmationPresented = true
+            }
+            .buttonStyle(.borderless)
+            .accessibilityIdentifier("settings.undoImport")
+        }
+    }
+
     // MARK: Google Sheets Sync
 
-    /// Google Sheets sync controls. Adapts to the coordinator state: not
-    /// enabled → enable; failed → retry + turn off; needs auth → sign in +
-    /// turn off; enabled and healthy → status + turn off.
+    /// Google Sheets sync controls. Adapts to the target's state: off → turn
+    /// on; needs attention → sign in or retry, plus turn off; healthy →
+    /// status plus turn off.
     private var sheetsSyncSection: some View {
         Section {
-            if sheetsSync.isEnabled {
+            if googleSheets.isConnected {
                 sheetsSyncStatusRow
-                switch sheetsSync.status {
-                case .failed(let reason):
-                    Button {
-                        pendingFailureRetry = reason
-                    } label: {
-                        Label("Retry Sync", systemImage: "exclamationmark.arrow.triangle.2.circlepath")
+                if case .needsAttention(let reason, let action) = googleSheets.status {
+                    switch action {
+                    case .retry:
+                        Button {
+                            pendingFailureRetry = reason
+                        } label: {
+                            Label("Retry Sync", systemImage: "exclamationmark.arrow.triangle.2.circlepath")
+                        }
+                    case .signIn:
+                        Button {
+                            Task { await reauthorizeSheetsSync() }
+                        } label: {
+                            Label("Sign in to Resume Sync", systemImage: "person.crop.circle.badge.questionmark")
+                        }
                     }
-                case .needsAuth:
-                    Button {
-                        Task { await reauthorizeSheetsSync() }
-                    } label: {
-                        Label("Sign in to Resume Sync", systemImage: "person.crop.circle.badge.questionmark")
-                    }
-                default:
-                    EmptyView()
                 }
                 Button(role: .destructive) {
-                    sheetsSync.disable()
+                    googleSheets.disconnect()
                 } label: {
                     Label("Turn Off Google Sheets Sync", systemImage: "tablecells.badge.ellipsis")
                 }
@@ -184,54 +224,54 @@ struct WorkoutDataSection: View {
                 Button {
                     isSheetsSyncConfirmationPresented = true
                 } label: {
-                    Label("Sync to Google Sheets", systemImage: "tablecells")
+                    Label("Mirror to Google Sheets", systemImage: "tablecells")
                 }
                 .accessibilityIdentifier("settings.enableSheetsSync")
             }
         } header: {
             Text("Google Sheets")
         } footer: {
-            Text("Keeps a one-way copy of your recorded workouts in a Google Sheet.")
+            Text("A one-way, read-only mirror of your cardio and strength. Train overwrites the sheet on every change, so edits made in it don't last.")
         }
     }
 
-    /// Non-actionable status row: syncing, synced, failed or signed out.
+    /// Non-actionable status row: syncing, synced, or needs attention.
     @ViewBuilder
     private var sheetsSyncStatusRow: some View {
-        switch sheetsSync.status {
+        switch googleSheets.status {
         case .syncing:
             Label("Syncing…", systemImage: "arrow.triangle.2.circlepath")
                 .foregroundStyle(.secondary)
-        case .success, .idle:
+        case .connected, .disconnected:
             Label("Synced", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
-        case .failed:
+        case .needsAttention(_, .retry):
             Label("Last sync failed", systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
-        case .needsAuth:
-            Label("Signed out on this device", systemImage: "person.crop.circle.badge.exclamationmark")
+        case .needsAttention(let reason, .signIn):
+            Label(reason, systemImage: "person.crop.circle.badge.exclamationmark")
                 .foregroundStyle(.orange)
         }
     }
 
-    /// Kicks off the OAuth + sheet creation + initial sync flow. Failures
+    /// Signs in, creates the sheet and runs the first sync. Failures
     /// surface via the shared `errorMessage` alert.
     private func startEnableSheetsSync() {
         Task {
             do {
-                try await sheetsSync.enable()
+                try await syncEngine.connect(googleSheets)
             } catch {
                 errorMessage = error.localizedDescription
             }
         }
     }
 
-    /// Re-presents OAuth on a device where sync is enabled in
-    /// AppConfiguration but no token exists locally. Reuses the existing
-    /// spreadsheet ID rather than creating a new one.
+    /// Re-presents sign-in on a device where sync is on but the session
+    /// expired or was never made here, then syncs to the existing sheet.
     private func reauthorizeSheetsSync() async {
         do {
-            try await sheetsSync.reauthorize()
+            try await googleSheets.reauthorize()
+            await syncEngine.syncNow()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -239,82 +279,81 @@ struct WorkoutDataSection: View {
 
     // MARK: Export
 
-    /// Builds the CSV document from the recorded workouts and triggers the
-    /// exporter.
+    /// Reads the snapshot and presents the folder exporter.
     private func startExport() {
-        let unit: WorkoutCSVDistanceUnit = useMetricUnits ? .kilometers : .miles
-        let csv = WorkoutCSV.encode(exercises: completedExercises, unit: unit)
-        exportDocument = WorkoutCSVDocument(text: csv)
-        isExporterPresented = true
+        do {
+            let snapshot = try TrainingSnapshot.load(from: modelContext)
+            exportDocument = TrainingExportDocument(files: TrainingCSVBundle.files(for: snapshot, on: Date()))
+            isExporterPresented = true
+        } catch {
+            errorMessage = "Export failed: \(error.localizedDescription)"
+        }
     }
-
-    /// Produces a dated default filename like `workouts-2026-04-09.csv`.
-    private func defaultExportFilename() -> String {
-        "workouts-\(Self.filenameDateFormatter.string(from: Date()))"
-    }
-
-    private static let filenameDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
 
     // MARK: Import
 
-    /// Handles the result from `.fileImporter`: reads the picked URL,
-    /// parses it, and either presents the confirmation sheet or an error.
-    private func handleFileImporterResult(_ result: Result<URL, Error>) {
+    /// Reads every picked file, parses each by its header, and presents the
+    /// confirmation sheet (or an error when nothing could be read).
+    private func handleFileImporterResult(_ result: Result<[URL], Error>) {
         switch result {
         case .failure(let error):
             errorMessage = "Import failed: \(error.localizedDescription)"
-        case .success(let url):
-            let accessed = url.startAccessingSecurityScopedResource()
-            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-
-            do {
-                let text = try String(contentsOf: url, encoding: .utf8)
-                let parsed = try WorkoutCSV.parse(text)
-                importUnit = useMetricUnits ? .kilometers : .miles
-                pendingImport = PendingImport(
-                    filename: url.lastPathComponent,
-                    result: parsed
-                )
-            } catch WorkoutCSVError.empty {
-                errorMessage = "This file is empty."
-            } catch WorkoutCSVError.missingHeader {
-                errorMessage = "This file is missing a header row."
-            } catch {
-                errorMessage = "Could not read file: \(error.localizedDescription)"
+        case .success(let urls):
+            var files: [TrainingCSVBundle.File] = []
+            var unreadable: [String] = []
+            for url in urls {
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                if let text = try? String(contentsOf: url, encoding: .utf8) {
+                    files.append(.init(name: url.lastPathComponent, text: text))
+                } else {
+                    unreadable.append("Could not read \(url.lastPathComponent).")
+                }
             }
+            var parsed = TrainingCSVBundle.parse(files)
+            parsed.failures += unreadable
+            guard !parsed.isEmpty || parsed.skippedCount > 0 else {
+                errorMessage = parsed.failures.isEmpty ? "No training found in the selected files." : parsed.failures.joined(separator: "\n")
+                return
+            }
+            importUnit = useMetricUnits ? .kilometers : .miles
+            pendingImport = PendingImport(
+                parsed: parsed,
+                duplicateCount: parsed.duplicateCount(known: TrainingImporter.knownIDs(in: modelContext))
+            )
         }
     }
 
-    /// Inserts all successfully parsed rows as new completed exercises.
-    private func commitImport(_ result: WorkoutCSVParseResult) {
-        for row in result.rows {
-            let exercise = WorkoutCSV.toExercise(row, unit: importUnit)
-            modelContext.insert(exercise)
-        }
+    /// Imports the parsed rows through `TrainingImporter`, then syncs once.
+    private func commitImport(_ parsed: TrainingCSVBundle.Parsed) {
         do {
-            try modelContext.save()
-            // Batch imports skip the per-mutation debounce and sync once
-            // after every parsed row has been inserted. Only fired on
-            // successful save so a partial-failure path doesn't trigger
-            // an upload of inconsistent state.
-            Task { await sheetsSync.syncNow() }
+            let outcome = try TrainingImporter.importRecords(parsed.records(cardioUnit: importUnit), from: .csvFile, into: modelContext)
+            // A batch syncs once, straight away, rather than after the debounce.
+            if outcome.added > 0 {
+                Task { await syncEngine.syncNow() }
+            }
         } catch {
-            errorMessage = "Saved partial import: \(error.localizedDescription)"
+            errorMessage = "Import failed: \(error.localizedDescription)"
         }
         pendingImport = nil
     }
+
+    /// Removes the last import, then syncs the mirror.
+    private func undo(_ batch: ImportBatch) {
+        do {
+            try TrainingImporter.undo(batch, in: modelContext)
+            Task { await syncEngine.syncNow() }
+        } catch {
+            errorMessage = "Undo failed: \(error.localizedDescription)"
+        }
+    }
 }
 
-/// A pending import waiting for user confirmation.
+/// Parsed files waiting for the athlete to confirm.
 private struct PendingImport: Identifiable {
     let id = UUID()
-    let filename: String
-    let result: WorkoutCSVParseResult
+    let parsed: TrainingCSVBundle.Parsed
+    let duplicateCount: Int
 }
 
 /// Gateway sheet shown before opening the file picker, with a link to import help.
@@ -330,7 +369,7 @@ private struct CSVImportGatewaySheet: View {
                     .font(.system(size: 48))
                     .foregroundStyle(.secondary)
 
-                Text("Select a CSV file to import your workout history.")
+                Text("Select one or more CSV files to import: a cardio file, a strength file, or both.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal)
@@ -343,7 +382,7 @@ private struct CSVImportGatewaySheet: View {
                 .padding(.horizontal, 40)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle("Import Workouts")
+            .navigationTitle("Import Training")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

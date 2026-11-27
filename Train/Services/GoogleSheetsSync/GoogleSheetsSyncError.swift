@@ -4,7 +4,7 @@
 //
 //  Errors surfaced by the Google Sheets sync stack — the API layer
 //  (`GoogleSheetsAPI`) and the orchestrating coordinator
-//  (`GoogleSheetsSyncCoordinator`).
+//  (`GoogleSheetsTarget`).
 //
 
 import Foundation
@@ -17,7 +17,7 @@ enum GoogleSheetsSyncError: Error, LocalizedError {
     /// so the live API is a no-op throw stub. README setup step missing.
     case notImplemented
 
-    /// `GoogleSheetsSyncCoordinator.attach(modelContainer:)` was not called
+    /// `SyncEngine.attach(modelContainer:)` was not called
     /// before an enable/sync attempt. Programmer error.
     case notAttached
 

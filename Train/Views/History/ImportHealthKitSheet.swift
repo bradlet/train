@@ -2,21 +2,19 @@
 //  ImportHealthKitSheet.swift
 //  Train
 //
-//  Sheet presented from the History tab menu to import workouts from
-//  Apple Health. Requests read authorization on appear, loads the most
-//  recent workouts via `HealthKitImportService`, lets the user multi-
-//  select with SwiftUI's native `EditMode`, and commits the selection
-//  to SwiftData on confirmation (with dedup against `externalID`).
+//  Sheet presented from Settings → Data to import workouts from Apple
+//  Health. Requests read authorization on appear, loads recent workouts via
+//  `AppleHealthTarget`, and lets the athlete multi-select with SwiftUI's
+//  native `EditMode`. Workouts already in the app (by HealthKit UUID) are
+//  shown as imported and can't be picked again. The selection is committed
+//  through `TrainingImporter`, which logs it for Undo.
 //
 
 import SwiftUI
 import SwiftData
-import HealthKit
 
 /// How many days of history to pull from HealthKit by default.
 private let importLookbackDays: TimeInterval = 30
-/// Upper bound on the number of workouts the sheet will display.
-private let importFetchLimit: Int = 60
 
 /// Sheet that lists recent Apple Health workouts and lets the user import
 /// selected ones into the app's SwiftData store.
@@ -27,16 +25,18 @@ struct ImportHealthKitSheet: View {
     @Environment(\.keyWorkoutTypes) private var keyWorkoutTypes
     @Environment(\.useMetricUnits) private var useMetricUnits
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.googleSheetsSync) private var sheetsSync
+    @Environment(\.syncEngine) private var syncEngine
 
     @State private var loadState: LoadState = .loading
     @State private var selection = Set<String>()
     @State private var importBanner: String?
+    /// HealthKit UUIDs already in the app, read when the list loads.
+    @State private var alreadyImported = Set<String>()
 
     /// Loading lifecycle for the HealthKit fetch.
     private enum LoadState {
         case loading
-        case loaded([HealthKitWorkout])
+        case loaded([TrainingRecord.Cardio])
         case empty
         case error(String)
     }
@@ -101,10 +101,12 @@ struct ImportHealthKitSheet: View {
         }
     }
 
-    private func loadedList(workouts: [HealthKitWorkout]) -> some View {
-        List(workouts, selection: $selection) { workout in
-            ImportHealthKitRow(workout: workout, useMetricUnits: useMetricUnits)
-                .tag(workout.id)
+    private func loadedList(workouts: [TrainingRecord.Cardio]) -> some View {
+        List(workouts, id: \.healthID, selection: $selection) { workout in
+            let imported = alreadyImported.contains(workout.healthID)
+            ImportHealthKitRow(workout: workout, isImported: imported, useMetricUnits: useMetricUnits)
+                .tag(workout.healthID)
+                .selectionDisabled(imported)
         }
         .environment(\.editMode, .constant(.active))
         .overlay(alignment: .bottom) {
@@ -130,72 +132,56 @@ struct ImportHealthKitSheet: View {
     private func load() async {
         loadState = .loading
         do {
-            try await service.requestAuthorization()
+            let target = AppleHealthTarget(service: service)
             let since = Date().addingTimeInterval(-importLookbackDays * 86400)
-            let workouts = try await service.fetchRecentWorkouts(
+            let records = try await target.fetchImports(
                 since: since,
-                limit: importFetchLimit
+                defaults: ImportDefaults(trainingExcludedTypes: trainingExcludedTypes, keyWorkoutTypes: keyWorkoutTypes)
             )
-            if workouts.isEmpty {
-                loadState = .empty
-            } else {
-                loadState = .loaded(workouts)
+            let workouts = records.compactMap { record -> TrainingRecord.Cardio? in
+                if case .cardio(let cardio) = record { return cardio }
+                return nil
             }
+            alreadyImported = TrainingImporter.knownIDs(in: modelContext)
+            loadState = workouts.isEmpty ? .empty : .loaded(workouts)
         } catch {
             loadState = .error(error.localizedDescription)
         }
     }
 
-    /// Transforms the selected DTOs into completed `Exercise` records,
-    /// filtering out any whose `externalID` already exists in SwiftData, and
-    /// persists them.
+    /// Imports the selected workouts through `TrainingImporter`, which skips
+    /// anything already present and logs the batch for Undo.
     private func commitImport() {
         guard case .loaded(let workouts) = loadState else { return }
-        let selected = workouts.filter { selection.contains($0.id) }
-
-        // Dedup against any recorded exercise already carrying an externalID.
-        let existingIDs = fetchExistingExternalIDs()
-        let deduped = selected.filter { !existingIDs.contains($0.id) }
-        let skippedCount = selected.count - deduped.count
-
-        for dto in deduped {
-            let exercise = HealthKitWorkoutMapper.toExercise(dto, excludedTypes: trainingExcludedTypes, keyTypes: keyWorkoutTypes)
-            modelContext.insert(exercise)
-        }
+        let selected = workouts.filter { selection.contains($0.healthID) }
+        let outcome: TrainingImporter.Outcome
         do {
-            try modelContext.save()
+            outcome = try TrainingImporter.importRecords(selected.map(TrainingRecord.cardio), from: .appleHealth, into: modelContext)
         } catch {
-            importBanner = "Saved partial import: \(error.localizedDescription)"
+            importBanner = "Import failed: \(error.localizedDescription)"
             return
         }
-
-        if skippedCount > 0 && deduped.isEmpty {
+        if outcome.added == 0 {
             // Everything was already imported — report and stay on screen.
             importBanner = "All selected workouts were already imported."
             return
         }
-
-        // Batch imports skip the per-mutation debounce and sync once after
-        // every selected row has been inserted. Fire-and-forget; UI proceeds.
-        Task { await sheetsSync.syncNow() }
+        // A batch syncs once, straight away, rather than after the debounce.
+        Task { await syncEngine.syncNow() }
         dismiss()
     }
+}
 
-    /// Snapshots the set of all recorded-workout `externalID` values currently
-    /// in SwiftData so the commit step can skip anything that's already been
-    /// imported. The `externalID` lives inside the nested `workout` Codable
-    /// value, which can't be reached from a `#Predicate`, so we fetch all
-    /// exercises and collect in memory.
-    private func fetchExistingExternalIDs() -> Set<String> {
-        let descriptor = FetchDescriptor<Exercise>()
-        guard let exercises = try? modelContext.fetch(descriptor) else { return [] }
-        return Set(exercises.compactMap { $0.workout?.externalID })
-    }
+private extension TrainingRecord.Cardio {
+    /// The HealthKit UUID every Health record carries as its anchor.
+    var healthID: String { externalID ?? "" }
 }
 
 /// Single row in the HealthKit import list.
 private struct ImportHealthKitRow: View {
-    let workout: HealthKitWorkout
+    let workout: TrainingRecord.Cardio
+    /// Already in the app: shown dimmed with an "Imported" label.
+    let isImported: Bool
     let useMetricUnits: Bool
 
     private static let dateFormatter: DateFormatter = {
@@ -206,7 +192,7 @@ private struct ImportHealthKitRow: View {
     }()
 
     var body: some View {
-        let exerciseType = HealthKitWorkoutMapper.exerciseType(for: workout.activityType)
+        let exerciseType = workout.type
         HStack(spacing: 12) {
             Image(systemName: exerciseType.systemImage)
                 .font(.title2)
@@ -215,21 +201,28 @@ private struct ImportHealthKitRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(exerciseType.rawValue)
                     .font(.headline)
-                Text(Self.dateFormatter.string(from: workout.startDate))
+                Text(Self.dateFormatter.string(from: workout.date))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 8) {
-                    Text(Int(workout.duration).formattedDuration)
-                    if let miles = workout.distanceMiles, miles > 0 {
+                    Text(workout.durationSeconds.formattedDuration)
+                    if workout.distanceMiles > 0 {
                         Text("•")
-                        Text(miles.formattedDistance(metric: useMetricUnits))
+                        Text(workout.distanceMiles.formattedDistance(metric: useMetricUnits))
                     }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
+            if isImported {
+                Spacer()
+                Label("Imported", systemImage: "checkmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 2)
+        .opacity(isImported ? 0.5 : 1)
     }
 }
 

@@ -30,11 +30,12 @@ struct TrainApp: App {
     /// used by the History tab's "Import from Apple Health" flow.
     private let healthKitImport: HealthKitImportService = LiveHealthKitImportService()
 
-    /// Shared Google Sheets sync coordinator. When the GoogleSignIn SPM
-    /// package is not installed, the live API is a throwing stub and the
-    /// coordinator surfaces `.notImplemented` errors when the user tries
-    /// to enable sync.
-    @State private var sheetsSync = GoogleSheetsSyncCoordinator(api: LiveGoogleSheetsAPI())
+    /// The Google Sheets target. When the GoogleSignIn SPM package is not
+    /// installed, the live API is a throwing stub and connecting surfaces
+    /// `.notImplemented`.
+    @State private var googleSheets: GoogleSheetsTarget
+    /// Keeps every auto-export target (Google Sheets today) current.
+    @State private var syncEngine: SyncEngine
 
     /// The coach conversation for this app session. App-scope so the transcript
     /// survives tab switches and navigation pops; deliberately not persisted,
@@ -52,6 +53,10 @@ struct TrainApp: App {
     private let coachSpeech: CoachSpeechService = Self.makeSpeechForLaunch()
 
     init() {
+        let sheets = GoogleSheetsTarget(api: LiveGoogleSheetsAPI())
+        _googleSheets = State(initialValue: sheets)
+        _syncEngine = State(initialValue: SyncEngine(targets: [sheets]))
+
         // When launched by the UI test harness with `-uiTestSeed`, replace any
         // existing workouts in the container with a deterministic fixture set.
         // This runs against the same `sharedModelContainer` the view hierarchy
@@ -69,15 +74,15 @@ struct TrainApp: App {
             ContentView()
                 .environment(\.aiCoach, aiCoach)
                 .environment(\.healthKitImport, healthKitImport)
-                .environment(\.googleSheetsSync, sheetsSync)
+                .environment(\.googleSheets, googleSheets)
+                .environment(\.syncEngine, syncEngine)
                 .environment(\.coachChat, coachChat)
                 .environment(\.coachSpeech, coachSpeech)
                 .environment(\.coachLauncher, coachLauncher)
                 .task {
-                    // Restore Google Sheets sync state from AppConfiguration
-                    // and silently re-authorize the OAuth session if a
-                    // previous sign-in is cached on this device.
-                    await sheetsSync.attach(modelContainer: sharedModelContainer)
+                    // Restore each target's state (Sheets silently restores
+                    // a cached Google session) and start syncing on saves.
+                    await syncEngine.attach(modelContainer: sharedModelContainer)
                 }
                 .onOpenURL { url in
                     // The widget's `com.bradlet.train://coach…` links open

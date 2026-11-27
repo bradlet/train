@@ -22,7 +22,6 @@ struct RecordWorkoutSheet: View {
     /// The type the form was filled with, whose `onChange` is not the
     /// athlete's doing.
     @State private var populatedType: ExerciseType?
-    @Environment(\.googleSheetsSync) private var sheetsSync
 
     /// The exercise template to pre-fill defaults from, or nil for quick add.
     let exercise: Exercise?
@@ -225,10 +224,9 @@ struct RecordWorkoutSheet: View {
             )
             modelContext.insert(newExercise)
         }
-        // Explicit save so the Google Sheets sync trigger sees the new
-        // record immediately when it fetches via a fresh ModelContext.
+        // Explicit save: the sync engine picks the change up from the save,
+        // and reads it via a fresh ModelContext.
         try? modelContext.save()
-        sheetsSync.requestSync()
         dismiss()
     }
 }

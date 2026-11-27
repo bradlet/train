@@ -1,29 +1,39 @@
 //
-//  GoogleSheetsSyncEnvironment.swift
+//  ConnectionsEnvironment.swift
 //  Train
 //
-//  SwiftUI environment key that injects the shared
-//  `GoogleSheetsSyncCoordinator`. Default value is a coordinator backed by
-//  the in-memory `StubGoogleSheetsAPI` so previews and tests never trigger
-//  real OAuth or hit the network.
+//  Environment keys for the connections layer (#21): the app's `SyncEngine`
+//  and its Google Sheets target. Defaults are stub-backed so previews and
+//  tests never trigger real OAuth or hit the network; the app root injects
+//  the live pair.
 //
 
 import SwiftUI
 
-/// Environment key for the shared `GoogleSheetsSyncCoordinator` instance.
-/// Default is a stub-backed coordinator so previews never touch the network.
-private struct GoogleSheetsSyncKey: EnvironmentKey {
+/// Environment key for the shared Google Sheets target.
+private struct GoogleSheetsKey: EnvironmentKey {
     @MainActor
-    static let defaultValue: GoogleSheetsSyncCoordinator = GoogleSheetsSyncCoordinator(
-        api: StubGoogleSheetsAPI(isAuthorized: false)
-    )
+    static let defaultValue = GoogleSheetsTarget(api: StubGoogleSheetsAPI(isAuthorized: false))
+}
+
+/// Environment key for the shared sync engine.
+private struct SyncEngineKey: EnvironmentKey {
+    @MainActor
+    static let defaultValue = SyncEngine(targets: [GoogleSheetsKey.defaultValue])
 }
 
 extension EnvironmentValues {
-    /// The active Google Sheets sync coordinator. Defaults to a stub-backed
-    /// instance; the production coordinator is injected at the app root.
-    var googleSheetsSync: GoogleSheetsSyncCoordinator {
-        get { self[GoogleSheetsSyncKey.self] }
-        set { self[GoogleSheetsSyncKey.self] = newValue }
+    /// The Google Sheets target (sign-in, status, on/off). Defaults to a
+    /// stub-backed instance.
+    var googleSheets: GoogleSheetsTarget {
+        get { self[GoogleSheetsKey.self] }
+        set { self[GoogleSheetsKey.self] = newValue }
+    }
+
+    /// The engine that keeps every auto-export target current. Defaults to
+    /// a stub-backed instance.
+    var syncEngine: SyncEngine {
+        get { self[SyncEngineKey.self] }
+        set { self[SyncEngineKey.self] = newValue }
     }
 }
