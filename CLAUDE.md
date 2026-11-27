@@ -108,7 +108,7 @@ The AI coach has a full contributor guide in `docs/AI_COACH.md`, and its evals h
 - `ModelContainerFactory.makePreviewContainer()` for test and preview contexts
 - Cached `DateFormatter` instances (static lets) — never allocate in computed properties
 - **The strength board never changes the selected day in response to a move.** Dragging a card onto a day chip and the card's "Move to Day" context menu both leave `selectedDay` alone; the chip counts are the feedback. Don't "helpfully" follow the exercise.
-- **Favorites pre-fill, they never record.** A `FavoriteWorkout` fills only name, type, targets and counts-toward-mileage; date, notes, ratings and recurrence stay as the athlete set them. Every favorite ↔ form conversion goes through `FavoriteFormValues` and every mutation through `FavoriteWorkoutEditor`. Sheets receive `favorites` as a `let` from `HomeView`/`AerobicTrainingView` — they never query.
+- **Favorites are cardio presets and live only in the cardio record/schedule sheets** — never on Home, so they never read as covering strength. **Favorites pre-fill, they never record.** A `FavoriteWorkout` fills only name, type, targets and counts-toward-mileage; date, notes, ratings and recurrence stay as the athlete set them. Every favorite ↔ form conversion goes through `FavoriteFormValues` and every mutation through `FavoriteWorkoutEditor`. Sheets receive `favorites` as a `let` from `HomeView`/`AerobicTrainingView` — they never query.
 - **Plan editing goes through `StrengthPlanFields`/`StrengthPlanDraft`.** Any surface that sets `plannedSets`/`plannedReps` (add-from-library today) reuses that section so the add and edit flows can't drift apart.
 - **Sheets sync `syncNow()` vs `performSync()` must stay split.** The debounce `Task` calls `performSync()` directly. Calling `syncNow()` from inside the debounce task would `.cancel()` the task on itself, propagating cancellation to the in-flight `URLSession` and surfacing as `CancellationError("cancelled")`. `StubGoogleSheetsAPI.overwriteSheet` calls `Task.checkCancellation()` to catch regressions of this pattern.
 
@@ -185,8 +185,9 @@ Views/
 - `Views/History/WorkoutListView.swift` — discrete 10-per-page pagination, tappable rows, calendar-driven navigation/highlight, `WorkoutListPagination` helper for testable page math
 - `Models/FavoriteWorkout.swift` — saved aerobic preset (`@Model`), plus `targetSummary(metric:)`
 - `Services/Favorites/FavoriteWorkoutEditor.swift` — `FavoriteFormValues` (stored ↔ form units, planned-first Save-as seed) and `FavoriteWorkoutEditor` (make/update/delete/reorder) (unit-tested)
-- `Views/Home/FavoritesSection.swift` / `ManageFavoritesSheet.swift` / `FavoriteWorkoutFormSheet.swift` — Home favorites card, manager, and create/edit form
-- `Views/Shared/FavoriteMenuSection.swift` — "Start from Favorite" menu shared by `RecordWorkoutSheet` and `AddExerciseSheet`
+- `Views/AerobicTraining/ManageFavoritesSheet.swift` / `FavoriteWorkoutFormSheet.swift` — the favorites manager (opened from "Manage Favorites…" in `FavoriteMenuSection`) and create/edit form
+- `Views/Shared/DurationWheelPickers.swift` — the h/m/s wheels shared by every cardio duration editor, headed by the 30/45/60 `DurationPreset` pills (unit-tested)
+- `Views/Shared/FavoriteMenuSection.swift` — "Start from Favorite" menu shared by `RecordWorkoutSheet` and `AddExerciseSheet`, and the only entry into managing favorites
 - `Views/Strength/StrengthBoardPlanner.swift` — pure lane/order mutations for the weekly kanban board (unit-tested)
 - `Services/Strength/StrengthLiftRegistry.swift` — lift/record lookups by `liftKey`, duplicate resolution, find-or-create (unit-tested)
 - `Views/Strength/RecordStrengthSheet.swift` — record a session in the lift's metric; `StrengthRecordDraft` owns the text → record parse and `nudge` (unit-tested)

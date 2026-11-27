@@ -51,7 +51,7 @@ Singleton preferences stored in SwiftData for CloudKit sync.
 `String`-backed enum used by `Exercise`. Provides `systemImage` and `color` computed properties for consistent UI rendering.
 
 ### FavoriteWorkout
-A saved aerobic preset (name, type, distance, duration, counts-toward-mileage) with a manual `sortOrder`. Managed from the Home Favorites card; picked from a Home chip (quick-record today) or the "Start from Favorite" menu atop a blank `RecordWorkoutSheet` or create-mode `AddExerciseSheet`. See [DATA_MODEL.md](DATA_MODEL.md#favoriteworkout).
+A saved aerobic preset (name, type, distance, duration, counts-toward-mileage) with a manual `sortOrder`. A cardio preset, so it lives only in the cardio sheets: picked from the "Start from Favorite" menu atop a blank `RecordWorkoutSheet` or create-mode `AddExerciseSheet`, and managed from that menu's "Manage Favorites…" entry (or its empty-state button). Home has no favorites card. See [DATA_MODEL.md](DATA_MODEL.md#favoriteworkout).
 
 ### Strength models
 `StrengthExercise` (a card on the weekly strength board — a slot for a lift), `StrengthLift` (a lift's identity and primary metric), `StrengthRecord` (one recorded session, owned by the lift), and `UserLibraryExercise` (athlete-created library entries) are documented in [STRENGTH_TRAINING.md](STRENGTH_TRAINING.md).
