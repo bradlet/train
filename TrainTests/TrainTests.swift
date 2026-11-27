@@ -10907,3 +10907,224 @@ struct TrainingCSVSingleFileTests {
         #expect(TrainingCSVBundle.files(for: snapshot, on: day) == [cardio, strength])
     }
 }
+
+// MARK: - FIT (Garmin) import
+
+/// Builds minimal FIT files for tests: header, definitions, data, dummy CRC.
+private struct FITTestWriter {
+    /// (field number, size, base type, value)
+    typealias Field = (number: UInt8, size: Int, baseType: UInt8, value: UInt64)
+
+    var bigEndian = false
+    private(set) var body: [UInt8] = []
+
+    /// Appends a definition (+ optional developer fields) for a local type.
+    mutating func define(local: UInt8, global: UInt16, fields: [Field], developerSizes: [Int] = []) {
+        body.append(0x40 | (developerSizes.isEmpty ? 0 : 0x20) | local)
+        body += [0, bigEndian ? 1 : 0]
+        body += int(UInt64(global), size: 2)
+        body.append(UInt8(fields.count))
+        for field in fields { body += [field.number, UInt8(field.size), field.baseType] }
+        if !developerSizes.isEmpty {
+            body.append(UInt8(developerSizes.count))
+            for (index, size) in developerSizes.enumerated() { body += [UInt8(index), UInt8(size), 0] }
+        }
+    }
+
+    /// Appends a data message; `compressed` uses a compressed-timestamp header.
+    mutating func data(local: UInt8, fields: [Field], developerBytes: Int = 0, compressed: Bool = false) {
+        body.append(compressed ? (0x80 | (local << 5) | 0x01) : local)
+        for field in fields { body += int(field.value, size: field.size) }
+        body += [UInt8](repeating: 0xAB, count: developerBytes)
+    }
+
+    /// The complete file.
+    var file: Data {
+        var header: [UInt8] = [14, 0x20, 0x08, 0x08]
+        header += [UInt8](withUnsafeBytes(of: UInt32(body.count).littleEndian, Array.init))
+        header += Array(".FIT".utf8) + [0, 0]
+        return Data(header + body + [0, 0])
+    }
+
+    private func int(_ value: UInt64, size: Int) -> [UInt8] {
+        let little = (0..<size).map { UInt8((value >> (8 * UInt64($0))) & 0xFF) }
+        return bigEndian ? little.reversed() : little
+    }
+}
+
+/// FIT base types used by the tests.
+private enum FITBase {
+    static let enumType: UInt8 = 0x00
+    static let sint16: UInt8 = 0x83
+    static let uint16: UInt8 = 0x84
+    static let uint32: UInt8 = 0x86
+    static let uint32z: UInt8 = 0x8C
+    static let string: UInt8 = 0x07
+}
+
+struct FITDecoderTests {
+
+    /// A run: file_id + one session (start, sport, elapsed, timer, distance).
+    static func runFile(
+        start: UInt64 = 1_100_000_000, sport: UInt64 = 1, subSport: UInt64 = 0,
+        timerMs: UInt64 = 1_800_000, distanceCm: UInt64 = 500_000, bigEndian: Bool = false
+    ) -> Data {
+        var writer = FITTestWriter(bigEndian: bigEndian)
+        writer.define(local: 0, global: 0, fields: [(3, 4, FITBase.uint32z, 0), (4, 4, FITBase.uint32, 0)])
+        writer.data(local: 0, fields: [(3, 4, FITBase.uint32z, 3_900_000_123), (4, 4, FITBase.uint32, start + 2000)])
+        let session: [FITTestWriter.Field] = [
+            (2, 4, FITBase.uint32, start), (5, 1, FITBase.enumType, sport), (6, 1, FITBase.enumType, subSport),
+            (7, 4, FITBase.uint32, timerMs + 60_000), (8, 4, FITBase.uint32, timerMs), (9, 4, FITBase.uint32, distanceCm)
+        ]
+        writer.define(local: 1, global: 18, fields: session)
+        writer.data(local: 1, fields: session)
+        return writer.file
+    }
+
+    @Test func decodesFileIDAndSessionFields() throws {
+        let messages = try FITDecoder.messages(from: Self.runFile())
+        #expect(messages.map(\.globalNumber) == [0, 18])
+        #expect(messages[0][3] == 3_900_000_123)
+        #expect(messages[1][2] == 1_100_000_000)
+        #expect(messages[1][8] == 1_800_000)
+        #expect(messages[1][9] == 500_000)
+    }
+
+    @Test func bigEndianMatchesLittleEndian() throws {
+        #expect(try FITDecoder.messages(from: Self.runFile(bigEndian: true)) == FITDecoder.messages(from: Self.runFile()))
+    }
+
+    @Test func invalidSentinelsAndStringsReadAsMissing() throws {
+        var writer = FITTestWriter()
+        let fields: [FITTestWriter.Field] = [
+            (1, 4, FITBase.uint32, 0xFFFF_FFFF), (2, 4, FITBase.uint32z, 0), (3, 2, FITBase.sint16, 0x7FFF),
+            (4, 1, FITBase.enumType, 0xFF), (5, 3, FITBase.string, 0x616263), (6, 2, FITBase.sint16, 0xFFFE)
+        ]
+        writer.define(local: 0, global: 99, fields: fields)
+        writer.data(local: 0, fields: fields)
+        let message = try #require(try FITDecoder.messages(from: writer.file).first)
+        #expect(message.fields == [6: -2])
+    }
+
+    @Test func compressedTimestampHeadersAndDeveloperFields() throws {
+        var writer = FITTestWriter()
+        let fields: [FITTestWriter.Field] = [(7, 2, FITBase.uint16, 42)]
+        writer.define(local: 2, global: 20, fields: fields, developerSizes: [3, 1])
+        writer.data(local: 2, fields: fields, developerBytes: 4)
+        writer.data(local: 2, fields: [(7, 2, FITBase.uint16, 43)], developerBytes: 4, compressed: true)
+        let messages = try FITDecoder.messages(from: writer.file)
+        #expect(messages.map { $0[7] } == [42, 43])
+    }
+
+    @Test func chainedFilesAreAllRead() throws {
+        let chained = Self.runFile(start: 1) + Self.runFile(start: 2)
+        let sessions = try FITDecoder.messages(from: chained).filter { $0.globalNumber == 18 }
+        #expect(sessions.map { $0[2] } == [1, 2])
+    }
+
+    @Test func malformedFilesThrow() {
+        #expect(throws: FITDecodeError.notFIT) { try FITDecoder.messages(from: Data("hello, not a fit file".utf8)) }
+        var truncated = Self.runFile()
+        truncated.removeLast(10)
+        #expect(throws: FITDecodeError.truncated) { try FITDecoder.messages(from: truncated) }
+        var writer = FITTestWriter()
+        writer.data(local: 3, fields: [])
+        #expect(throws: FITDecodeError.undefinedLocalType(3)) { try FITDecoder.messages(from: writer.file) }
+    }
+
+    @Test func fitEpochIs1989() {
+        #expect(FITDecoder.date(fromFIT: 0) == ISO8601DateFormatter().date(from: "1989-12-31T00:00:00Z"))
+    }
+}
+
+struct FITActivityMapperTests {
+
+    private func activity(_ data: Data, defaults: ImportDefaults = ImportDefaults()) throws -> FITActivityImport {
+        FITActivityMapper.activity(from: try FITDecoder.messages(from: data), defaults: defaults)
+    }
+
+    @Test func runSessionBecomesACardioRecord() throws {
+        let record = try #require(try activity(FITDecoderTests.runFile()).records.first)
+        #expect(record.type == .run)
+        #expect(record.name == "Run")
+        #expect(record.source == WorkoutSource.garmin.rawValue)
+        #expect(record.durationSeconds == 1800, "moving time, not elapsed")
+        #expect(abs(record.distanceMiles - 5000 / 1609.344) < 0.0001)
+        #expect(record.date == FITDecoder.date(fromFIT: 1_100_000_000))
+        #expect(record.externalID == "fit:3900000123:1100002000:0")
+        #expect(record.feeling == nil && record.perceivedExertion == nil)
+    }
+
+    @Test func sameFileGivesTheSameAnchor() throws {
+        #expect(try activity(FITDecoderTests.runFile()).records.map(\.externalID)
+                == activity(FITDecoderTests.runFile()).records.map(\.externalID))
+    }
+
+    @Test func athleteDefaultsDecideKeyAndInclusion() throws {
+        let walk = try #require(try activity(
+            FITDecoderTests.runFile(sport: 11),
+            defaults: ImportDefaults(trainingExcludedTypes: [.walk], keyWorkoutTypes: [.walk])
+        ).records.first)
+        #expect(walk.type == .walk)
+        #expect(!walk.countsTowardTraining)
+        #expect(walk.isKeyWorkout)
+        let run = try #require(try activity(FITDecoderTests.runFile()).records.first)
+        #expect(!run.isKeyWorkout, "never inferred")
+    }
+
+    @Test func strengthSessionsAreLeftOutAndCounted() throws {
+        let result = try activity(FITDecoderTests.runFile(sport: 10, subSport: 20))
+        #expect(result.records.isEmpty)
+        #expect(result.skippedStrength == 1)
+    }
+
+    @Test func sportMapping() {
+        #expect(FITActivityMapper.mapping(sport: 1, subSport: 1) == .cardio(.run))
+        #expect(FITActivityMapper.mapping(sport: 2, subSport: nil) == .cardio(.bike))
+        #expect(FITActivityMapper.mapping(sport: 5, subSport: nil) == .cardio(.swim))
+        #expect(FITActivityMapper.mapping(sport: 17, subSport: nil) == .cardio(.hike))
+        #expect(FITActivityMapper.mapping(sport: 4, subSport: 15) == .cardio(.elliptical))
+        #expect(FITActivityMapper.mapping(sport: 4, subSport: 1) == .cardio(.other))
+        #expect(FITActivityMapper.mapping(sport: 10, subSport: 0) == .cardio(.other))
+        #expect(FITActivityMapper.mapping(sport: 3, subSport: nil) == .skip)
+        #expect(FITActivityMapper.mapping(sport: 99, subSport: nil) == .cardio(.other))
+    }
+
+    @Test func externalIDFallsBackToSessionStart() {
+        #expect(FITActivityMapper.externalID(fileID: nil, sessionStart: 77, index: 2) == "fit:0:77:2")
+    }
+}
+
+struct GarminFITTargetTests {
+
+    @Test @MainActor func identity() {
+        let target = GarminFITTarget()
+        #expect(target.id == .garmin)
+        #expect(target.capabilities == [.import])
+        #expect(WorkoutSource.garmin.rawValue == "Garmin")
+    }
+
+    @Test func parseSortsAndReportsFailures() {
+        let parsed = GarminFITTarget.parse([
+            ("late.fit", FITDecoderTests.runFile(start: 2_000)),
+            ("early.fit", FITDecoderTests.runFile(start: 1_000)),
+            ("lift.fit", FITDecoderTests.runFile(sport: 10, subSport: 20)),
+            ("bad.fit", Data("nope".utf8))
+        ], defaults: ImportDefaults())
+        #expect(parsed.records.map(\.date) == [FITDecoder.date(fromFIT: 1_000), FITDecoder.date(fromFIT: 2_000)])
+        #expect(parsed.skippedStrength == 1)
+        #expect(parsed.failures.count == 1)
+        #expect(parsed.failures[0].hasPrefix("bad.fit"))
+    }
+
+    @Test func reimportingAFITFileAddsNothing() throws {
+        let context = ModelContext(ModelContainerFactory.makePreviewContainer())
+        let records = GarminFITTarget.parse([("run.fit", FITDecoderTests.runFile())], defaults: ImportDefaults()).records
+        let first = try TrainingImporter.importRecords(records.map(TrainingRecord.cardio), from: .garmin, into: context)
+        let second = try TrainingImporter.importRecords(records.map(TrainingRecord.cardio), from: .garmin, into: context)
+        #expect(first.cardioAdded == 1)
+        #expect(second.added == 0)
+        #expect(second.duplicates == 1)
+        #expect(try context.fetch(FetchDescriptor<Exercise>()).first?.workout?.workoutSource == .garmin)
+    }
+}

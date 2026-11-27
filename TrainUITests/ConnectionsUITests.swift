@@ -43,7 +43,7 @@ final class ConnectionsUITests: XCTestCase {
             XCTAssertTrue(app.descendants(matching: .any)["connections.\(id)"].waitForExistence(timeout: 3), "\(id) card")
         }
         for id in ["settings.enableSheetsSync", "settings.exportWorkouts", "settings.importWorkouts",
-                   "connections.csvAutoExport.setUp", "settings.importHealth"] {
+                   "connections.csvAutoExport.setUp", "settings.importHealth", "connections.garmin.importFIT"] {
             let button = app.buttons[id]
             for _ in 0..<4 where !button.exists { app.swipeUp() }
             XCTAssertTrue(button.exists, "\(id) should be on the dashboard")
