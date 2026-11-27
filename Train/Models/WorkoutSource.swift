@@ -19,6 +19,8 @@ enum WorkoutSource: String {
     case csv = "CSV"
     /// Imported from Apple Health (Apple Watch / iOS Workout app).
     case appleHealth = "Apple Exercise App"
+    /// Imported from a Garmin FIT activity file (#22).
+    case garmin = "Garmin"
     /// Fallback used when the persisted `source` string does not match
     /// any known case (e.g. data written by a newer app version).
     case unknown = "Unknown"
