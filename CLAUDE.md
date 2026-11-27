@@ -182,6 +182,7 @@ Views/
 - `Services/Connections/CSVAutoExportTarget.swift` — CSV auto-export to a picked folder (bookmark in this device's `UserDefaults`, never synced) (unit-tested)
 - `Services/Connections/ConnectionAlert.swift` — which paused connection Home's banner shows, and its dismissal key (unit-tested)
 - `Views/Settings/ConnectionsView.swift` — the Connections dashboard
+- `Services/Connections/FIT/` — `FITDecoder` (pure FIT binary decoder), `FITActivityMapper` (session → cardio record, strength left out), `GarminFITTarget` (#22) (unit-tested); `Views/Settings/ImportFITSheet.swift` reviews picked or shared `.fit` files
 - `Views/Shared/WorkoutFormFields.swift` — reusable workout form sections shared by `RecordWorkoutSheet` (create) and `WorkoutDetailSheet` (edit)
 - `Views/Shared/RadialRatingPicker.swift` — the radial dial, plus the configured `FeelingDial` (1–5, faces) and `ExertionDial` (1–10, numerals)
 - `Views/Shared/RadialDialGeometry.swift` — pure drag → position → snapped-slot math for the dial (unit-tested)

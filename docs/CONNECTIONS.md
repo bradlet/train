@@ -187,3 +187,13 @@ A cardio header **without** a `date` column is read positionally in the order ab
 - **Garmin:** the Garmin Connect → Apple Health route until FIT import (#22).
 
 Below the cards, **Import History** lists recent imports, each with Undo. A target in `needsAttention` puts one banner on Home. Dismissing it holds until the same target fails for a different reason. The Settings gear and the Connections row carry the status dot. Cardio → Progress and Strength → Progress each have a toolbar export for their own file.
+
+## Garmin (#22)
+
+Phase 1 is **FIT file import**: no account, no approval, and it works offline. The athlete picks `.fit` files in **Connections → Garmin → Import FIT Files…**, or opens or shares a file into Train. Info.plist declares `com.garmin.fit` with Train as an alternate viewer, and `TrainApp.onOpenURL` routes file URLs to `ImportFITSheet`.
+
+- `FITDecoder` is a pure decoder for single-value numeric fields. It handles normal and compressed-timestamp headers, both byte orders, developer fields (skipped), invalid sentinels and chained files. It does not check the CRC.
+- `FITActivityMapper` turns each `session` message (18) into a cardio record. Duration is `total_timer_time` (moving time), distance is `total_distance`, and the anchor is `fit:<serial>:<time_created>:<session index>`, so re-importing a file adds nothing. Every kind of running maps to plain Run. Key and inclusion come from the athlete's defaults and are never inferred. Strength-training sessions are left out and counted (#36 tracks importing their sets), and so are transitions.
+- The zero-effort route is still Garmin Connect → Apple Health → Health import. The two routes don't recognise each other's anchors, so import an activity through one route only.
+
+Phase 2, automatic import through Garmin's APIs, is #35.
