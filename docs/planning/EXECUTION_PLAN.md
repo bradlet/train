@@ -44,7 +44,7 @@ One ordered path through everything planned on 2026-11-24. Do one step at a time
 This is an independent track. It can run in parallel with any step after step 4, because it needs the strength record format.
 
 15. ✅ **#21** Generic import/export layer, covering strength. Doc: [CONNECTIONS](CONNECTIONS.md). The open questions were decided first: Sheets stays overwrite-only (Cardio + Strength tabs), Health import stays manual, and CSV is two files read by header name. `SyncEngine` syncs on training saves, and every import goes through `TrainingImporter` (dedupe by `externalID`, Undo last import). CSV auto-export waits for #23.
-16. **#23** Connections dashboard, sync status, CSV auto-export. Doc: [CONNECTIONS](CONNECTIONS.md)
+16. ✅ **#23** Connections dashboard, sync status, CSV auto-export. Doc: [CONNECTIONS](CONNECTIONS.md). Shipped as Settings → Connections, which replaced Settings → Data. CSV auto-export is a second `AutoExportTarget`, a paused target gets a dismissible Home banner, and each Progress segment has its own CSV export. Garmin shows the Health route until #22.
 17. **#22** Garmin import: FIT files first, the API later. Doc: [CONNECTIONS](CONNECTIONS.md)
 
 ### H. Release readiness

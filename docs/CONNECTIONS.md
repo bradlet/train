@@ -85,7 +85,7 @@ The URL scheme is the client ID **reversed**: drop `.apps.googleusercontent.com`
 
 #### 5. Verify
 
-Build and run, then open **Settings (the gear on any tab) → Google Sheets → Mirror to Google Sheets**. Sign in with any Google account and grant the scope. The app creates a spreadsheet in your Drive with a Cardio and a Strength tab and writes the history to both.
+Build and run, then open **Settings (the gear on any tab) → Connections → Mirror to Google Sheets**. Sign in with any Google account and grant the scope. The app creates a spreadsheet in your Drive with a Cardio and a Strength tab and writes the history to both.
 
 ### What the user sees in-app
 
@@ -125,6 +125,8 @@ flowchart LR
 | `TrainingCSVBundle` | Manual export (two files in one folder) and multi-file import (kind detected per file). |
 | `TrainingImporter` | The only import write path: dedupe, `ImportBatch` stamping, Undo. |
 | `ConnectionTarget` | Identity and capabilities. `AutoExportTarget` (Sheets; CSV auto-export in #23) and `ImportSourceTarget` (Apple Health; Garmin in #22) refine it. |
+| `CSVAutoExportTarget` | Keeps `train-cardio.csv` and `train-strength.csv` current in a folder the athlete picks. The bookmark is device-local (`UserDefaults`). |
+| `ConnectionAlert` | Picks the one dismissible Home banner for a paused target. |
 | `SyncEngine` | Debounces training saves and exports to every connected auto-export target, owning their `ConnectionStatus`. |
 
 **Rules**
@@ -174,3 +176,14 @@ A cardio header **without** a `date` column is read positionally in the order ab
 | `counts_toward_training` | `true`/`false`, the lift's opt-out (applied only to a lift the import creates) | `true` |
 | `lift_id` | the lift key: a library ID or `name:<name>` | from `lift` |
 | `id` | dedupe anchor | none (no dedupe) |
+
+## Connections dashboard (#23)
+
+**Settings → Connections** has a card per connection:
+
+- **Google Sheets:** status, Open Sheet, turn on/off, sign in or retry.
+- **CSV:** export the pair, import any mix of files, and auto-export to a folder.
+- **Apple Health:** last import, and Import now.
+- **Garmin:** the Garmin Connect → Apple Health route until FIT import (#22).
+
+Below the cards, **Import History** lists recent imports, each with Undo. A target in `needsAttention` puts one banner on Home. Dismissing it holds until the same target fails for a different reason. The Settings gear and the Connections row carry the status dot. Cardio → Progress and Strength → Progress each have a toolbar export for their own file.
