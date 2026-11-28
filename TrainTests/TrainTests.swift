@@ -11128,3 +11128,258 @@ struct GarminFITTargetTests {
         #expect(try context.fetch(FetchDescriptor<Exercise>()).first?.workout?.workoutSource == .garmin)
     }
 }
+
+// MARK: - New-workout notifications (#37)
+
+struct HealthWorkoutSourceTests {
+
+    @Test func garminBundleIDsAreRecognised() {
+        #expect(HealthKitWorkout.isGarmin(bundleID: "com.garmin.connect.mobile"))
+        #expect(HealthKitWorkout.isGarmin(bundleID: "com.Garmin.Connect"))
+        #expect(!HealthKitWorkout.isGarmin(bundleID: "com.apple.health.ABC"))
+        #expect(!HealthKitWorkout.isGarmin(bundleID: nil))
+    }
+
+    @Test func sourceDefaultsToUnknown() {
+        let workout = HealthKitWorkout(id: "a", activityType: .running, startDate: Date(), duration: 60, distanceMiles: 1)
+        #expect(workout.sourceBundleID == nil)
+        #expect(!workout.isFromGarmin)
+    }
+
+    @Test func strengthAndMobilityAreNotCardio() {
+        #expect(!HealthKitWorkoutMapper.isCardio(.traditionalStrengthTraining))
+        #expect(!HealthKitWorkoutMapper.isCardio(.functionalStrengthTraining))
+        #expect(!HealthKitWorkoutMapper.isCardio(.coreTraining))
+        #expect(!HealthKitWorkoutMapper.isCardio(.yoga))
+        #expect(HealthKitWorkoutMapper.isCardio(.running))
+        #expect(HealthKitWorkoutMapper.isCardio(.cycling))
+        #expect(HealthKitWorkoutMapper.isCardio(.rowing))
+    }
+
+    @Test func garminWorkoutsKeepTheirOrigin() {
+        let garmin = HealthKitWorkout(id: "g", activityType: .running, startDate: Date(), duration: 60, distanceMiles: 1, sourceBundleID: "com.garmin.connect.mobile")
+        let watch = HealthKitWorkout(id: "w", activityType: .running, startDate: Date(), duration: 60, distanceMiles: 1, sourceBundleID: "com.apple.health")
+        #expect(HealthKitWorkoutMapper.toRecord(garmin).source == WorkoutSource.garmin.rawValue)
+        #expect(HealthKitWorkoutMapper.toRecord(watch).source == WorkoutSource.appleHealth.rawValue)
+        #expect(HealthKitWorkoutMapper.toRecord(garmin).externalID == "g")
+    }
+}
+
+struct NewWorkoutNotificationTests {
+
+    private func workout(_ id: String, elliptical: Bool = false, miles: Double? = 3.1, garmin: Bool = false) -> HealthKitWorkout {
+        HealthKitWorkout(
+            id: id,
+            activityType: elliptical ? .elliptical : .running,
+            startDate: Date(),
+            duration: 1800,
+            distanceMiles: miles,
+            sourceBundleID: garmin ? "com.garmin.connect.mobile" : "com.apple.health"
+        )
+    }
+
+    @Test func noWorkoutsNoNotification() {
+        #expect(NewWorkoutNotification.make(for: [], metric: false) == nil)
+    }
+
+    @Test func oneGarminRunNamesTypeDistanceAndTime() throws {
+        let note = try #require(NewWorkoutNotification.make(for: [workout("g1", garmin: true)], metric: false))
+        #expect(note.title == "New run from Garmin")
+        #expect(note.body.contains(3.1.formattedDistance(metric: false)))
+        #expect(note.body.contains(1800.formattedDuration))
+        #expect(note.body.hasSuffix("Tap to review and import."))
+        #expect(note.workoutIDs == ["g1"])
+        #expect(note.identifier == "health.g1")
+    }
+
+    @Test func oneWatchWorkoutWithoutDistance() throws {
+        let note = try #require(NewWorkoutNotification.make(for: [workout("e1", elliptical: true, miles: nil)], metric: true))
+        #expect(note.title == "New elliptical from Apple Health")
+        #expect(note.body == "\(1800.formattedDuration). Tap to review and import.")
+    }
+
+    @Test func severalAreCountedBySource() throws {
+        let garmin = try #require(NewWorkoutNotification.make(for: [workout("a", garmin: true), workout("b", garmin: true)], metric: false))
+        #expect(garmin.title == "2 new workouts from Garmin")
+        #expect(garmin.workoutIDs == ["a", "b"])
+        let mixed = try #require(NewWorkoutNotification.make(for: [workout("a", garmin: true), workout("b")], metric: false))
+        #expect(mixed.title == "2 new workouts in Apple Health")
+        #expect(mixed.identifier == "health.batch.a.2")
+    }
+
+    @Test func tappedUserInfoRoundTrips() {
+        #expect(NewWorkoutNotification.workoutIDs(from: [NewWorkoutNotification.workoutIDsKey: ["x", "y"]]) == ["x", "y"])
+        #expect(NewWorkoutNotification.workoutIDs(from: [NewWorkoutNotification.workoutIDsKey: [String]()]) == nil)
+        #expect(NewWorkoutNotification.workoutIDs(from: ["other": 1]) == nil)
+    }
+}
+
+@MainActor
+struct HealthWorkoutWatcherTests {
+
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private func defaults() -> UserDefaults {
+        UserDefaults(suiteName: "test.healthWatcher.\(UUID().uuidString)")!
+    }
+
+    private func run(_ id: String, hoursAgo: Double = 1, garmin: Bool = false, strength: Bool = false) -> HealthKitWorkout {
+        HealthKitWorkout(
+            id: id,
+            activityType: strength ? .traditionalStrengthTraining : .running,
+            startDate: now.addingTimeInterval(-hoursAgo * 3600),
+            duration: 1800,
+            distanceMiles: strength ? nil : 3,
+            sourceBundleID: garmin ? "com.garmin.connect.mobile" : "com.apple.health"
+        )
+    }
+
+    private func makeWatcher(
+        observer: StubHealthWorkoutObserver,
+        notifier: StubNewWorkoutNotifier = StubNewWorkoutNotifier(),
+        defaults: UserDefaults? = nil
+    ) -> HealthWorkoutWatcher {
+        let now = self.now
+        return HealthWorkoutWatcher(observer: observer, notifier: notifier, defaults: defaults ?? self.defaults(), now: { now })
+    }
+
+    // MARK: Filter
+
+    @Test func filterKeepsRecentNewCardioFromEnabledSources() {
+        let workouts = [
+            run("old", hoursAgo: 49),
+            run("lift", strength: true),
+            run("known"),
+            run("garmin", hoursAgo: 2, garmin: true),
+            run("watch", hoursAgo: 3)
+        ]
+        let all = HealthWorkoutWatcher.workoutsToNotify(workouts, known: ["known"], notifiesHealth: true, notifiesGarmin: true, now: now)
+        #expect(all.map(\.id) == ["watch", "garmin"])
+        let garminOnly = HealthWorkoutWatcher.workoutsToNotify(workouts, known: [], notifiesHealth: false, notifiesGarmin: true, now: now)
+        #expect(garminOnly.map(\.id) == ["garmin"])
+        let healthOnly = HealthWorkoutWatcher.workoutsToNotify(workouts, known: [], notifiesHealth: true, notifiesGarmin: false, now: now)
+        #expect(healthOnly.map(\.id) == ["watch", "known"])
+    }
+
+    // MARK: Lifecycle
+
+    @Test func switchesDefaultOnAndPersist() {
+        let store = defaults()
+        let watcher = makeWatcher(observer: StubHealthWorkoutObserver(), defaults: store)
+        #expect(watcher.notifiesHealth)
+        #expect(watcher.notifiesGarmin)
+        #expect(!watcher.isGarminConnected)
+        watcher.notifiesGarmin = false
+        #expect(!makeWatcher(observer: StubHealthWorkoutObserver(), defaults: store).notifiesGarmin)
+    }
+
+    @Test func doesNothingUntilHealthIsConnected() async {
+        let observer = StubHealthWorkoutObserver(authorized: false)
+        let notifier = StubNewWorkoutNotifier()
+        let watcher = makeWatcher(observer: observer, notifier: notifier)
+        await watcher.start(container: ModelContainerFactory.makePreviewContainer())
+        #expect(!watcher.isHealthConnected)
+        #expect(!watcher.isObserving)
+        #expect(await notifier.requestCount == 0)
+        #expect(await !observer.isObserving)
+    }
+
+    @Test func connectedHealthAsksForPermissionAndObserves() async {
+        let observer = StubHealthWorkoutObserver()
+        let notifier = StubNewWorkoutNotifier(grant: .denied)
+        let watcher = makeWatcher(observer: observer, notifier: notifier)
+        await watcher.start(container: ModelContainerFactory.makePreviewContainer())
+        #expect(watcher.isHealthConnected)
+        #expect(watcher.isObserving)
+        #expect(watcher.notificationPermission == .denied)
+        #expect(await observer.isObserving)
+    }
+
+    @Test func historyNeverNotifiesButNewWorkoutsDo() async {
+        let observer = StubHealthWorkoutObserver(workouts: [run("history")])
+        let notifier = StubNewWorkoutNotifier()
+        let watcher = makeWatcher(observer: observer, notifier: notifier)
+        await watcher.start(container: ModelContainerFactory.makePreviewContainer())
+        #expect(await notifier.posted.isEmpty)
+
+        await observer.save([run("fresh")])
+        let posted = await notifier.posted
+        #expect(posted.count == 1)
+        #expect(posted.first?.workoutIDs == ["fresh"])
+    }
+
+    @Test func alreadyImportedAndStrengthStaySilent() async throws {
+        let container = ModelContainerFactory.makePreviewContainer()
+        let context = ModelContext(container)
+        let imported = run("imported")
+        context.insert(HealthKitWorkoutMapper.toExercise(imported))
+        try context.save()
+
+        let observer = StubHealthWorkoutObserver()
+        let notifier = StubNewWorkoutNotifier()
+        let watcher = makeWatcher(observer: observer, notifier: notifier)
+        await watcher.start(container: container)
+        await observer.save([imported, run("lift", strength: true)])
+        #expect(await notifier.posted.isEmpty)
+    }
+
+    @Test func garminIsConnectedFromHealthSources() async {
+        let store = defaults()
+        let observer = StubHealthWorkoutObserver(sourceBundleIDs: ["com.garmin.connect.mobile"])
+        let watcher = makeWatcher(observer: observer, defaults: store)
+        await watcher.start(container: ModelContainerFactory.makePreviewContainer())
+        #expect(watcher.isGarminConnected)
+        // Remembered on this device.
+        #expect(makeWatcher(observer: StubHealthWorkoutObserver(), defaults: store).isGarminConnected)
+    }
+
+    @Test func aFirstGarminActivityConnectsGarminAndNotifies() async {
+        let observer = StubHealthWorkoutObserver()
+        let notifier = StubNewWorkoutNotifier()
+        let watcher = makeWatcher(observer: observer, notifier: notifier)
+        await watcher.start(container: ModelContainerFactory.makePreviewContainer())
+        #expect(!watcher.isGarminConnected)
+        await observer.save([run("g", garmin: true)])
+        #expect(watcher.isGarminConnected)
+        #expect(await notifier.posted.first?.title == "New run from Garmin")
+    }
+
+    @Test func garminSwitchOffSilencesOnlyGarmin() async {
+        let observer = StubHealthWorkoutObserver()
+        let notifier = StubNewWorkoutNotifier()
+        let watcher = makeWatcher(observer: observer, notifier: notifier)
+        watcher.notifiesGarmin = false
+        await watcher.start(container: ModelContainerFactory.makePreviewContainer())
+        await observer.save([run("g", garmin: true)])
+        #expect(await notifier.posted.isEmpty)
+        await observer.save([run("w")])
+        #expect(await notifier.posted.map(\.workoutIDs) == [["w"]])
+    }
+
+    @Test func bothSwitchesOffStopsObserving() async {
+        let observer = StubHealthWorkoutObserver()
+        let watcher = makeWatcher(observer: observer)
+        await watcher.start(container: ModelContainerFactory.makePreviewContainer())
+        #expect(watcher.isObserving)
+        watcher.notifiesHealth = false
+        watcher.notifiesGarmin = false
+        await watcher.syncObserving()
+        #expect(!watcher.notifiesAnything)
+        #expect(!watcher.isObserving)
+        #expect(await !observer.isObserving)
+    }
+
+    // MARK: Routing
+
+    @Test func routerOpensAnImportWithTheNotifiedWorkouts() {
+        let router = HealthImportRouter()
+        router.route(workoutIDs: ["a", "b", "a"])
+        #expect(router.pending?.workoutIDs == ["a", "b"])
+    }
+
+    @Test func sheetTicksOnlyListedWorkoutsNotYetImported() {
+        let selection = ImportHealthKitSheet.initialSelection(["a", "b", "gone"], available: ["a", "b", "c"], imported: ["b"])
+        #expect(selection == ["a"])
+        #expect(ImportHealthKitSheet.initialSelection([], available: ["a"], imported: []).isEmpty)
+    }
+}
