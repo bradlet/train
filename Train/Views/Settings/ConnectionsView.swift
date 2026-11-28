@@ -24,6 +24,7 @@ struct ConnectionsView: View {
     @Environment(\.csvAutoExport) private var csvAutoExport
     @Environment(\.syncEngine) private var syncEngine
     @Environment(\.openURL) private var openURL
+    @Environment(\.healthWatcher) private var healthWatcher
 
     // MARK: CSV state
 
@@ -66,6 +67,7 @@ struct ConnectionsView: View {
         }
         .navigationTitle("Connections")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await healthWatcher.refreshPermission() }
         .fileExporter(
             isPresented: $isExporterPresented,
             document: exportDocument,
@@ -239,8 +241,9 @@ struct ConnectionsView: View {
 
     // MARK: - Apple Health
 
-    /// Last import and the manual import action.
+    /// Last import, the manual import action, and new-workout notifications.
     private var healthSection: some View {
+        @Bindable var watcher = healthWatcher
         let last = importBatches.first { $0.source == .appleHealth }
         return Section {
             ConnectionHeaderRow(
@@ -254,8 +257,29 @@ struct ConnectionsView: View {
                 Label("Import from Apple Health", systemImage: "heart.text.square")
             }
             .accessibilityIdentifier("settings.importHealth")
+            Toggle(isOn: $watcher.notifiesHealth) {
+                Label("Notify me about new workouts", systemImage: "bell.badge")
+            }
+            .accessibilityIdentifier("connections.health.notify")
+            notificationsOffRow
         } footer: {
-            Text("Pick recent workouts to bring in. Ones already in Train are marked and skipped.")
+            Text("Pick recent workouts to bring in. Ones already in Train are marked and skipped. When a cardio workout lands in Apple Health, Train notifies you to review it; nothing imports until you confirm.")
+        }
+    }
+
+    /// Shown when a notify switch is on but iOS notifications are off.
+    @ViewBuilder
+    private var notificationsOffRow: some View {
+        if healthWatcher.notificationPermission == .denied && healthWatcher.notifiesAnything {
+            Button {
+                if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                    openURL(url)
+                }
+            } label: {
+                Label("Notifications are off for Train. Turn them on in Settings.", systemImage: "bell.slash")
+                    .font(.footnote)
+            }
+            .accessibilityIdentifier("connections.notificationsOff")
         }
     }
 
@@ -263,13 +287,23 @@ struct ConnectionsView: View {
 
     /// FIT file import (#22), plus the zero-effort Apple Health route.
     private var garminSection: some View {
+        @Bindable var watcher = healthWatcher
         let last = importBatches.first { $0.source == .garmin }
+        let viaHealth = healthWatcher.isGarminConnected
         return Section {
             ConnectionHeaderRow(
                 id: .garmin,
-                status: nil,
-                detail: last.map { "Last import \($0.date.formatted(date: .abbreviated, time: .omitted))" } ?? "FIT files, or via Apple Health"
+                status: viaHealth ? .connected(lastSync: nil) : nil,
+                detail: viaHealth
+                    ? "Connected through Apple Health"
+                    : last.map { "Last import \($0.date.formatted(date: .abbreviated, time: .omitted))" } ?? "FIT files, or via Apple Health"
             )
+            if viaHealth {
+                Toggle(isOn: $watcher.notifiesGarmin) {
+                    Label("Notify me about new activities", systemImage: "bell.badge")
+                }
+                .accessibilityIdentifier("connections.garmin.notify")
+            }
             Button {
                 isFITPickerPresented = true
             } label: {
@@ -278,12 +312,14 @@ struct ConnectionsView: View {
             .accessibilityIdentifier("connections.garmin.importFIT")
             DisclosureGroup("Other ways to bring in Garmin activities") {
                 Text("**Share a FIT file:** in Garmin Connect on the web, open an activity, choose ⚙︎ → **Export Original**, then open the file with Train.")
-                Text("**Through Apple Health:** in the Garmin Connect app, open **More → Settings → Connected Apps → Apple Health** and turn on **Workouts**, then use **Import from Apple Health** here.")
+                Text("**Through Apple Health:** in the Garmin Connect app, open **More → Settings → Connected Apps → Apple Health** and turn on **Workouts**. Train then notifies you after each activity, ready to review and import.")
             }
             .font(.subheadline)
             .accessibilityIdentifier("connections.garmin.how")
         } footer: {
-            Text("Activities already in Train are marked and skipped. Strength sessions stay out: log lifts in Strength.")
+            Text(viaHealth
+                 ? "Garmin activities reach Train through Apple Health, and Train notifies you after each cardio activity. Import each activity one way only: through Health or as a FIT file, not both. Strength sessions stay out: log lifts in Strength."
+                 : "Activities already in Train are marked and skipped. Strength sessions stay out: log lifts in Strength.")
         }
         .background(
             Color.clear.fileImporter(
