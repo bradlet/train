@@ -14,6 +14,7 @@ import GoogleSignIn
 
 @main
 struct TrainApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     var sharedModelContainer: ModelContainer = Self.makeContainerForLaunch()
 
     /// Shared on-device coach instance. Uses MLX-Swift to run Gemma 4 E2B
@@ -28,7 +29,12 @@ struct TrainApp: App {
 
     /// Shared HealthKit import service. Backed by a real `HKHealthStore`,
     /// used by the History tab's "Import from Apple Health" flow.
-    private let healthKitImport: HealthKitImportService = LiveHealthKitImportService()
+    private let healthKitImport: HealthKitImportService
+
+    /// Notifies about new Apple Health workouts, Garmin's included (#37).
+    @State private var healthWatcher: HealthWorkoutWatcher
+    /// Carries a tapped new-workout notification to the import sheet.
+    @State private var healthImportRouter = HealthImportRouter.shared
 
     /// The Google Sheets target. When the GoogleSignIn SPM package is not
     /// installed, the live API is a throwing stub and connecting surfaces
@@ -57,6 +63,29 @@ struct TrainApp: App {
     private let coachSpeech: CoachSpeechService = Self.makeSpeechForLaunch()
 
     init() {
+        let isUITest = CommandLine.arguments.contains("-uiTestSeed")
+        let health = LiveHealthKitImportService()
+        healthKitImport = health
+        // UI tests never touch HealthKit or post notifications; with
+        // `-uiTestGarminConnected` the stub reports Garmin Connect in Health.
+        let watcher: HealthWorkoutWatcher
+        if isUITest {
+            let suite = "uiTest.healthWatcher"
+            UserDefaults().removePersistentDomain(forName: suite)
+            let garmin = CommandLine.arguments.contains(UITestFixtures.garminConnectedArgument)
+            watcher = HealthWorkoutWatcher(
+                observer: StubHealthWorkoutObserver(
+                    authorized: garmin,
+                    sourceBundleIDs: garmin ? ["com.garmin.connect.mobile"] : []
+                ),
+                notifier: StubNewWorkoutNotifier(),
+                defaults: UserDefaults(suiteName: suite) ?? .standard
+            )
+        } else {
+            watcher = HealthWorkoutWatcher(observer: health, notifier: LiveNewWorkoutNotifier())
+        }
+        _healthWatcher = State(initialValue: watcher)
+
         let sheets = GoogleSheetsTarget(api: LiveGoogleSheetsAPI())
         _googleSheets = State(initialValue: sheets)
         // UI tests get a throwaway bookmark store so a folder picked on the
@@ -79,6 +108,12 @@ struct TrainApp: App {
                 UITestFixtures.seedChartHistory(into: sharedModelContainer)
             }
         }
+
+        // Start watching at launch, not from a view: when iOS relaunches
+        // Train in the background for a new workout, no scene connects, but
+        // the observer query must be running to receive it.
+        let container = sharedModelContainer
+        Task { await watcher.start(container: container) }
     }
 
     var body: some Scene {
@@ -89,6 +124,7 @@ struct TrainApp: App {
                 .environment(\.googleSheets, googleSheets)
                 .environment(\.csvAutoExport, csvAutoExport)
                 .environment(\.syncEngine, syncEngine)
+                .environment(\.healthWatcher, healthWatcher)
                 .environment(\.coachChat, coachChat)
                 .environment(\.coachSpeech, coachSpeech)
                 .environment(\.coachLauncher, coachLauncher)
@@ -99,6 +135,9 @@ struct TrainApp: App {
                 }
                 .sheet(item: $sharedFITImport) { request in
                     ImportFITSheet(request: request)
+                }
+                .sheet(item: $healthImportRouter.pending) { request in
+                    ImportHealthKitSheet(preselected: request.workoutIDs)
                 }
                 .onOpenURL { url in
                     // A FIT activity shared or opened from Files (#22).

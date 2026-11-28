@@ -28,4 +28,18 @@ struct HealthKitWorkout: Sendable, Equatable, Identifiable {
     /// Total distance in miles, or `nil` for activity types that don't
     /// report distance (e.g. elliptical, strength, "other").
     let distanceMiles: Double?
+    /// Bundle ID of the app that saved the workout to Health (e.g.
+    /// `com.garmin.connect.mobile`), or `nil` when unknown. Tells a Garmin
+    /// activity synced through Garmin Connect apart from an Apple Watch one.
+    var sourceBundleID: String? = nil
+
+    /// Whether Garmin Connect saved this workout (#37).
+    var isFromGarmin: Bool { HealthKitWorkout.isGarmin(bundleID: sourceBundleID) }
+
+    /// Whether a Health source bundle ID belongs to Garmin
+    /// (`com.garmin.connect.mobile` and its variants).
+    /// - Parameter bundleID: The source's bundle identifier.
+    static func isGarmin(bundleID: String?) -> Bool {
+        bundleID?.lowercased().contains("garmin") ?? false
+    }
 }

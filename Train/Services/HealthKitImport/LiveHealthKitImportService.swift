@@ -20,7 +20,9 @@ import HealthKit
 /// by `MLXAICoachService`.
 final class LiveHealthKitImportService: HealthKitImportService, @unchecked Sendable {
 
-    private let store = HKHealthStore()
+    let store = HKHealthStore()
+    /// The new-workout observer query, when watching (#37).
+    let observer = HealthObserverBox()
 
     func requestAuthorization() async throws {
         guard HKHealthStore.isHealthDataAvailable() else {
@@ -62,19 +64,22 @@ final class LiveHealthKitImportService: HealthKitImportService, @unchecked Senda
                     return
                 }
                 let workouts = (samples as? [HKWorkout]) ?? []
-                let dtos = workouts.map { workout -> HealthKitWorkout in
-                    let miles = workout.totalDistance?.doubleValue(for: .mile())
-                    return HealthKitWorkout(
-                        id: workout.uuid.uuidString,
-                        activityType: workout.workoutActivityType,
-                        startDate: workout.startDate,
-                        duration: workout.duration,
-                        distanceMiles: miles
-                    )
-                }
+                let dtos = workouts.map(Self.dto)
                 continuation.resume(returning: dtos)
             }
             self.store.execute(query)
         }
+    }
+
+    /// The DTO for a HealthKit workout, including the app that saved it.
+    static func dto(_ workout: HKWorkout) -> HealthKitWorkout {
+        HealthKitWorkout(
+            id: workout.uuid.uuidString,
+            activityType: workout.workoutActivityType,
+            startDate: workout.startDate,
+            duration: workout.duration,
+            distanceMiles: workout.totalDistance?.doubleValue(for: .mile()),
+            sourceBundleID: workout.sourceRevision.source.bundleIdentifier
+        )
     }
 }

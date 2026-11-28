@@ -40,6 +40,20 @@ enum HealthKitWorkoutMapper {
         }
     }
 
+    /// Activity types that aren't cardio: strength, and mobility or
+    /// mind-body sessions. Health only knows them as "45 min", so they never
+    /// prompt a new-workout notification (#37); lifts are logged in Strength.
+    static let nonCardioTypes: Set<HKWorkoutActivityType> = [
+        .traditionalStrengthTraining, .functionalStrengthTraining, .coreTraining,
+        .yoga, .flexibility, .mindAndBody, .pilates, .taiChi, .cooldown, .preparationAndRecovery
+    ]
+
+    /// Whether a Health activity type is cardio.
+    /// - Parameter activityType: The raw activity type from `HKWorkout`.
+    static func isCardio(_ activityType: HKWorkoutActivityType) -> Bool {
+        !nonCardioTypes.contains(activityType)
+    }
+
     /// Converts a `HealthKitWorkout` DTO into an interchange record whose
     /// `externalID` is the HealthKit UUID, so a repeat import is recognised.
     /// - Parameters:
@@ -55,7 +69,8 @@ enum HealthKitWorkoutMapper {
         let type = exerciseType(for: dto.activityType)
         return TrainingRecord.Cardio(
             externalID: dto.id,
-            source: WorkoutSource.appleHealth.rawValue,
+            // A Garmin activity synced through Health keeps its origin.
+            source: (dto.isFromGarmin ? WorkoutSource.garmin : WorkoutSource.appleHealth).rawValue,
             date: dto.startDate,
             name: type.rawValue,
             type: type,

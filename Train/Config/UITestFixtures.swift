@@ -138,6 +138,11 @@ enum UITestFixtures {
     /// the Progress charts' 1Y and All scales (#31).
     static let chartHistoryArgument = "-uiTestChartHistory"
 
+    /// Launch argument (with `-uiTestSeed`) under which the stub Health
+    /// watcher reports Apple Health connected and Garmin Connect writing to
+    /// it, so Connections shows Garmin as connected (#37).
+    static let garminConnectedArgument = "-uiTestGarminConnected"
+
     /// Adds about 20 months of older runs — weekly, with a five-week break
     /// and a run of unrated weeks — before the standard 25 days, so the long
     /// chart scales have data to bucket, gaps to break on and months to label.

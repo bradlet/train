@@ -9,6 +9,10 @@
 //  shown as imported and can't be picked again. The selection is committed
 //  through `TrainingImporter`, which logs it for Undo.
 //
+//  A tapped new-workout notification (#37) opens it with those workouts
+//  ticked (`preselected`). The first time it gets Health access, it starts
+//  `HealthWorkoutWatcher`, which then asks for notification permission.
+//
 
 import SwiftUI
 import SwiftData
@@ -19,6 +23,9 @@ private let importLookbackDays: TimeInterval = 30
 /// Sheet that lists recent Apple Health workouts and lets the user import
 /// selected ones into the app's SwiftData store.
 struct ImportHealthKitSheet: View {
+    /// HealthKit UUIDs to tick on load, from a notification.
+    var preselected: Set<String> = []
+
     @Environment(\.healthKitImport) private var service
     @Environment(\.modelContext) private var modelContext
     @Environment(\.trainingExcludedTypes) private var trainingExcludedTypes
@@ -26,6 +33,7 @@ struct ImportHealthKitSheet: View {
     @Environment(\.useMetricUnits) private var useMetricUnits
     @Environment(\.dismiss) private var dismiss
     @Environment(\.syncEngine) private var syncEngine
+    @Environment(\.healthWatcher) private var healthWatcher
 
     @State private var loadState: LoadState = .loading
     @State private var selection = Set<String>()
@@ -143,10 +151,23 @@ struct ImportHealthKitSheet: View {
                 return nil
             }
             alreadyImported = TrainingImporter.knownIDs(in: modelContext)
+            selection = Self.initialSelection(preselected, available: workouts.compactMap(\.externalID), imported: alreadyImported)
             loadState = workouts.isEmpty ? .empty : .loaded(workouts)
+            // Health is connected now; start new-workout notifications.
+            await healthWatcher.start(container: modelContext.container)
         } catch {
             loadState = .error(error.localizedDescription)
         }
+    }
+
+    /// The workouts ticked on load: the notified ones that are listed and
+    /// not already in Train.
+    /// - Parameters:
+    ///   - preselected: HealthKit UUIDs from the notification.
+    ///   - available: UUIDs in the loaded list.
+    ///   - imported: Anchors already in Train.
+    static func initialSelection(_ preselected: Set<String>, available: [String], imported: Set<String>) -> Set<String> {
+        preselected.intersection(available).subtracting(imported)
     }
 
     /// Imports the selected workouts through `TrainingImporter`, which skips
