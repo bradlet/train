@@ -134,7 +134,7 @@ flowchart LR
 - **`externalID` dedupes imports, nothing else.** It is the source's ID (HealthKit UUID, later a Garmin activity ID), or the app's own UUID for records made here. An import skips any record whose anchor is already present (`Exercise.id`, `Workout.externalID`, `StrengthRecord.id` or `StrengthRecord.externalID`), and the Health picker shows those records as imported. Exports never merge by it: Sheets is overwrite-only.
 - **Every import goes through `TrainingImporter`** so it is logged and can be undone. The rows it creates carry `importBatchID`. Undo deletes exactly those rows, plus any lift the import created that is left with no records and no board card.
 - **Sync is driven by saves, not call sites.** `SyncEngine` listens for `ModelContext.didSave` touching `Exercise`, `StrengthRecord` or `StrengthLift`. Batch flows (imports, Undo, retry, connect) call `syncNow()` so the mirror updates at once. Keep the `syncNow()` / `performSync()` split: the debounce task calls `performSync()` directly, because routing it through `syncNow()` would cancel the in-flight upload.
-- **Apple Health import stays manual.** It never runs in the background.
+- **Apple Health import is always confirmed.** Train notifies about new workouts (below), but only the athlete's tap on Import brings them in.
 - **Status is one model.** `ConnectionStatus` is `disconnected`, `connected(lastSync)`, `syncing` or `needsAttention(reason, action)`, where the action is `signIn` or `retry`. The Settings gear's dot reads every auto-export target through `SettingsBadge.forConnections`.
 
 ## CSV column reference
@@ -183,8 +183,8 @@ A cardio header **without** a `date` column is read positionally in the order ab
 
 - **Google Sheets:** status, Open Sheet, turn on/off, sign in or retry.
 - **CSV:** export the pair, import any mix of files, and auto-export to a folder.
-- **Apple Health:** last import, and Import now.
-- **Garmin:** the Garmin Connect → Apple Health route until FIT import (#22).
+- **Apple Health:** last import, Import now, and the new-workout notification switch.
+- **Garmin:** FIT import, and once Garmin Connect writes to Health, "Connected through Apple Health" with its own notification switch.
 
 Below the cards, **Import History** lists recent imports, each with Undo. A target in `needsAttention` puts one banner on Home. Dismissing it holds until the same target fails for a different reason. The Settings gear and the Connections row carry the status dot. Cardio → Progress and Strength → Progress each have a toolbar export for their own file.
 
@@ -194,6 +194,32 @@ Phase 1 is **FIT file import**: no account, no approval, and it works offline. T
 
 - `FITDecoder` is a pure decoder for single-value numeric fields. It handles normal and compressed-timestamp headers, both byte orders, developer fields (skipped), invalid sentinels and chained files. It does not check the CRC.
 - `FITActivityMapper` turns each `session` message (18) into a cardio record. Duration is `total_timer_time` (moving time), distance is `total_distance`, and the anchor is `fit:<serial>:<time_created>:<session index>`, so re-importing a file adds nothing. Every kind of running maps to plain Run. Key and inclusion come from the athlete's defaults and are never inferred. Strength-training sessions are left out and counted (#36 tracks importing their sets), and so are transitions.
-- The zero-effort route is still Garmin Connect → Apple Health → Health import. The two routes don't recognise each other's anchors, so import an activity through one route only.
+- The zero-effort route is Garmin Connect → Apple Health, with a notification after each activity (see below). The two routes don't recognise each other's anchors, so import an activity through one route only.
 
-Phase 2, automatic import through Garmin's APIs, is #35.
+Train doesn't call Garmin's APIs (#35, closed). The Activity API is server-to-server, needs a legal entity's approved application, and approvals are paused. The October 2026 personal API key only covers apps the key holder runs themselves. Train has no backend, so Garmin data comes through Apple Health or FIT files.
+
+## New-workout notifications (#37)
+
+When any app saves a cardio workout to Apple Health (an Apple Watch, or Garmin Connect syncing a Garmin activity), Train posts a notification. Tapping it opens the Apple Health import sheet with that workout ticked. Nothing imports until the athlete confirms.
+
+```mermaid
+sequenceDiagram
+    participant G as Garmin Connect / Apple Watch
+    participant H as Apple Health
+    participant W as HealthWorkoutWatcher
+    participant N as Notification
+    participant S as ImportHealthKitSheet
+    G->>H: saves a workout
+    H->>W: HKObserverQuery (background delivery)
+    W->>H: anchored fetch since the last anchor
+    W->>W: cardio, recent (48 h), not in Train, switch on
+    W->>N: one notification for what's left
+    N->>S: tap (HealthImportRouter), workouts ticked
+    S->>S: athlete confirms → TrainingImporter
+```
+
+- **On by default, once Apple Health is connected.** The watcher starts from `TrainApp.init` (so a background relaunch has its observer), but only after Health access was requested. It never prompts for Health itself. The first run with Health connected asks for notification permission, and the first fetch only records the anchor, so history never notifies.
+- **Garmin is detected, not signed in.** Every Health workout names the app that saved it. A Garmin Connect source marks Garmin connected (`HKSourceQuery` at launch, or the first Garmin workout), and the Garmin card then shows "Connected through Apple Health". Garmin activities keep `WorkoutSource.garmin` on import.
+- **Two switches, both on by default:** Apple Health ("new workouts", every non-Garmin source) and Garmin ("new activities"), so Garmin notifications start the moment Garmin is connected. They and the anchor live in this device's `UserDefaults`, never in the synced `AppConfiguration`.
+- **Cardio only.** Strength and mobility sessions (`HealthKitWorkoutMapper.nonCardioTypes`) never notify.
+- The pieces: `HealthWorkoutObserving` (live on `LiveHealthKitImportService`, `StubHealthWorkoutObserver` for tests), `NewWorkoutNotifying` (`LiveNewWorkoutNotifier` over `UNUserNotificationCenter`), `NewWorkoutNotification` (pure content), `HealthWorkoutWatcher` (`@Environment(\.healthWatcher)`), and `AppDelegate`, which routes taps to `HealthImportRouter`. The entitlement is `com.apple.developer.healthkit.background-delivery`. UI tests pass `-uiTestGarminConnected` to show the connected Garmin card.

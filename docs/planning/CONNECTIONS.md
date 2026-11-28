@@ -57,7 +57,7 @@ flowchart LR
 ### Garmin import
 
 - **Phase 1: FIT file import.** No approval is needed and it works offline. The athlete exports an activity's original FIT from Garmin Connect, or shares it into the app, and a FIT codec maps it to a `TrainingRecord`. Phase 1 also points athletes to the zero-effort route, because Garmin Connect can already write activities to Apple Health, which we already import.
-- **Phase 2: Garmin Connect Developer Program (Activity API).** This needs an approved program application ([Activity API](https://developer.garmin.com/gc-developer-program/activity-api/)). It uses OAuth 2 PKCE and largely assumes a backend receiving data, which the app does not have. Garmin's [personal API](https://the5krunner.com/2026/10/22/garmin-personal-api/) (October 2026) may offer a lighter path, so re-evaluate it before building.
+- **Phase 2: evaluated and not pursued (#35, 2026-11-27).** The [Activity API](https://developer.garmin.com/gc-developer-program/activity-api/) is server-to-server push to a backend, requires a legal entity's approved application, and [new approvals are paused](https://the5krunner.com/2026/09/14/garmin-developer-api-access-paused/). Garmin's [personal API key](https://the5krunner.com/2026/10/22/garmin-personal-api/) (October 2026) is limited to apps the key holder builds and runs, not multi-user apps. Train has no backend and is free, so Garmin data comes through Apple Health, which Garmin Connect already writes to, with a notification after each activity (#37). Revisit only if Garmin opens a client-side, multi-user path.
 
 ## Connections dashboard (UX)
 
@@ -83,6 +83,7 @@ IMPORT HISTORY   Nov 20 · 3 workouts from Health   [Undo]
 ## Decisions (2026-11-27)
 
 1. **Sheets stays overwrite-only.** The app is the source of truth and the sheet is a mirror with one Cardio tab and one Strength tab. The set-up copy says plainly that edits made in the sheet are wiped on the next sync. `externalID` is never used to merge into the sheet. It exists only to stop the same activity being imported, or shown as importable, twice (Apple Health, Garmin, and re-imported CSVs).
-2. **Apple Health import stays manual** ("Import now"). It never runs in the background. Workouts already imported show as imported in the picker instead of offering themselves again.
+2. **Apple Health import stays confirmed by the athlete.** Workouts already imported show as imported in the picker instead of offering themselves again. *Updated by #37:* Train now watches Health in the background, but only to **notify**. A new cardio workout (Apple Watch, or Garmin via Garmin Connect) posts a notification that opens the picker with it ticked. It's on by default once Health is connected, with a separate Garmin switch that is also on by default.
+5. **Garmin is cardio only (#36, closed).** Garmin strength sets are not imported; lifts are logged in Strength.
 3. **CSV is two files read by header name.** Export writes `train-cardio-<date>.csv` and `train-strength-<date>.csv`. Import detects each file's kind from its header and reads columns by name, so a missing column takes its default and an unknown column is ignored. There is no version line. A cardio file whose header has no `date` column falls back to the legacy fixed column order.
 4. **#21 builds the full layer:** `TrainingRecord`, the codecs, the `ConnectionTarget` protocols, `SyncEngine` and the import log with Undo. CSV *auto*-export, as a second auto target, arrives with the dashboard (#23).
